@@ -1,0 +1,51 @@
+name: Publish Windows 1.2.14
+on:
+  push:
+    branches: [main]
+    paths: ['release-staging/v1.2.14/**', '.github/workflows/publish-1.2.14.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: signed-windows-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore and verify signed release
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess, shutil
+          stage=Path('release-staging/v1.2.14')
+          exe=Path('channel/Litakova-Komisiia-PC.exe')
+          expected='6863bb5eed4a1e4fe124472761653b3afb710e7d26a0fe0a8627cfa3a739a40b'
+          actual=hashlib.sha256(exe.read_bytes()).hexdigest()
+          if actual!=expected:
+              assert actual=='bedbbb24ce2f5566997452078491a1baa9cfc624cd491e8e5c459241c4646709', 'Unexpected base EXE'
+              subprocess.run(['git','apply','--check',str(stage/'windows.patch')],check=True)
+              subprocess.run(['git','apply',str(stage/'windows.patch')],check=True)
+          assert hashlib.sha256(exe.read_bytes()).hexdigest()==expected
+          for name in ['updates.txt','index.html']:
+              shutil.copyfile(stage/name,Path('channel')/name)
+          shutil.copyfile(stage/'release-notes.md','release-notes.md')
+          PY
+          python3 release-tools/github_release.py channel --verify-only
+          python3 -m unittest discover -s release-tools/tests -p 'test_*.py'
+      - name: Store verified release in repository
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add channel/Litakova-Komisiia-PC.exe channel/updates.txt channel/index.html release-notes.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish verified Windows 1.2.14 / 137'
+            git push origin HEAD:main
+          fi
+      - name: Upload verify and publish latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 release-tools/github_release.py channel
+
