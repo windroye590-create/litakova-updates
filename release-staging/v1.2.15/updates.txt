@@ -1,0 +1,13 @@
+LKUPDATE1
+Gq+GWwoIVtQ9n94MlMesk/9M7zBvjRDlMp/S9aO8XcqQAVJt1R8yFVFl6gg9F+7zMoX26ZMU37Yw2QxknZgj9SFUmIoH2tZch25x+ZWGbl8FaRTUOrs8Q5xsbsw5bLkN8rbUypT4my2P84OiOdEqScwz7jOP9/ZSq/lHhfeStKPPtGD1Bq5IH9WARSEhW3DCehGFkhhiC1dybjNKFNu4IE9UEsELM+OAiCwR7YdyPRL4uvGt8UgO3x/7aApc+T+fXgtIKBNF//Tf1uaAOmm+Avxlu5E0Z+vzLObWWXg8mCVIZUowZCjuFXbduUAfEMyW5MuH+GEQYIiiESzIzXngHhUcODYVzVRQIMX1LCWHbeBXzcc6BCBGIboiKt/T+i2pkWHvSMWocNiKrGeIWzBrS/i5fUPaHamMnvMgS7N0vO7hqg1a0ZAP1tbQALWKVZMA+8mf6HXfftIAJhjqGC6UbVuT5QxV4509vv+TFhKSwTaO3yQ3GpgOX5pz1XpG5vMZ
+schema=1
+android.code=70
+android.name=3.2.3
+android.file=Litakova-Komisiia-3.2.3.apk
+android.size=14938750
+android.sha256=81abe0da7f255ae2b262360d76801ea1e63653504c58981fe3d3596579b1a05d
+windows.code=138
+windows.name=1.2.15
+windows.file=Litakova-Komisiia-PC.exe
+windows.size=9647719
+windows.sha256=adaf992ca21a3eaefcb650217f000f1276d178a71ace5fa682a38ec8efeea4bd
