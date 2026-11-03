@@ -1,0 +1,8 @@
+{
+  "version": "1.2.18",
+  "versionCode": 141,
+  "candidateSHA256": "936f9f69e8862f2143edc84528f5ddfdbe666ad597df00b87ce47e8b7b08f31b",
+  "baseSHA256": "fe184e32251331adb8409898167cfecf6d11a3ce985e68179c41f26177995285",
+  "bytes": 9776682,
+  "purpose": "Verify the exact Windows 1.2.18 candidate before the user-authorized auto-update release"
+}

@@ -1,0 +1,49 @@
+name: Verify private Windows storage 1.2.18
+on:
+  push:
+    branches: [verify-storage-1.2.18]
+    paths: ['ci/private-storage-1.2.18/**', '.github/workflows/verify-private-storage-1.2.18.yml']
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore exact test candidate
+        run: python3 ci/private-storage-1.2.18/restore_candidate.py
+      - name: Exercise packaged legacy and private UI paths in Chromium
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os,shutil,subprocess
+          stage=Path('ci/private-storage-1.2.18').resolve()
+          ci=Path(os.environ['RUNNER_TEMP'])/'lk-private-browser'
+          shutil.copytree(stage/'tests',ci/'tests',dirs_exist_ok=True)
+          (ci/'verification').mkdir(parents=True,exist_ok=True)
+          (ci/'package.json').write_text(json.dumps({'name':'litakova-private-ci','private':True,'type':'module','version':'1.2.18','versionCode':141,'dependencies':{'playwright':'1.62.1'}}))
+          exe=Path('channel/Litakova-Komisiia-PC.exe').resolve()
+          metadata=stage/'assets.json'
+          subprocess.run(['npm','install','--prefix',str(ci),'--ignore-scripts','--no-audit','--no-fund'],check=True)
+          chrome=shutil.which('google-chrome') or shutil.which('chromium') or shutil.which('chromium-browser')
+          assert chrome,'Actual Chromium is required'
+          env={**os.environ,'CHROMIUM_PATH':chrome,'PACKED_EXE':str(exe),'PACKED_METADATA':str(metadata)}
+          subprocess.run(['node',str(ci/'tests/packaged-startup.mjs')],check=True,env=env)
+          subprocess.run(['node',str(ci/'tests/private-storage-ui.mjs')],check=True,env=env)
+          for name in ['packaged-startup.json','private-storage-ui.json']:
+              print((ci/'verification'/name).read_text())
+          PY
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore exact test candidate
+        shell: bash
+        run: python ci/private-storage-1.2.18/restore_candidate.py
+      - name: Exercise actual Windows CNG, DPAPI, backups and account boundaries
+        shell: bash
+        run: python ci/private-storage-1.2.18/tests/windows-private-storage.py channel/Litakova-Komisiia-PC.exe
