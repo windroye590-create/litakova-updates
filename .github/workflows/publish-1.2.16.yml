@@ -22,7 +22,7 @@ jobs:
           import hashlib, subprocess, shutil, os
           stage=Path('release-staging/v1.2.16')
           exe=Path('channel/Litakova-Komisiia-PC.exe')
-          expected='e72d45e443fd757e823fcced5b81011aab6a622cb03efad2e48681a724414ed9'
+          expected='25c9901a0af12146510182c9bf1085381bbe9e5fdc97ed7fd79a1407ea225540'
           actual=hashlib.sha256(exe.read_bytes()).hexdigest()
           if actual!=expected:
               assert actual=='adaf992ca21a3eaefcb650217f000f1276d178a71ace5fa682a38ec8efeea4bd', 'Unexpected base EXE'
@@ -41,13 +41,16 @@ jobs:
         run: |
           python3 - <<'PY_CI'
           from pathlib import Path
-          import base64, json, os, shutil, subprocess, zipfile, io
+          import json, os, shutil, subprocess
           stage=Path('release-staging/v1.2.16')
           ci=Path(os.environ['RUNNER_TEMP'])/'lk-packaged-startup'
           ci.mkdir()
-          with zipfile.ZipFile(io.BytesIO(base64.b64decode((stage/'packaged-tests.zip.b64').read_text(),validate=False))) as z:
-              assert all(not Path(n).is_absolute() and '..' not in Path(n).parts for n in z.namelist())
-              z.extractall(ci)
+          (ci/'tests').mkdir()
+          for name in ['packed_image.py','packaged-startup.mjs']:
+              shutil.copyfile(stage/name,ci/'tests'/name)
+          for name in ['assets-1.2.15.json','assets-1.2.16.json']:
+              shutil.copyfile(stage/name,ci/name)
+          (ci/'package.json').write_text(json.dumps({'name':'litakova-public-startup-smoke','private':True,'type':'module','dependencies':{'playwright':'1.62.1'}}))
           exe=Path('channel/Litakova-Komisiia-PC.exe').resolve()
           subprocess.run(['python3',str(ci/'tests/packed_image.py'),str(exe),'--root',str(ci),'--metadata',str(ci/'assets-1.2.16.json'),'--output',str(ci/'web'),'--check'],check=True)
           (ci/'web/manifest.json').unlink()
