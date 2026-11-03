@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "passed": 12,
+  "checks": [
+    "A thousand distinct invalid logins fill the bounded store",
+    "The next new login evicts the oldest bucket instead of globally throttling",
+    "Cadet and instructor can authenticate while all buckets are occupied",
+    "Repeated saturation stays bounded and fresh valid logins remain available",
+    "The oldest timestamp wins even when property enumeration is reversed",
+    "A pre-existing oversized store is reduced enough to admit one new bucket",
+    "Expired and malformed buckets are reclaimed before any active bucket",
+    "An existing account bucket still reaches eight attempts without eviction",
+    "Account cooldown survives cache loss and expires normally at capacity",
+    "A busy script lock rejects without evicting data or consuming a challenge",
+    "Eviction failure releases the script lock and cannot authenticate a bad proof",
+    "Saturation and eviction leave accounts, results and unrelated properties unchanged"
+  ],
+  "realServerSource": true,
+  "syntheticDataOnly": true,
+  "productionRequests": false,
+  "physicalWindowsRuntimeVerified": false,
+  "serverBuild": "pc-1.2.16-login-capacity",
+  "apiVersion": 20,
+  "fullNpmTest": "passed",
+  "productionActivated": true,
+  "exeChanged": false,
+  "serverSHA256": "5ad25e5fdf8f7d535c08e59dbbb900de4cabe1f9da636aae582913990eecc387",
+  "deploymentVersion": 30,
+  "publicHealthVerified": true,
+  "productionHealthRequests": 1,
+  "productionLoadTestRequests": 0
+}
