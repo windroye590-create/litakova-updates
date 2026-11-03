@@ -8,7 +8,7 @@ with tempfile.TemporaryDirectory(prefix='lk-native-ci-') as scratch:
  # A known Windows executable substitutes only for launching a browser. It
  # never renders the app and therefore cannot make production RPC calls.
  browser=scratch/'programs/Microsoft/Edge/Application/msedge.exe';browser.parent.mkdir(parents=True)
- shutil.copyfile(pathlib.Path(os.environ['SystemRoot'])/'System32/where.exe',browser)
+ shutil.copyfile(pathlib.Path(os.environ['SystemRoot'])/'System32/whoami.exe',browser)
  env=os.environ.copy();env.update(LOCALAPPDATA=str(data),ProgramFiles=str(scratch/'programs'))
  env['ProgramFiles(x86)']=str(scratch/'programs')
  process=subprocess.Popen([str(exe)],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -49,6 +49,16 @@ with tempfile.TemporaryDirectory(prefix='lk-native-ci-') as scratch:
   assert request('/state')==state;assert request('/journal')==journal;passed('An inaccessible state path never becomes a successful empty read')
   print(json.dumps({'status':'passed','checks':checks,'passed':len(checks),'actualWindowsHostExecuted':True,'realDPAPIVerified':True,'browserRendered':False,'productionRPCRequests':0}))
  finally:
-  process.terminate()
+  # ShellExecute starts the isolated browser stub as a child. Stop this test's
+  # process tree before removing its directory; Windows locks running images.
+  if process.poll() is None:
+   subprocess.run(['taskkill','/PID',str(process.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+  if process.poll() is None:process.terminate()
   try:process.wait(timeout=10)
   except subprocess.TimeoutExpired:process.kill();process.wait()
+  until=time.monotonic()+10
+  while browser.exists():
+   try:browser.unlink()
+   except PermissionError:
+    if time.monotonic()>=until:raise
+    time.sleep(.1)
