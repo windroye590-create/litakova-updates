@@ -1,4 +1,4 @@
-name: Verify PDF repaint completion
+name: Verify standard Chromium and PDF repaint completion
 on:
   push:
     branches: [audit/2026-11-04]
@@ -15,12 +15,13 @@ jobs:
         run: python3 audit/2026-11-04/restore.py
       - name: Install isolated test dependency
         run: npm install --prefix "$RUNNER_TEMP/litakova-full-audit" --ignore-scripts --no-audit --no-fund
-      - name: Repeat complete PDF materials scenarios three times with paint synchronization
+      - name: Verify all standard suites and repeat complete PDF materials scenarios
         run: |
           cp audit/pdf-repaint-2026-11-05/materials-ui.mjs "$RUNNER_TEMP/litakova-full-audit/tests/materials-ui.mjs"
           export LITAKOVA_CHROMIUM_EXECUTABLE="$(command -v google-chrome)"
+          python3 audit/2026-11-04/run.py standard
           cd "$RUNNER_TEMP/litakova-full-audit"
-          for attempt in 1 2 3; do
+          for attempt in 2 3; do
             echo "PDF_ATTEMPT $attempt"
             node tests/materials-ui.mjs
           done
