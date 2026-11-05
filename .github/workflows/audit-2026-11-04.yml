@@ -1,0 +1,57 @@
+name: Verify audit fixes 1.2.20 / API 23
+on:
+  push:
+    branches: [audit/2026-11-04]
+    paths: ['audit/2026-11-04/**', '.github/workflows/audit-2026-11-04.yml']
+permissions:
+  contents: read
+jobs:
+  chromium:
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [standard, extended, stress]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore audited source and exact published application assets
+        run: python3 audit/2026-11-04/restore.py
+      - name: Install test dependencies
+        run: npm install --prefix "$RUNNER_TEMP/litakova-full-audit" --ignore-scripts --no-audit --no-fund
+      - name: Run every selected Chromium suite and collect failures
+        run: python3 audit/2026-11-04/run.py ${{ matrix.suite }}
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python3 audit/2026-11-04/restore.py
+      - name: Verify RSA parser and adversarial catalog vectors
+        run: |
+          cd "$RUNNER_TEMP/litakova-full-audit"
+          python3 tests/update_protocol.py
+          python3 tests/deep-native-fuzz.py
+  model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python3 audit/2026-11-04/restore.py
+      - name: Execute complete isolated server and client model checks
+        run: |
+          cd "$RUNNER_TEMP/litakova-full-audit"
+          npm test
+          for suite in account-sync exam-resume multiple-choice test-deletion materials-server updater cadet-transfer learning workspace-reliability statement instructor-tools concurrent-delivery intake-stress performance-server deep-ranking-fuzz deep-concurrency-60-42 deep-concurrency-120-271828 deep-concurrency-120-31427; do node tests/$suite.mjs; done
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python audit/2026-11-04/restore.py
+        shell: bash
+      - name: Execute actual Windows DPAPI and CNG persistence scenarios
+        run: python "$RUNNER_TEMP/litakova-full-audit/tests/windows-private-storage.py" channel/Litakova-Komisiia-PC.exe
+        shell: bash
