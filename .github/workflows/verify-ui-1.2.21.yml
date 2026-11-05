@@ -1,0 +1,52 @@
+name: Verify synchronization header 1.2.21
+on:
+  push:
+    branches: [ui/1.2.21]
+    paths: ['ui-check/v1.2.21/**', '.github/workflows/verify-ui-1.2.21.yml']
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore exact candidate
+        run: python3 ui-check/v1.2.21/restore.py
+      - name: Install browser test dependency
+        run: npm install --prefix "$RUNNER_TEMP/litakova-ui21" --ignore-scripts --no-audit --no-fund
+      - name: Verify existing interface, responsive layout, update and private storage scenarios
+        run: |
+          export CHROMIUM_PATH="$(command -v google-chrome)"
+          export LITAKOVA_CHROMIUM_EXECUTABLE="$CHROMIUM_PATH"
+          export PACKED_EXE="$GITHUB_WORKSPACE/channel/Litakova-Komisiia-PC.exe"
+          export PACKED_METADATA="$GITHUB_WORKSPACE/ui-check/v1.2.21/assets.json"
+          cd "$RUNNER_TEMP/litakova-ui21"
+          for suite in ui responsive-ui updates-ui private-storage-ui packaged-startup; do
+            echo "SUITE_START $suite"
+            node "tests/$suite.mjs"
+            echo "SUITE_PASSED $suite"
+          done
+          LITAKOVA_RESPONSIVE_VISUAL=1 node tests/responsive-ui.mjs
+      - name: Retain synthetic layout images for visual review
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: header-sync-ui21
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/litakova-ui21/verification/desktop-preview.png
+            ${{ runner.temp }}/litakova-ui21/verification/responsive-ui.json
+            ${{ runner.temp }}/tmp/responsive-*.png
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python ui-check/v1.2.21/restore.py
+        shell: bash
+      - name: Verify actual Windows host and saved login
+        run: python "$RUNNER_TEMP/litakova-ui21/tests/windows-private-storage.py" channel/Litakova-Komisiia-PC.exe
+        shell: bash
