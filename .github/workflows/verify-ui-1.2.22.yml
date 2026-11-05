@@ -1,0 +1,61 @@
+name: Verify menu status 1.2.22
+on:
+  push:
+    branches: [ui/1.2.22]
+    paths: ['ui-check/v1.2.22/**', '.github/workflows/verify-ui-1.2.22.yml']
+permissions:
+  contents: read
+jobs:
+  browser:
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [standard, review]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python3 ui-check/v1.2.22/restore.py
+      - run: npm install --prefix "$RUNNER_TEMP/litakova-menu22" --ignore-scripts --no-audit --no-fund
+      - name: Exercise actual application and isolated server
+        env:
+          TEST_GROUP: ${{ matrix.group }}
+        run: |
+          export CHROMIUM_PATH="$(command -v google-chrome)"
+          export LITAKOVA_CHROMIUM_EXECUTABLE="$CHROMIUM_PATH"
+          export PACKED_EXE="$GITHUB_WORKSPACE/channel/Litakova-Komisiia-PC.exe"
+          export PACKED_METADATA="$GITHUB_WORKSPACE/ui-check/v1.2.22/assets.json"
+          cd "$RUNNER_TEMP/litakova-menu22"
+          if [ "$TEST_GROUP" = standard ]; then
+            suites="ui responsive-ui instructors-ui updates-ui"
+          else
+            suites="review-presence-ui test-access-intake-ui private-storage-ui packaged-startup"
+          fi
+          node tests/menu-status.mjs
+          for suite in $suites; do
+            echo "SUITE_START $suite"
+            node "tests/$suite.mjs"
+            echo "SUITE_PASSED $suite"
+          done
+          if [ "$TEST_GROUP" = standard ]; then LITAKOVA_RESPONSIVE_VISUAL=1 node tests/responsive-ui.mjs; fi
+      - name: Retain synthetic interface review images
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: menu22-${{ matrix.group }}
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/litakova-menu22/verification/desktop-preview.png
+            ${{ runner.temp }}/litakova-menu22/verification/review-presence-busy.png
+            ${{ runner.temp }}/tmp/responsive-*.png
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python ui-check/v1.2.22/restore.py
+        shell: bash
+      - run: python "$RUNNER_TEMP/litakova-menu22/tests/windows-private-storage.py" channel/Litakova-Komisiia-PC.exe
+        shell: bash
