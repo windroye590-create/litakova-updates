@@ -1,0 +1,54 @@
+name: Publish verified Windows 1.2.20
+on:
+  push:
+    branches: [main]
+    paths: ['release-staging/v1.2.20/**', '.github/workflows/publish-1.2.20.yml']
+permissions:
+  contents: read
+concurrency:
+  group: signed-windows-release
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore and validate the exact signed candidate
+        run: |
+          python3 release-staging/v1.2.20/restore_bundle.py
+          python3 release-tools/github_release.py channel --verify-only
+          python3 -m unittest discover -s release-tools/tests -p 'test_*.py'
+      - name: Require all completed audit gates and compatible active API 23
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 release-staging/v1.2.20/verify_gates.py
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore and verify release and active backend
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 release-staging/v1.2.20/restore_bundle.py
+          python3 release-tools/github_release.py channel --verify-only
+          python3 release-staging/v1.2.20/verify_gates.py
+      - name: Store verified release in repository
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add channel/Litakova-Komisiia-PC.exe channel/updates.txt channel/index.html release-notes.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish verified Windows 1.2.20 / 143'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - name: Upload, compare downloaded assets and publish latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 release-tools/github_release.py channel
