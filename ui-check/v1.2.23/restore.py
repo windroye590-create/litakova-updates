@@ -16,8 +16,10 @@ root=Path(os.environ['RUNNER_TEMP'])/'litakova-one-attempt23';root.mkdir(exist_o
 with zipfile.ZipFile(archive) as z:
  for name in z.namelist():assert (root/name).resolve().is_relative_to(root)
  z.extractall(root)
-subprocess.run(['git','apply','--check',str(stage/'source.patch')],cwd=root,check=True)
-subprocess.run(['git','apply',str(stage/'source.patch')],cwd=root,check=True)
+with tempfile.TemporaryDirectory() as tmp:
+ patch=Path(tmp)/'source.patch';patch.write_bytes((stage/'source.patch').read_bytes().replace(b'\r\n',b'\n'))
+ subprocess.run(['git','-c','core.autocrlf=false','apply','--check',str(patch)],cwd=root,check=True)
+ subprocess.run(['git','-c','core.autocrlf=false','apply',str(patch)],cwd=root,check=True)
 (root/'verification').mkdir(exist_ok=True);(root.parent/'tmp').mkdir(exist_ok=True)
 subprocess.run(['python',str(root/'tests/packed_image.py'),str(exe),'--root',str(root),'--metadata',str(stage/'assets.json'),'--output',str(root/'web'),'--check'],check=True)
 assert hashlib.sha256((root/'Code.gs').read_bytes()).hexdigest()=='3a14d1f8fef783b627af2d0cc89c52c56904a621c1b784b6aeeb0ab870acd719'

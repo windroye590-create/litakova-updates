@@ -304,7 +304,7 @@ index d86e482..be1b5ae 100644
  const parts=spreadsheet.getSheetByName('_Частини_тестів'),catalog=spreadsheet.getSheetByName('_Тести');
  await check('A valid 200-question draft above 2M characters synchronizes within the documented 2.8M limit',()=>{
 diff --git a/tests/fixtures/server_model.mjs b/tests/fixtures/server_model.mjs
-index cf2f047..07f99f4 100644
+index cf2f047..9833e54 100644
 --- a/tests/fixtures/server_model.mjs
 +++ b/tests/fixtures/server_model.mjs
 @@ -201,8 +201,8 @@ function expectCode(action, expected) {
@@ -318,7 +318,7 @@ index cf2f047..07f99f4 100644
  assert.equal(spreadsheet.getSheetByName("_Результати_дані").rows[0][2], "ПІБ",
    "Службовий заголовок має залишатися сумісним із сервером версії 3");
  const publicSpreadsheet = spreadsheets.get(properties.getProperty("PUBLIC_RESULTS_SPREADSHEET_ID"));
-@@ -343,12 +343,29 @@ const secondCadet = api("POST", "/api/register", "", {
+@@ -343,12 +343,30 @@ const secondCadet = api("POST", "/api/register", "", {
    groupId: group.id,
    ...credential("cadet2-password")
  });
@@ -330,6 +330,7 @@ index cf2f047..07f99f4 100644
 -assert.equal(api("GET", "/api/tests", cadetLogin.token).tests.some((item) => String(item.id) === String(retry.test.id)), true);
 +// Simulate records created by an older server; no production data is used.
 +function seedLegacyRetry(source, userId, resultId, completedToken = '') {
++  source=context.getTestById_(source.id)||source;
 +  const seeded = api('POST', '/api/instructor/tests', instructorToken, {
 +    title: String(source.title).slice(0,150) + ' — повторна спроба',
 +    description: String(source.description || ''), mode: source.mode,
@@ -354,7 +355,7 @@ index cf2f047..07f99f4 100644
  
  const secondChallenge = api("POST", "/api/challenge", "", {username: "cadet2", groupName: "Лелека-100"});
  const secondDerived = crypto.pbkdf2Sync("cadet2-password", Buffer.from(secondChallenge.salt, "base64"), 120000, 32, "sha256");
-@@ -359,16 +376,8 @@ const secondCadetLogin = api("POST", "/api/login", "", {
+@@ -359,16 +377,8 @@ const secondCadetLogin = api("POST", "/api/login", "", {
  assert.equal(api("GET", "/api/tests", secondCadetLogin.token).tests.some((item) => String(item.id) === String(retry.test.id)), false,
    "Персональний повтор не повинен бути доступний іншому курсанту");
  
@@ -373,7 +374,7 @@ index cf2f047..07f99f4 100644
  
  const replacement = api("POST", `/api/instructor/tests/${test.id}/replace`, instructorToken, {
    title: "Контрольний тест — оновлений",
-@@ -413,7 +422,7 @@ assert.ok(audit.some((entry) => entry.action === "CADET_PASSWORD"));
+@@ -413,7 +423,7 @@ assert.ok(audit.some((entry) => entry.action === "CADET_PASSWORD"));
  assert.equal(api("DELETE", `/api/instructor/question-bank/${bankQuestion.id}`, instructorToken).deleted, true);
  assert.equal(api("GET", "/api/instructor/question-bank", instructorToken).questions.length, 0);
  
@@ -382,7 +383,7 @@ index cf2f047..07f99f4 100644
  
  const failures = [];
  let regressionCount = 0;
-@@ -465,25 +474,14 @@ regression("Blank test rows do not change which questions are fetched", () => {
+@@ -465,25 +475,14 @@ regression("Blank test rows do not change which questions are fetched", () => {
    } finally { sheet.rows.splice(1, 1); }
  });
  
@@ -416,7 +417,7 @@ index cf2f047..07f99f4 100644
  });
  
  regression("An analytics write failure cannot reject a saved result", () => {
-@@ -543,27 +541,22 @@ regression("User-defined group names do not collide with object properties", ()
+@@ -543,27 +542,22 @@ regression("User-defined group names do not collide with object properties", ()
    assert.equal(stats.passRate, 100);
  });
  
@@ -457,7 +458,7 @@ index cf2f047..07f99f4 100644
  });
  
  regression("Primary result key remains idempotent when the sync ledger fails", () => {
-@@ -688,15 +681,15 @@ regression("Direct exam submission requires a server-owned timed attempt", () =>
+@@ -688,15 +682,15 @@ regression("Direct exam submission requires a server-owned timed attempt", () =>
  });
  
  regression("Release announcement rejects unsafe URLs and stale stored versions", () => {
@@ -478,7 +479,7 @@ index cf2f047..07f99f4 100644
    assert.equal(info.downloadUrl, "https://example.invalid/Litakova-Komisiia-PC.exe");
  });
  
-@@ -820,7 +813,7 @@ regression('Full deletion clears both groups without touching same-name cadets o
+@@ -820,7 +814,7 @@ regression('Full deletion clears both groups without touching same-name cadets o
    const aResult=api('POST','/api/results',a.token,regressionBody(test,'delete-result-a')).result;
    const bResult=api('POST','/api/results',b.token,regressionBody(test,'delete-result-b')).result;
    const keepResult=api('POST','/api/results',keep.token,regressionBody(test,'delete-keep')).result;
@@ -487,7 +488,7 @@ index cf2f047..07f99f4 100644
    // A corrupt legacy retry link must not cause a shared test to be deleted.
    spreadsheet.getSheetByName('_Повторні_спроби').appendRow([aResult.id,a.user.id,test.id,test.id,new Date(),true]);
    spreadsheet.getSheetByName('_Результати').appendRow(['legacy-a','old-device','1',String(aResult.id),a.user.id,a.user.fullName,a.user.groupName,test.id,test.title,100,1,1,true,17,new Date(),new Date()]);
-@@ -897,4 +890,4 @@ if (failures.length) {
+@@ -897,4 +891,4 @@ if (failures.length) {
  }
  console.log(`Server regression checks passed: ${regressionCount}/${regressionCount}.`);
  
