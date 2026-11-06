@@ -1,0 +1,735 @@
+diff --git a/Code.gs b/Code.gs
+index 8aa08f3..533c59c 100644
+--- a/Code.gs
++++ b/Code.gs
+@@ -1,6 +1,6 @@
+ /**
+  * Літакова Комісія — безкоштовний хмарний сервер Google Apps Script.
+- * API v23. Перевірка цілісності тестів, входу та синхронізації.
++ * API v24. Одна спроба тесту; повторні проходження вимкнено.
+  *
+  * Для першого налаштування комісії запустіть setupCommission() один раз.
+  * Для оновлення чинної комісії достатньо зберегти код і створити нову
+@@ -8,15 +8,15 @@
+  */
+ 
+ const SPREADSHEET_ID = '1acfLVVoxCYs75ruUgTEIvwBLgb072QVz1MgEIW2b1sI';
+-const API_VERSION = 23;
++const API_VERSION = 24;
+ const PUBLIC_SYNC_COLUMN = 27;
+ const PUBLIC_SYNC_CACHE = 'LK_PUBLIC_SYNC_SUMMARY_V1';
+ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
+ const PUBLIC_SYNC_DELAY_MS = 30000;
+ const REVIEW_LEASE_MS = 120000;
+ const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
+-const LATEST_APP_VERSION_CODE = 143;
+-const LATEST_APP_VERSION_NAME = '1.2.20';
++const LATEST_APP_VERSION_CODE = 146;
++const LATEST_APP_VERSION_NAME = '1.2.23';
+ const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
+ const ROLE_INSTRUCTOR = 'instructor';
+ const ROLE_CADET = 'cadet';
+@@ -106,7 +106,8 @@ function doGet() {
+     ok: true,
+     service: 'Літакова Комісія',
+     version: API_VERSION,
+-    serverBuild: 'pc-1.2.20-audit-reliability',
++    serverBuild: 'pc-1.2.23-single-attempt',
++    singleAttempt: true,
+     privateLocalStorage: true,
+     trainingResume: true,
+     publicTableSync: true,
+@@ -315,6 +316,7 @@ function startTraining_(user,id,body,choiceProtocol) {
+     requireChoiceProtocol_(test,choiceProtocol);
+     test=sanitizeTestForCadet_(attachTestAccess_(test,user));
+   }else test=getTestForUser_(id,user,1,choiceProtocol);
++  requireSingleAttemptTest_(test);
+   if(test.mode!=='training')fail_('Іспит потрібно починати через збережену серверну спробу.','EXAM_SESSION_REQUIRED');
+   if(findResultRecord_(user.id,id))fail_('Цей тест уже пройдено.','ALREADY_COMPLETED');
+   if(resume)return {test:test,submissionId:body.submissionId,startPermit:body.startPermit,trainingResumeProtocol:1};
+@@ -485,7 +487,7 @@ function workspaceRevisions_(user,all) {
+ function conditionalWorkspace_(user,body) {
+   var all=body.allResults===true,known=body.known||{},before=workspaceRevisions_(user,all),props=PropertiesService.getScriptProperties();
+   var busy=props.getProperty('LK_WORKSPACE_WRITE'),changes={},out={workspaceProtocol:1,user:publicUser_(user),revisions:before,changes:changes,
+-    capabilities:{privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
++    capabilities:{singleAttempt:true,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
+   if(user.role===ROLE_INSTRUCTOR)out.intake=intakeStatus_();
+   if(known.groups!==before.groups)changes.groups=listGroups_();
+   if(known.tests!==before.tests)changes.tests=listTestsForUser_(user);
+@@ -624,7 +626,8 @@ function routeApi_(request) {
+ 
+   var retryResultMatch = path.match(/^\/api\/instructor\/results\/([^/]+)\/retry$/);
+   if (method === 'POST' && retryResultMatch) {
+-    return allowRetry_(decodePart_(retryResultMatch[1]), user);
++    requireRole_(user, ROLE_INSTRUCTOR);
++    fail_('Повторне проходження тестів вимкнено. Доступна одна спроба.', 'RETAKES_DISABLED');
+   }
+ 
+   var deleteGroupMatch = path.match(/^\/api\/instructor\/groups\/([^/]+)$/);
+@@ -1493,7 +1496,7 @@ function deleteBankQuestion_(id, actor) {
+ }
+ 
+ function listTestsForUser_(user) {
+-  var tests = listTests_(false);
++  var tests = listTests_(false).filter(function(test){return !isRetakeTest_(test);});
+   if (user.role === ROLE_INSTRUCTOR) return tests.filter(function (test) { return !isArchivedTest_(test); }).map(function(test){return attachTestAccess_(test,user);});
+   return tests.filter(function (test) {
+     return test.published && !isArchivedTest_(test) && visibleTestForUser_(test, user);
+@@ -1550,8 +1553,14 @@ function getTestById_(id) {
+   return metadata;
+ }
+ 
++function isRetakeTest_(test) { return String(test && test.description || '').indexOf(RETRY_PREFIX) >= 0; }
++function requireSingleAttemptTest_(test) {
++  if (isRetakeTest_(test)) fail_('Повторне проходження тестів вимкнено. Доступна одна спроба.', 'RETAKES_DISABLED');
++}
++
+ function getTestForUser_(id, user, writtenProtocol, choiceProtocol) {
+   var test = getTestById_(id);
++  requireSingleAttemptTest_(test);
+   if (!test || isArchivedTest_(test)) fail_('Тест не знайдено.', 'TEST_NOT_FOUND');
+   requireChoiceProtocol_(test,choiceProtocol);
+   if (test.questions.some(function(q){return isWritten_(q)||questionPoints_(q)!==1;}) && writtenProtocol !== 1) fail_('Письмові завдання доступні у версії застосунку для ПК.', 'UPDATE_REQUIRED');
+@@ -1584,6 +1593,8 @@ function testCreationReplay_(receipt) {
+   return null;
+ }
+ function createTest_(user, body, skipAudit) {
++  requireSingleAttemptTest_(body);
++  if(body.retryUserId)fail_('Повторне проходження тестів вимкнено.', 'RETAKES_DISABLED');
+   // Commit the creation receipt in the authoritative catalog row itself.
+   var receipt=skipAudit===true?null:testCreationRequest_(user,body),replay=receipt?testCreationReplay_(receipt):null;
+   if(replay)return replay;
+@@ -1629,30 +1640,14 @@ function createTest_(user, body, skipAudit) {
+ function replaceTest_(id, user, body) {
+   var original = getTestById_(id);
+   if (!original || isArchivedTest_(original)) fail_('Тест не знайдено.', 'TEST_NOT_FOUND');
+-  // Editing a personal retry must preserve its recipient even if an older client
+-  // omits the hidden marker from the draft.
+-  var retryUserId = markerValue_(original.description, RETRY_PREFIX);
+-  if (retryUserId) {
+-    body = copyObject_(body);
+-    var updatedDescription = removeMarker_(String(body.description || ''), RETRY_PREFIX);
+-    body.description = RETRY_PREFIX + retryUserId + MARKER_SUFFIX + '\n' + updatedDescription;
+-  }
+-  var retryLinks = listRetries_().filter(function (retry) {
+-    return retry.active && String(retry.retryTestId) === String(id);
+-  });
++  requireSingleAttemptTest_(original);
+   var replacement = createTest_(user, body, true);
+   try {
+     var description = String(original.description || '');
+     if (description.indexOf(ARCHIVE_MARKER) < 0) description = ARCHIVE_MARKER + '\n' + description;
+     sheet_('tests').getRange(original.rowNumber, 3).setValue(safeCellText_(description));
+-    retryLinks.forEach(function (retry) {
+-      sheet_('retries').getRange(retry.rowNumber, 4).setValue(replacement.id);
+-    });
+   } catch (error) {
+     try { sheet_('tests').getRange(original.rowNumber, 3).setValue(original.description); } catch (ignored) {}
+-    retryLinks.forEach(function (retry) {
+-      try { sheet_('retries').getRange(retry.rowNumber, 4).setValue(retry.retryTestId); } catch (ignored) {}
+-    });
+     try { deleteTestRowOnly_(replacement.id); } catch (ignored) {}
+     throw error;
+   }
+@@ -1847,10 +1842,11 @@ function submitResult_(user, body, examSource, recoveryApproval) {
+       return String(row[0]) === submissionId && String(row[1]) === 'result:' + String(existing.id);
+     }));
+     if (accepted) return {result: existing, review: safeResultReview_(user, record), practice: safeResultMistakes_(user, existing.id), alreadyAccepted: true,tableSynced:publishCommittedResult_(existing,record.rowNumber)};
+-    fail_('Цей тест уже пройдено. Повтор може дозволити інструктор.', 'ALREADY_COMPLETED');
++    fail_('Цей тест уже пройдено. Повторне проходження недоступне.', 'ALREADY_COMPLETED');
+   }
+   if(!examSource){var attempt=examDocument_(user).value;if(attempt&&String(attempt.test.id)===String(body.testId))fail_('Продовжіть збережену спробу іспиту.','EXAM_SESSION_REQUIRED');}
+   var test = examSource || getTestById_(body.testId);
++  requireSingleAttemptTest_(test);
+   if (!test || (!examSource && (isArchivedTest_(test) || !test.published || !visibleTestForUser_(test, user)))) {
+     fail_('Тест не знайдено або він уже недоступний.', 'TEST_NOT_FOUND');
+   }
+@@ -1917,7 +1913,6 @@ function submitResult_(user, body, examSource, recoveryApproval) {
+       detailSheet.getRange(startRow, 1, detailRows.length, HEADERS.resultDetails.length).setValues(detailRows);
+     });
+   }
+-  tryAuxiliaryWrite_('Статус повторної спроби', function () { completeRetryForTest_(test.id, user.id); });
+   var tableSynced = publishCommittedResult_(result,committedRow);
+   return {result: result, review: buildResultReview_(user, result, test, selected, {}), practice: mistakePractice_(result, test, selected, null), tableSynced: tableSynced};
+ }
+@@ -2093,7 +2088,7 @@ function instructorDashboard_() {
+     results: recentResults,
+     resultTotal: resultTotal,
+     resultsTruncated: resultTotal > recentResults.length,
+-    retries: listRetries_(),
++    retries: [],
+     resultsSheetUrl: sheetInfo.url
+   };
+ }
+@@ -2249,47 +2244,6 @@ function listRetries_() {
+   }).filter(function (retry) { return retry.resultId !== ''; });
+ }
+ 
+-function allowRetry_(resultId, user) {
+-  var result = findResultById_(resultId);
+-  if (!result) fail_('Результат не знайдено.', 'RESULT_NOT_FOUND');
+-  var existing = listRetries_().filter(function (retry) {
+-    return retry.active && String(retry.resultId) === String(result.id);
+-  })[0];
+-  if (existing) {
+-    var existingTest = getTestById_(existing.retryTestId);
+-    if (existingTest && existingTest.published && !isArchivedTest_(existingTest)) {
+-      return {test: existingTest, alreadyExisting: true};
+-    }
+-    sheet_('retries').getRange(existing.rowNumber, 6).setValue(false);
+-  }
+-  var source = getTestById_(result.testId);
+-  if (!source) fail_('Початковий тест не знайдено.', 'TEST_NOT_FOUND');
+-  var description = removeMarker_(String(source.description || ''), RETRY_PREFIX);
+-  description = description.replace(ARCHIVE_MARKER, '').trim();
+-  description = RETRY_PREFIX + String(result.userId) + MARKER_SUFFIX + (description ? '\n' + description : '');
+-  var retrySuffix = ' — повторна спроба';
+-  var retryTest = createTest_(user, {
+-    title: String(source.title || result.testTitle || 'Тест').slice(0, 180 - retrySuffix.length) + retrySuffix,
+-    description: description,
+-    mode: source.mode,
+-    durationMinutes: source.durationMinutes,
+-    passingPercent: source.passingPercent,
+-    published: true,
+-    questions: source.questions
+-  }, true);
+-  try {
+-    sheet_('retries').appendRow([
+-      result.id, result.userId, result.testId, retryTest.id, new Date(), true
+-    ]);
+-  } catch (error) {
+-    try { deleteTestRowOnly_(retryTest.id); } catch (ignored) {}
+-    throw error;
+-  }
+-  logAudit_(user, 'RETRY_ALLOW', 'result', result.id, result.userName + ' — ' + result.testTitle,
+-    'Створено повторний тест #' + String(retryTest.id) + '.');
+-  return {test: retryTest, alreadyExisting: false};
+-}
+-
+ function deactivateRetriesForTest_(testId) {
+   listRetries_().forEach(function (retry) {
+     if (retry.active && String(retry.retryTestId) === String(testId)) {
+@@ -2298,15 +2252,6 @@ function deactivateRetriesForTest_(testId) {
+   });
+ }
+ 
+-function completeRetryForTest_(testId, userId) {
+-  listRetries_().forEach(function (retry) {
+-    if (retry.active && String(retry.retryTestId) === String(testId)
+-        && String(retry.userId) === String(userId)) {
+-      sheet_('retries').getRange(retry.rowNumber, 6).setValue(false);
+-    }
+-  });
+-}
+-
+ function logAudit_(actor, action, targetType, targetId, targetName, details) {
+   if (!actor) return;
+   var createdAt = new Date();
+@@ -2639,8 +2584,7 @@ function publishVisibleResult_(result) {
+ }
+ 
+ function visibleTestForUser_(test, user) {
+-  var retryId = markerValue_(test.description, RETRY_PREFIX);
+-  if (retryId && String(retryId) !== String(user.id)) return false;
++  if (isRetakeTest_(test)) return false;
+   var groups = assignedGroups_(test.description);
+   if (groups === null) return false;
+   if (!groups.length) return true;
+@@ -3446,6 +3390,7 @@ function routeExam_(method,path,body,user,choiceProtocol) {
+   if(path.indexOf('/api/exam-session')!==0)return null;
+   requireRole_(user,ROLE_CADET);
+   var doc=examDocument_(user),v=doc.value;
++  if(v&&v.status!=='completed')requireSingleAttemptTest_(v.sourceTest||v.test);
+   if(v&&v.status!=='completed')requireChoiceProtocol_(v.sourceTest||v.test,choiceProtocol);
+   if(method==='GET'&&path==='/api/exam-session')return examReply_(user,doc);
+   if(method!=='POST')fail_('Дію не знайдено.','NOT_FOUND');
+diff --git a/native/update_protocol.h b/native/update_protocol.h
+index 54e7afd..8d53929 100644
+--- a/native/update_protocol.h
++++ b/native/update_protocol.h
+@@ -1,7 +1,7 @@
+ /* Strict signed release catalog format. No URLs or paths from JSON. */
+ #define UPDATE_MAX_SIZE (64u*1024u*1024u)
+-#define PC_VERSION_CODE 143u
+-#define PC_VERSION_NAME "1.2.20"
++#define PC_VERSION_CODE 146u
++#define PC_VERSION_NAME "1.2.23"
+ #define UPDATE_HOST L"github.com"
+ #define UPDATE_PATH_PREFIX L"/windroye590-create/litakova-updates/releases/latest/download/"
+ typedef struct {DWORD code,size;char name[32],file[128],sha256[65];} UPDATE_RELEASE;
+diff --git a/package.json b/package.json
+index 5bd40eb..f26cb6e 100644
+--- a/package.json
++++ b/package.json
+@@ -1,10 +1,10 @@
+ {
+   "name": "litakova-komisiia-pc",
+-  "version": "1.2.20",
++  "version": "1.2.23",
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "test": "node tests/contract.mjs && node tests/flows.mjs && node tests/written.mjs && node tests/written-reliability.mjs && node tests/review-audit.mjs && node tests/session-transitions.mjs && node tests/json-import-safety.mjs && node tests/pc-only.mjs && node tests/auth-recovery.mjs && node tests/login-capacity.mjs && node tests/results.mjs && node tests/large-tests.mjs && node tests/recent-results.mjs && node tests/review-presence.mjs && node tests/test-access-intake.mjs && node tests/public-table-sync.mjs && npm run test:storage-recovery && npm run test:private-storage && npm run test:audit",
++    "test": "node tests/no-retakes.mjs && node tests/contract.mjs && node tests/flows.mjs && node tests/written.mjs && node tests/written-reliability.mjs && node tests/review-audit.mjs && node tests/session-transitions.mjs && node tests/json-import-safety.mjs && node tests/pc-only.mjs && node tests/auth-recovery.mjs && node tests/login-capacity.mjs && node tests/results.mjs && node tests/large-tests.mjs && node tests/recent-results.mjs && node tests/review-presence.mjs && node tests/test-access-intake.mjs && node tests/public-table-sync.mjs && npm run test:storage-recovery && npm run test:private-storage && npm run test:audit",
+     "test:ui": "node tests/ui.mjs && node tests/materials-ui.mjs && node tests/written-ui.mjs && node tests/results-ui.mjs && node tests/office.mjs && node tests/responsive-ui.mjs && node tests/updates-ui.mjs && node tests/instructors-ui.mjs && node tests/performance-ui.mjs && node tests/large-tests-ui.mjs && node tests/review-presence-ui.mjs && node tests/test-access-intake-ui.mjs && node tests/public-table-sync-ui.mjs",
+     "build": "python3 build_windows.py",
+     "test:office": "node tests/office.mjs",
+@@ -37,5 +37,5 @@
+     "playwright": "1.62.1"
+   },
+   "executableName": "Litakova-Komisiia-PC.exe",
+-  "versionCode": 143
++  "versionCode": 146
+ }
+diff --git a/tests/audit-regressions.mjs b/tests/audit-regressions.mjs
+index d86e482..be1b5ae 100644
+--- a/tests/audit-regressions.mjs
++++ b/tests/audit-regressions.mjs
+@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
+ import fs from 'node:fs';
+ import crypto from 'node:crypto';
+ process.env.LITAKOVA_SERVER_SOURCE=new URL('../Code.gs',import.meta.url).pathname;
+-const {api,context,spreadsheet,instructorToken,credential}=await import('./fixtures/server_model.mjs');
++const {api,context,spreadsheet,instructorToken,credential ,seedLegacyRetry}=await import('./fixtures/server_model.mjs');
+ const checks=[],failures=[];
+ async function check(name,fn){try{await fn();checks.push(name);console.log('PASS '+name);}catch(error){failures.push({name,error:error.message,code:error.code});console.error('FAIL '+name+': '+error.message);}}
+ const props=context.PropertiesService.getScriptProperties();
+@@ -63,7 +63,7 @@ const questions=Array.from({length:60},(_,i)=>({text:('Audit question '+i+' ').p
+ const make=title=>api('POST','/api/instructor/tests',instructorToken,{title,mode:'training',published:true,questions}).test;
+ const first=make('Audit retained first');
+ const result=api('POST','/api/results',cadet.token,{testId:first.id,submissionId:'audit-long-submission-12345',writtenProtocol:1,choiceProtocol:2,durationSeconds:60,answers:first.questions.map(q=>({questionId:q.id,answerId:q.answers[0].id}))}).result;
+-const retry=api('POST','/api/instructor/results/'+result.id+'/retry',instructorToken).test;
++const retry=seedLegacyRetry(first,cadet.user.id,result.id);
+ const last=make('Audit retained after private retry');
+ const parts=spreadsheet.getSheetByName('_Частини_тестів'),catalog=spreadsheet.getSheetByName('_Тести');
+ await check('A valid 200-question draft above 2M characters synchronizes within the documented 2.8M limit',()=>{
+diff --git a/tests/fixtures/server_model.mjs b/tests/fixtures/server_model.mjs
+index cf2f047..07f99f4 100644
+--- a/tests/fixtures/server_model.mjs
++++ b/tests/fixtures/server_model.mjs
+@@ -201,8 +201,8 @@ function expectCode(action, expected) {
+ assert.match(context.setupCommission(), /окрема таблиця результатів/i);
+ assert.equal(spreadsheet.sheets.size, 19);
+ assert.ok(spreadsheet.getSheetByName('_Частини_тестів'));
+-assert.equal(api("GET", "/api/app-info").latestVersionName, "1.2.20");
+-assert.equal(api("GET", "/api/app-info").latestVersionCode, 143);
++assert.equal(api("GET", "/api/app-info").latestVersionName, "1.2.23");
++assert.equal(api("GET", "/api/app-info").latestVersionCode, 146);
+ assert.equal(spreadsheet.getSheetByName("_Результати_дані").rows[0][2], "ПІБ",
+   "Службовий заголовок має залишатися сумісним із сервером версії 3");
+ const publicSpreadsheet = spreadsheets.get(properties.getProperty("PUBLIC_RESULTS_SPREADSHEET_ID"));
+@@ -343,12 +343,29 @@ const secondCadet = api("POST", "/api/register", "", {
+   groupId: group.id,
+   ...credential("cadet2-password")
+ });
+-const retry = api("POST", `/api/instructor/results/${result.id}/retry`, secondInstructor.token);
+-const retryAgain = api("POST", `/api/instructor/results/${result.id}/retry`, instructorToken);
+-assert.equal(retry.alreadyExisting, false);
+-assert.equal(retryAgain.alreadyExisting, true);
+-assert.equal(String(retryAgain.test.id), String(retry.test.id));
+-assert.equal(api("GET", "/api/tests", cadetLogin.token).tests.some((item) => String(item.id) === String(retry.test.id)), true);
++// Simulate records created by an older server; no production data is used.
++function seedLegacyRetry(source, userId, resultId, completedToken = '') {
++  const seeded = api('POST', '/api/instructor/tests', instructorToken, {
++    title: String(source.title).slice(0,150) + ' — повторна спроба',
++    description: String(source.description || ''), mode: source.mode,
++    durationMinutes: source.durationMinutes, passingPercent: source.passingPercent,
++    published: true, questions: source.questions
++  }).test;
++  if (completedToken) api('POST', '/api/results', completedToken, {
++    testId: seeded.id, writtenProtocol:1, choiceProtocol:2, durationSeconds:30,
++    submissionId:'historical-' + seeded.id,
++    answers:seeded.questions.map(q=>({questionId:q.id,answerId:q.answers.find(a=>a.isCorrect)?.id||'0'}))
++  });
++  const stored=context.getTestById_(seeded.id);
++  seeded.description='[[LK-RETRY:' + String(userId) + ']]\n' + seeded.description;
++  spreadsheet.getSheetByName('_Тести').getRange(stored.rowNumber,3).setValue(seeded.description);
++  spreadsheet.getSheetByName('_Повторні_спроби').appendRow([resultId,userId,source.id,seeded.id,new Date(),!completedToken]);
++  return seeded;
++}
++expectCode(()=>api('POST', `/api/instructor/results/${result.id}/retry`, secondInstructor.token),'RETAKES_DISABLED');
++expectCode(()=>api('POST', `/api/instructor/results/${result.id}/retry`, instructorToken),'RETAKES_DISABLED');
++const retry={test:seedLegacyRetry(test,cadetRegistration.user.id,result.id,cadetLogin.token)};
++assert.equal(api('GET','/api/tests',cadetLogin.token).tests.some(t=>String(t.id)===String(retry.test.id)),false);
+ 
+ const secondChallenge = api("POST", "/api/challenge", "", {username: "cadet2", groupName: "Лелека-100"});
+ const secondDerived = crypto.pbkdf2Sync("cadet2-password", Buffer.from(secondChallenge.salt, "base64"), 120000, 32, "sha256");
+@@ -359,16 +376,8 @@ const secondCadetLogin = api("POST", "/api/login", "", {
+ assert.equal(api("GET", "/api/tests", secondCadetLogin.token).tests.some((item) => String(item.id) === String(retry.test.id)), false,
+   "Персональний повтор не повинен бути доступний іншому курсанту");
+ 
+-const retryFull = api("GET", `/api/tests/${retry.test.id}`, cadetLogin.token).test;
+-const retryResult = api("POST", "/api/results", cadetLogin.token, {
+-  testId: retryFull.id,
+-  durationSeconds: 30,
+-  submissionId: "contract-retry-1",
+-  answers: [{questionId: retryFull.questions[0].id, answerId: retryFull.questions[0].answers[0].id}]
+-}).result;
+-assert.equal(retryResult.score, 100);
+-assert.equal(api("GET", "/api/instructor/dashboard", instructorToken).retries
+-  .some((item) => String(item.retryTestId) === String(retry.test.id) && item.active), false);
++expectCode(()=>api('GET', `/api/tests/${retry.test.id}`,cadetLogin.token),'RETAKES_DISABLED');
++assert.deepEqual(api('GET','/api/instructor/dashboard',instructorToken).retries,[]);
+ 
+ const replacement = api("POST", `/api/instructor/tests/${test.id}/replace`, instructorToken, {
+   title: "Контрольний тест — оновлений",
+@@ -413,7 +422,7 @@ assert.ok(audit.some((entry) => entry.action === "CADET_PASSWORD"));
+ assert.equal(api("DELETE", `/api/instructor/question-bank/${bankQuestion.id}`, instructorToken).deleted, true);
+ assert.equal(api("GET", "/api/instructor/question-bank", instructorToken).questions.length, 0);
+ 
+-console.log("Apps Script v7 contract tests passed: schema, bank, analytics, audit, shared results, sessions, invites, groups, replace and retry.");
++console.log("Apps Script v7 contract tests passed: schema, bank, analytics, audit, shared results, sessions, invites, groups, replace and disabled retakes.");
+ 
+ const failures = [];
+ let regressionCount = 0;
+@@ -465,25 +474,14 @@ regression("Blank test rows do not change which questions are fetched", () => {
+   } finally { sheet.rows.splice(1, 1); }
+ });
+ 
+-regression("Editing a personal retry preserves recipient and retry linkage", () => {
+-  const source = regressionTest("Персональний повтор");
+-  const completed = api("POST", "/api/results", secondCadetLogin.token,
+-    regressionBody(source, "regression-retry-source")).result;
+-  const personal = api("POST", `/api/instructor/results/${completed.id}/retry`, instructorToken).test;
+-  const retries = spreadsheet.getSheetByName("_Повторні_спроби");
+-  retries.rows.splice(1, 0, []);
+-  try {
+-    const edited = api("POST", `/api/instructor/tests/${personal.id}/replace`, instructorToken, {
+-      title: "Персональний повтор після редагування", description: "", mode: "training", published: true,
+-      questions: personal.questions
+-    }).test;
+-    const otherUserToken = context.issueToken_(context.findUserById_(cadetRegistration.user.id));
+-    assert.equal(api("GET", "/api/tests", otherUserToken).tests.some((t) => String(t.id) === String(edited.id)), false);
+-    assert.equal(api("GET", "/api/tests", secondCadetLogin.token).tests.some((t) => String(t.id) === String(edited.id)), true);
+-    assert.equal(context.listRetries_().some((r) => r.active && String(r.retryTestId) === String(edited.id)), true);
+-    api("POST", "/api/results", secondCadetLogin.token, regressionBody(edited, "regression-retry-edited"));
+-    assert.equal(context.listRetries_().some((r) => r.active && String(r.retryTestId) === String(edited.id)), false);
+-  } finally { retries.rows.splice(1, 1); }
++regression("Legacy personal retries cannot be edited into new attempts", () => {
++  const source=regressionTest('Старий персональний повтор');
++  const completed=api('POST','/api/results',secondCadetLogin.token,regressionBody(source,'regression-old-retry')).result;
++  const personal=seedLegacyRetry(source,secondCadetLogin.user.id,completed.id);
++  const previousIds=context.listTests_(false).map(t=>String(t.id));
++  expectCode(()=>api('POST',`/api/instructor/tests/${personal.id}/replace`,instructorToken,{title:'Повтор після редагування',description:'',mode:'training',published:true,questions:personal.questions}),'RETAKES_DISABLED');
++  assert.deepEqual(context.listTests_(false).map(t=>String(t.id)),previousIds);
++  assert.equal(api('GET','/api/tests',secondCadetLogin.token).tests.some(t=>String(t.id)===String(personal.id)),false);
+ });
+ 
+ regression("An analytics write failure cannot reject a saved result", () => {
+@@ -543,27 +541,22 @@ regression("User-defined group names do not collide with object properties", ()
+   assert.equal(stats.passRate, 100);
+ });
+ 
+-regression("A retry can be created for a test with a maximum-length title", () => {
+-  const test = regressionTest("Т".repeat(180));
+-  const result = api("POST", "/api/results", secondCadetLogin.token,
+-    regressionBody(test, "regression-long-title")).result;
+-  const retry = api("POST", `/api/instructor/results/${result.id}/retry`, instructorToken).test;
+-  assert.ok(retry.title.length <= 180);
+-  assert.ok(retry.title.endsWith(" — повторна спроба"));
++regression("Retakes remain disabled for maximum-length test titles", () => {
++  const test=regressionTest('Т'.repeat(180));
++  const result=api('POST','/api/results',secondCadetLogin.token,regressionBody(test,'regression-long-title')).result;
++  expectCode(()=>api('POST',`/api/instructor/results/${result.id}/retry`,instructorToken),'RETAKES_DISABLED');
+ });
+ 
+-regression("A failed retry link write rolls back the new personal test", () => {
+-  const test = regressionTest("Відкат повтору");
+-  const result = api("POST", "/api/results", secondCadetLogin.token,
+-    regressionBody(test, "regression-retry-rollback")).result;
+-  const previousIds = context.listTests_(false).map((item) => String(item.id)).sort();
+-  const retries = spreadsheet.getSheetByName("_Повторні_спроби");
+-  const original = retries.appendRow;
+-  retries.appendRow = () => { throw new Error("Injected retry write failure"); };
++regression("A disabled retry never creates tests or writes retry links", () => {
++  const test=regressionTest('Вимкнений повтор');
++  const result=api('POST','/api/results',secondCadetLogin.token,regressionBody(test,'regression-no-retry-write')).result;
++  const previousIds=context.listTests_(false).map(t=>String(t.id));
++  const retries=spreadsheet.getSheetByName('_Повторні_спроби'),original=retries.appendRow;
++  retries.appendRow=()=>{throw Error('Retry storage must not be used');};
+   try {
+-    assert.throws(() => api("POST", `/api/instructor/results/${result.id}/retry`, instructorToken), /Injected retry/);
+-    assert.deepEqual(context.listTests_(false).map((item) => String(item.id)).sort(), previousIds);
+-  } finally { retries.appendRow = original; }
++    expectCode(()=>api('POST',`/api/instructor/results/${result.id}/retry`,instructorToken),'RETAKES_DISABLED');
++    assert.deepEqual(context.listTests_(false).map(t=>String(t.id)),previousIds);
++  }finally{retries.appendRow=original;}
+ });
+ 
+ regression("Primary result key remains idempotent when the sync ledger fails", () => {
+@@ -688,15 +681,15 @@ regression("Direct exam submission requires a server-owned timed attempt", () =>
+ });
+ 
+ regression("Release announcement rejects unsafe URLs and stale stored versions", () => {
+-  assert.equal(api("GET", "/api/app-info").latestVersionCode, 143);
++  assert.equal(api("GET", "/api/app-info").latestVersionCode, 146);
+   context.setAppDownloadUrl("https://example.invalid/legacy.exe", 52, "3.1.1");
+   const stale = api("GET", "/api/app-info");
+-  assert.equal(stale.latestVersionCode, 143); assert.equal(stale.latestVersionName, "1.2.20"); assert.equal(stale.downloadUrl, "");
++  assert.equal(stale.latestVersionCode, 146); assert.equal(stale.latestVersionName, "1.2.23"); assert.equal(stale.downloadUrl, "");
+   assert.throws(() => context.setAppDownloadUrl("http://unsafe.example/app.exe", 72, "3.3.1"));
+-  assert.equal(api("GET", "/api/app-info").latestVersionCode, 143);
+-  context.setAppDownloadUrl("https://example.invalid/Litakova-Komisiia-PC.exe", 144, "1.3.0");
++  assert.equal(api("GET", "/api/app-info").latestVersionCode, 146);
++  context.setAppDownloadUrl("https://example.invalid/Litakova-Komisiia-PC.exe", 147, "1.3.0");
+   const info = api("GET", "/api/app-info");
+-  assert.equal(info.latestVersionCode, 144); assert.equal(info.latestVersionName, "1.3.0");
++  assert.equal(info.latestVersionCode, 147); assert.equal(info.latestVersionName, "1.3.0");
+   assert.equal(info.downloadUrl, "https://example.invalid/Litakova-Komisiia-PC.exe");
+ });
+ 
+@@ -820,7 +813,7 @@ regression('Full deletion clears both groups without touching same-name cadets o
+   const aResult=api('POST','/api/results',a.token,regressionBody(test,'delete-result-a')).result;
+   const bResult=api('POST','/api/results',b.token,regressionBody(test,'delete-result-b')).result;
+   const keepResult=api('POST','/api/results',keep.token,regressionBody(test,'delete-keep')).result;
+-  const retry=api('POST','/api/instructor/results/'+aResult.id+'/retry',instructorToken).test;
++  const retry=seedLegacyRetry(test,a.user.id,aResult.id);
+   // A corrupt legacy retry link must not cause a shared test to be deleted.
+   spreadsheet.getSheetByName('_Повторні_спроби').appendRow([aResult.id,a.user.id,test.id,test.id,new Date(),true]);
+   spreadsheet.getSheetByName('_Результати').appendRow(['legacy-a','old-device','1',String(aResult.id),a.user.id,a.user.fullName,a.user.groupName,test.id,test.title,100,1,1,true,17,new Date(),new Date()]);
+@@ -897,4 +890,4 @@ if (failures.length) {
+ }
+ console.log(`Server regression checks passed: ${regressionCount}/${regressionCount}.`);
+ 
+-export {context, api, credential, spreadsheet, lock, instructorToken, regressionTest, regressionBody};
++export {context, api, credential, spreadsheet, lock, instructorToken, regressionTest, regressionBody, seedLegacyRetry};
+diff --git a/tests/materials-ui.mjs b/tests/materials-ui.mjs
+index c262fd7..7bd088e 100644
+--- a/tests/materials-ui.mjs
++++ b/tests/materials-ui.mjs
+@@ -69,6 +69,13 @@ try {
+  });
+  await mark('In-app viewer renders PDF under native CSP and navigates slides',async()=>{
+   await click('material-open');await page.waitForFunction(()=>document.querySelector('#material-page')?.textContent==='1 / 3');await click('material-next');await page.waitForFunction(()=>document.querySelector('#material-page')?.textContent==='2 / 3');await click('material-plus');await page.waitForFunction(()=>document.querySelector('#material-zoom')?.textContent==='125%');await click('material-fullscreen');await page.waitForFunction(()=>Boolean(document.fullscreenElement));await click('material-fullscreen');await page.waitForFunction(()=>!document.fullscreenElement);
++  // Fullscreen state changes before PDF.js finishes the resize repaint. Keep
++  // the original pixel assertions, but wait for the fixture to be painted.
++  await page.waitForFunction(()=>{
++   const canvas=document.querySelector('#material-canvas');if(!canvas||canvas.width<=10||canvas.height<=10)return false;
++   const pixel=canvas.getContext('2d').getImageData(10,10,1,1).data;
++   return pixel[3]>0&&pixel.slice(0,3).some(value=>value!==255);
++  });
+   const pixels=await page.locator('#material-canvas').evaluate(c=>{const p=c.getContext('2d').getImageData(10,10,1,1).data;return [...p];});assert.ok(pixels[3]>0);assert.notDeepEqual(pixels.slice(0,3),[255,255,255]);await click('material-close');
+  });
+  await mark('Instructor sees cadets who have not opened material',async()=>{await click('material-readers');await page.getByRole('heading',{name:/Перегляди: Матеріали/}).waitFor();assert.ok((await page.locator('#modal').textContent()).includes('Тестовий Курсант PDF'));assert.ok((await page.locator('#modal').textContent()).includes('Ще не відкривав'));await page.locator('#modal .primary').click();});
+diff --git a/tests/menu-status.mjs b/tests/menu-status.mjs
+new file mode 100644
+index 0000000..45ca26d
+--- /dev/null
++++ b/tests/menu-status.mjs
+@@ -0,0 +1,17 @@
++import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';import * as C from '../web/core.js';
++const source=fs.readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
++const code=[['function catalogTestState(t){','function testCard('],['function reviewCountBadge(){','function reviewsScreen('],['async function loadReviewQueue(','async function pollReviewPresence(']].map(([a,b])=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)))).join('\n');
++const checks=[];
++function fixture(rpc=async(_m,path)=>path.endsWith('/reviews')?{results:[{id:'a',pendingWritten:2},{id:'b',pendingWritten:2}]}:{recoveries:[{id:'recovery'}]}){
++ const f={C,Date,performance,id:C.id,e:C.esc,__selected:null,rpc,__renders:0,__badge:{outerHTML:''}};vm.createContext(f);vm.runInContext(`let S={session:{token:'one',user:{role:'instructor'}},groups:[{id:'a',name:'А'},{id:'b',name:'Б'}]},page='home';let reviewQueue=[],examRecoveryQueue=[],reviewQueueToken='',reviewQueueUpdatedAt=0,reviewQueueFlight=null,reviewQueueError='',reviewQueueAt=0,reviewQueueRevision=null;function instructor(){return S.session?.user.role==='instructor';}function selectedGroup(){return __selected;}function $(s){return s==='#review-count'?__badge:null;}function render(){__renders++;}${code}`,f);return f;
++}
++async function check(name,fn){await fn();checks.push(name);console.log('PASS '+name);}
++await check('Count works and recoveries instead of individual written answers',async()=>{const f=fixture();await f.loadReviewQueue(true,true);assert.match(f.reviewCountBadge(),/· 3</);assert.equal(f.__renders,0);});
++await check('Confirmed refresh reduces the counter after one work is completed',async()=>{let done=false;const f=fixture(async(_m,p)=>p.endsWith('/reviews')?{results:done?[{id:'b',pendingWritten:2}]:[{id:'a',pendingWritten:2},{id:'b',pendingWritten:2}]}:{recoveries:[]});await f.loadReviewQueue(true,true);assert.match(f.reviewCountBadge(),/· 2</);done=true;await f.loadReviewQueue(true,true,true);assert.match(f.reviewCountBadge(),/· 1</);});
++await check('Switching accounts hides the previous session’s count',async()=>{const f=fixture();await f.loadReviewQueue(true,true);vm.runInContext("S.session.token='two'",f);assert.match(f.reviewCountBadge(),/ hidden/);assert.doesNotMatch(f.reviewCountBadge(),/· 3/);});
++await check('A delayed old-account reply cannot replace the current count',async()=>{let release;const held=new Promise(r=>release=r);const f=fixture(async(_m,p,_b,token)=>{if(token==='one'&&p.endsWith('/reviews')){await held;return {results:Array.from({length:9},(_,id)=>({id}))};}return p.endsWith('/reviews')?{results:[{id:'current'}]}:{recoveries:[]};});const old=f.loadReviewQueue(true,true);vm.runInContext("S.session.token='two'",f);await f.loadReviewQueue(true,true);release();await old;assert.match(f.reviewCountBadge(),/· 1</);assert.equal(vm.runInContext('reviewQueueToken',f),'two');});
++await check('Cadets never send instructor queue requests',async()=>{let calls=0;const f=fixture(async()=>{calls++;throw Error('Forbidden');});vm.runInContext("S.session.user.role='cadet'",f);await f.loadReviewQueue(true,true,true);assert.equal(calls,0);});
++await check('Offline refresh retains the last confirmed count with a cache notice',async()=>{let offline=false;const f=fixture(async(_m,p)=>{if(offline)throw Error('Offline');return p.endsWith('/reviews')?{results:[{id:'one'}]}:{recoveries:[]};});await f.loadReviewQueue(true,true);offline=true;await f.loadReviewQueue(true,true,true);assert.match(f.reviewCountBadge(),/· 1</);assert.match(f.reviewCountBadge(),/Останній підтверджений/);});
++await check('Mixed group permissions follow the selected group',async()=>{const f=fixture(),t={published:true,description:'',access:{defaultOpen:false,groups:{a:true}}};assert.equal(f.catalogTestState(t).label,'Відкритий');assert.equal(f.catalogTestState(t).note,'Для частини груп');f.__selected={id:'b',name:'Б'};assert.equal(f.catalogTestState(t).label,'Закритий');f.__selected={id:'a',name:'А'};assert.equal(f.catalogTestState(t).label,'Відкритий');});
++await check('An unpublished test stays a draft despite an open access override',async()=>{assert.equal(fixture().catalogTestState({published:false,access:{defaultOpen:true,groups:{a:true}}}).label,'Чернетка');});
++fs.mkdirSync(new URL('../verification/',import.meta.url),{recursive:true});fs.writeFileSync(new URL('../verification/menu-status.json',import.meta.url),JSON.stringify({status:'passed',passed:checks.length,checks,actualApplicationFunctions:true,physicalBrowserVerified:false,productionRequests:0},null,2));
+diff --git a/tests/no-retakes.mjs b/tests/no-retakes.mjs
+new file mode 100644
+index 0000000..97c4652
+--- /dev/null
++++ b/tests/no-retakes.mjs
+@@ -0,0 +1,100 @@
++// Real client and Code.gs logic; isolated synthetic Sheets only.
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import * as C from '../web/core.js';
++process.env.LITAKOVA_SERVER_SOURCE=new URL('../Code.gs',import.meta.url).pathname;
++const {api,context,credential,instructorToken,spreadsheet,regressionTest,regressionBody,seedLegacyRetry}=await import('./fixtures/server_model.mjs');
++const checks=[];
++function check(name,run){run();checks.push(name);console.log('PASS '+name);}
++function rejected(run,code){assert.throws(run,e=>e.code===code);}
++const group=api('POST','/api/instructor/groups',instructorToken,{name:'Одна спроба — перевірка'}).group;
++const cadet=api('POST','/api/register','',{fullName:'Курсант Однієї Спроби',username:'no_retakes',groupId:group.id,...credential('OneAttempt-2026!')});
++const test=regressionTest('Незмінний результат');
++const body=regressionBody(test,'single-attempt-first');
++body.answers.forEach(a=>{a.answerId='0';});
++const completion=api('POST','/api/results',cadet.token,body);
++check('A failed test still consumes the only completed attempt',()=>{
++ assert.equal(completion.result.passed,false);
++ rejected(()=>api('POST','/api/results',cadet.token,{...body,submissionId:'single-attempt-second'}),'ALREADY_COMPLETED');
++});
++check('The same delivery acknowledgement remains idempotent',()=>{
++ const again=api('POST','/api/results',cadet.token,body);
++ assert.equal(again.result.id,completion.result.id);assert.equal(again.alreadyAccepted,true);
++ assert.equal(api('GET','/api/my-results',cadet.token).results.filter(r=>r.testId===test.id).length,1);
++});
++check('A new training start on another PC cannot bypass completion',()=>{
++ rejected(()=>api('POST','/api/tests/'+test.id+'/start',cadet.token,{submissionId:'pc-another-device-2026'}),'ALREADY_COMPLETED');
++});
++check('Instructor grants are disabled without creating or editing any tests',()=>{
++ const before=JSON.stringify(spreadsheet.getSheetByName('_Тести').rows);
++ const links=JSON.stringify(spreadsheet.getSheetByName('_Повторні_спроби').rows);
++ for(let i=0;i<2;i++)rejected(()=>api('POST','/api/instructor/results/'+completion.result.id+'/retry',instructorToken),'RETAKES_DISABLED');
++ assert.equal(JSON.stringify(spreadsheet.getSheetByName('_Тести').rows),before);
++ assert.equal(JSON.stringify(spreadsheet.getSheetByName('_Повторні_спроби').rows),links);
++});
++check('Cadets and anonymous callers cannot grant retries',()=>{
++ rejected(()=>api('POST','/api/instructor/results/'+completion.result.id+'/retry',cadet.token),'FORBIDDEN');
++ rejected(()=>api('POST','/api/instructor/results/'+completion.result.id+'/retry',''),'SESSION_EXPIRED');
++});
++const legacy=seedLegacyRetry(test,cadet.user.id,completion.result.id);
++check('Previously granted repeats are excluded from both catalogs and dashboards',()=>{
++ for(const token of [cadet.token,instructorToken])assert.ok(!api('GET','/api/tests',token).tests.some(t=>String(t.id)===String(legacy.id)));
++ assert.equal(api('GET','/api/instructor/dashboard',instructorToken).retries.length,0);
++});
++check('A direct legacy-test URL and a raw result submission are blocked',()=>{
++ rejected(()=>api('GET','/api/tests/'+legacy.id,cadet.token),'RETAKES_DISABLED');
++ rejected(()=>api('POST','/api/results',cadet.token,regressionBody(legacy,'legacy-forged-submit')),'RETAKES_DISABLED');
++});
++check('An old cached repeat cannot be started',()=>{
++ rejected(()=>api('POST','/api/tests/'+legacy.id+'/start',cadet.token,{submissionId:'pc-legacy-cached-2026'}),'RETAKES_DISABLED');
++});
++check('Editing or importing a legacy repeat cannot create a new attempt',()=>{
++ rejected(()=>api('POST','/api/instructor/tests/'+legacy.id+'/replace',instructorToken,{...legacy,description:''}),'RETAKES_DISABLED');
++ rejected(()=>api('POST','/api/instructor/tests',instructorToken,{...legacy,id:0}),'RETAKES_DISABLED');
++ rejected(()=>api('POST','/api/instructor/tests',instructorToken,{...test,id:0,retryUserId:String(cadet.user.id)}),'RETAKES_DISABLED');
++});
++check('Client imports, old persisted drafts and direct export reject retry metadata',()=>{
++ assert.throws(()=>C.draftFrom(legacy),/Повторне проходження/);
++ const draft={...C.newDraft(),title:'Стара чернетка',retryUserId:String(cadet.user.id)};
++ assert.match(C.validateDraft(draft),/Повторне проходження/);
++ assert.throws(()=>C.draftAPI(draft),/Повторне проходження/);
++ assert.equal(Object.hasOwn(C.newDraft(),'retryUserId'),false);
++});
++check('Empty legacy recipient markers cannot turn a hidden repeat into a shared test',()=>{
++ const malformed={...test,description:'[[LK-RETRY:]]'};
++ assert.equal(C.cadetTests([malformed,test]).length,1);
++ assert.throws(()=>C.draftFrom(malformed),/Повторне проходження/);
++ rejected(()=>api('POST','/api/instructor/tests',instructorToken,malformed),'RETAKES_DISABLED');
++});
++const historic=seedLegacyRetry(test,cadet.user.id,completion.result.id,cadet.token);
++check('Historical retry results and answer reviews remain available',()=>{
++ const saved=api('GET','/api/my-results',cadet.token).results.find(r=>String(r.testId)===String(historic.id));
++ assert.ok(saved);
++ const replay=api('POST','/api/results',cadet.token,{...regressionBody(historic,'historical-'+historic.id)});
++ assert.equal(replay.result.id,saved.id);assert.equal(replay.alreadyAccepted,true);assert.ok(replay.review.length);
++});
++const resumable=regressionTest('Продовження тієї самої роботи');
++const first=api('POST','/api/tests/'+resumable.id+'/start',cadet.token,{submissionId:'pc-one-resumable-2026'});
++check('A normal unfinished training resumes with the original attempt permit',()=>{
++ const resumed=api('POST','/api/tests/'+resumable.id+'/start',cadet.token,{submissionId:first.submissionId,startPermit:first.startPermit,resumeProtocol:1});
++ assert.equal(resumed.startPermit,first.startPermit);assert.equal(resumed.submissionId,first.submissionId);
++ const sent=api('POST','/api/results',cadet.token,{...regressionBody(resumable,first.submissionId),startPermit:first.startPermit});
++ assert.ok(sent.result.id);
++});
++const exam=api('POST','/api/instructor/tests',instructorToken,{...test,title:'Іспит — одна спроба',mode:'exam',durationMinutes:10}).test;
++const device={deviceId:'single-exam-device',requestId:'single-exam-start',testId:exam.id};
++const started=api('POST','/api/exam-session/start',cadet.token,device);
++check('An interrupted normal exam retains the original submission and deadline',()=>{
++ const repeated=api('POST','/api/exam-session/start',cadet.token,{...device,requestId:'single-exam-resume'});
++ assert.equal(repeated.document.value.submissionId,started.document.value.submissionId);
++ assert.equal(repeated.document.value.deadline,started.document.value.deadline);
++});
++const v=started.document.value;
++const finished=api('POST','/api/exam-session/finish',cadet.token,{...device,requestId:'single-exam-finish',submissionId:v.submissionId,fence:v.fence,expectedRevision:started.document.revision,checkpoint:{answers:{},index:0,exitCount:0}});
++check('A completed exam cannot be restarted after failure',()=>{
++ assert.equal(finished.completion.result.passed,false);
++ rejected(()=>api('POST','/api/exam-session/start',cadet.token,{...device,requestId:'single-exam-new'}),'ALREADY_COMPLETED');
++});
++fs.mkdirSync(new URL('../verification',import.meta.url),{recursive:true});
++fs.writeFileSync(new URL('../verification/no-retakes.json',import.meta.url),JSON.stringify({passed:checks.length,checks,productionDataWrites:0},null,2)+'\n');
++console.log('Single-attempt policy: '+checks.length+' checks passed.');
+diff --git a/tests/review-audit.mjs b/tests/review-audit.mjs
+index 9278a5c..074b64f 100644
+--- a/tests/review-audit.mjs
++++ b/tests/review-audit.mjs
+@@ -94,7 +94,7 @@ await check('Reopening an ordinary test removes its legacy empty grading draft',
+ });
+ await check('Account migration removes empty artifacts while preserving unfinished written comments', () => {
+   const data = {tests:[], gradingDrafts:{old:{revision:0, items:{}}, written:{revision:1, items:{question:{points:'', comment:'Незбережений коментар'}}}}};
+-  const migration = {S:{accounts:{teacher:data}}, user:()=>({id:'teacher',role:'instructor'}), id:C.id, C};
++  const migration = {S:{accounts:{teacher:data}}, user:()=>({id:'teacher',role:'instructor'}), id:C.id, C, cadetViews:new WeakMap()};
+   vm.createContext(migration);
+   vm.runInContext(appFunction('account'), migration);
+   migration.account();
+diff --git a/tests/review-presence-ui.mjs b/tests/review-presence-ui.mjs
+index 1402863..909fe4f 100644
+--- a/tests/review-presence-ui.mjs
++++ b/tests/review-presence-ui.mjs
+@@ -54,6 +54,9 @@ async function queue(p){await p.locator('.nav [data-page="reviews"]').click();aw
+ async function open(p,w){await reviewButton(p,w).click();await p.locator('#review-presence-status').waitFor();}
+ async function check(name,fn){await fn();checks.push(name);console.log('PASS '+name);}
+ try{
++ // Each work contains two written answers; count works before opening the queue.
++ await one.page.locator('#review-count').filter({hasText:'· 2'}).waitFor();
++ await two.page.locator('#review-count').filter({hasText:'· 2'}).waitFor();
+  await queue(one.page);await queue(two.page);
+  await check('The owner gets an editable work and the other instructor sees their name',async()=>{
+   await open(one.page,a);await one.page.getByText('Ви перевіряєте цю роботу',{exact:true}).waitFor();
+@@ -78,7 +81,7 @@ try{
+  });
+  await check('The second instructor completes grading while preserving both authors',async()=>{
+   await two.page.locator('[data-grade-prop="points"]').nth(1).fill('4');await two.page.locator('[data-grade-prop="comment"]').nth(1).fill('Коментар другого інструктора');await action(two.page,'save-grades').click();await two.page.getByRole('heading',{name:'Перевірка робіт',exact:true}).waitFor();
+-  const saved=api('GET','/api/results/'+a.result.id+'/review',first.token);assert.equal(saved.result.pendingWritten,0);assert.equal(saved.review[0].reviewerName,first.user.fullName);assert.equal(saved.review[1].reviewerName,second.user.fullName);assert.equal(await reviewButton(two.page,a).count(),0);
++  const saved=api('GET','/api/results/'+a.result.id+'/review',first.token);assert.equal(saved.result.pendingWritten,0);await two.page.locator('#review-count').filter({hasText:'· 1'}).waitFor();assert.equal(saved.review[0].reviewerName,first.user.fullName);assert.equal(saved.review[1].reviewerName,second.user.fullName);assert.equal(await reviewButton(two.page,a).count(),0);
+  });
+  await check('A closed PC does not leave a permanent reservation',async()=>{
+   await open(one.page,b);await one.page.getByText('Ви перевіряєте цю роботу',{exact:true}).waitFor();await one.context.close();
+diff --git a/tests/test-access-intake-ui.mjs b/tests/test-access-intake-ui.mjs
+index 2d17f71..b04ae26 100644
+--- a/tests/test-access-intake-ui.mjs
++++ b/tests/test-access-intake-ui.mjs
+@@ -95,7 +95,7 @@ try{
+  await check('Another instructor can finish cleanup without deleting instructors, groups or the test catalog',async()=>{
+   await refresh(resumer.page);await action(resumer.page,'resume-intake').click();await resumer.page.locator('#toast').filter({hasText:'Новий набір підготовлено'}).waitFor({timeout:30000});
+   assert.equal(context.listUsers_().filter(u=>u.role==='cadet').length,0);assert.ok(context.findUserById_(first.user.id));assert.ok(context.findUserById_(second.user.id));assert.ok(context.findGroupById_(ga.id));assert.ok(context.getTestById_(test.id));
+-  await refresh(instructor.page);await nav(instructor.page,'tests');await card(instructor.page).getByText('Закрито для проходження',{exact:true}).waitFor();assert.equal(api('GET','/api/instructor/results',instructorToken).results.length,0);
++  await refresh(instructor.page);await nav(instructor.page,'tests');await card(instructor.page).getByText('Закритий',{exact:true}).waitFor();assert.equal(api('GET','/api/instructor/results',instructorToken).results.length,0);
+  });
+  await check('A newly registered cadet has a fresh ID and sees the retained tests closed',async()=>{
+   const fresh=createCadet('Новий курсант UI','intake-ui-a');assert.notEqual(String(fresh.user.id),String(ca.user.id));seed('cadet-fresh',fresh);const next=await pc('cadet-fresh');await nav(next.page,'tests');await card(next.page).getByText('Очікує відкриття інструктором',{exact:true}).waitFor();assert.equal(await card(next.page).locator('[data-action=start]').isDisabled(),true);await next.context.close();
+diff --git a/tests/test-deletion.mjs b/tests/test-deletion.mjs
+index 5481e85..c48ffd3 100644
+--- a/tests/test-deletion.mjs
++++ b/tests/test-deletion.mjs
+@@ -4,7 +4,7 @@ import vm from 'node:vm';
+ import {payload} from '../web/core.js';
+ import {createExamSession} from '../web/exam-session.js';
+ process.env.LITAKOVA_SERVER_SOURCE = new URL('../Code.gs', import.meta.url).pathname;
+-const {api, context, credential, instructorToken, spreadsheet} = await import('./fixtures/server_model.mjs');
++const {api, context, credential, instructorToken, spreadsheet,seedLegacyRetry} = await import('./fixtures/server_model.mjs');
+ const checks = [];
+ async function check(name, action) { await action(); checks.push(name); console.log('PASS ' + name); }
+ const group = api('POST', '/api/instructor/groups', instructorToken, {name:'Видалення тестів'}).group;
+@@ -93,7 +93,7 @@ await check('Deletion uses the write lock and invalidates the catalog cursor on
+  assert.equal(context.requiresWriteLock_({action:'api',method:'DELETE',path:'/api/instructor/tests/'+t.id}),true);
+ });
+ await check('Deleting a personal retry revokes its link without removing the original accepted result',()=>{
+- const t=make('Повтор видаленого тесту'), result=submit(t), retry=api('POST','/api/instructor/results/'+result.result.id+'/retry',instructorToken).test; del(retry);
++ const t=make('Повтор видаленого тесту'), result=submit(t), retry=seedLegacyRetry(t,cadet.user.id,result.result.id); del(retry);
+  assert.ok(!context.listRetries_().some(r=>String(r.retryTestId)===String(retry.id)&&r.active));
+  assert.equal(api('GET','/api/results/'+result.result.id+'/review',cadet.token).result.id,result.result.id);
+ });
+diff --git a/tests/ui.mjs b/tests/ui.mjs
+index 3728b0b..3886592 100644
+--- a/tests/ui.mjs
++++ b/tests/ui.mjs
+@@ -6,7 +6,7 @@ import fs from 'node:fs';
+ import {createRequire} from 'node:module';
+ const {chromium}=createRequire(import.meta.url)('playwright');
+ process.env.LITAKOVA_SERVER_SOURCE=new URL('../Code.gs',import.meta.url).pathname;
+-const {context,api,instructorToken}=await import('./fixtures/server_model.mjs');
++const {context,api,instructorToken,seedLegacyRetry}=await import('./fixtures/server_model.mjs');
+ let state={},journal={},offline=false,dropAfterCommit=false,foreignDeleteAck=false,transferMode='',stateWritesFail=false,launchId='local-ui-test',uptimeOffset=100000,updateState=2;
+ const start=performance.now(),rpcCalls=[],failures=[],checks=[];
+ const group=api('POST','/api/instructor/groups',instructorToken,{name:'ПК — перевірка інтерфейсу'}).group;
+@@ -84,7 +84,7 @@ try{
+   const unit=page.locator('.learning-unit').filter({hasText:'Синхронізація між ПК'});await unit.getByText('Завершено · повторіть матеріал',{exact:true}).waitFor();assert.equal(await unit.locator('button[data-action=start]').count(),0);await unit.getByRole('button',{name:'Перевірка відповідей',exact:true}).waitFor();
+  });
+  await mark('Completed test blocks repeat across PCs',async()=>{await page.locator('.nav button[data-page=tests]').click();const card=page.locator('.test-card').filter({hasText:'Синхронізація між ПК'});assert.ok(await card.locator('button[data-action=start]').isDisabled());assert.throws(()=>api('POST','/api/results',cadetToken,{testId:test.id,submissionId:'second-pc-repeat',answers:[]}),x=>x.code==='ALREADY_COMPLETED');});
+- await mark('Previously granted personal retake is absent from cadet UI',async()=>{const result=api('GET','/api/my-results',cadetToken).results.find(r=>String(r.testId)===String(test.id));const retry=api('POST','/api/instructor/results/'+result.id+'/retry',instructorToken).test;const refreshed=page.waitForResponse(r=>r.url().endsWith('/rpc')&&['/api/cadet/workspace','/api/workspace'].includes(r.request().postDataJSON()?.path));await click('refresh');await refreshed;await page.locator('button[data-action=refresh]:not([disabled])').waitFor();assert.equal(await page.getByRole('heading',{name:retry.title,exact:true}).count(),0);});
++ await mark('Previously granted personal retake is absent from cadet UI',async()=>{const result=api('GET','/api/my-results',cadetToken).results.find(r=>String(r.testId)===String(test.id));assert.throws(()=>api('POST','/api/instructor/results/'+result.id+'/retry',instructorToken),e=>e.code==='RETAKES_DISABLED');const retry=seedLegacyRetry(test,result.userId,result.id);const refreshed=page.waitForResponse(r=>r.url().endsWith('/rpc')&&['/api/cadet/workspace','/api/workspace'].includes(r.request().postDataJSON()?.path));await click('refresh');await refreshed;await page.locator('button[data-action=refresh]:not([disabled])').waitFor();assert.equal(await page.getByRole('heading',{name:retry.title,exact:true}).count(),0);});
+  await mark('Instructor sees cadet result submitted from PC',async()=>{await click('logout');await login('instructor','WindRoy','instructor-password');await page.locator('.nav button[data-page=results]').click();await page.getByRole('heading',{name:'Результати курсантів'}).waitFor();await page.locator('#filter').fill('Перевірка ПК Курсант');await page.waitForFunction(()=>document.querySelector('#results-table')?.textContent.includes('33%'));});
+  await mark('Instructor results have no action to grant retakes',async()=>{assert.equal(await page.locator('button[data-action=allow-retry]').count(),0);assert.equal(await page.getByRole('button',{name:/Дозволити повтор/}).count(),0);});
+  await mark('Theme and account cache survive restart',async()=>{await click('theme');await page.waitForFunction(()=>document.body.classList.contains('dark'));assert.equal(state.theme,'dark');await page.reload();await page.getByRole('heading',{name:'Кабінет інструктора'}).waitFor();assert.ok(await page.locator('body').evaluate(el=>el.classList.contains('dark')));});
