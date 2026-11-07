@@ -1,0 +1,61 @@
+[
+  {
+    "test": "tests/storage_json.py",
+    "exitCode": 0,
+    "seconds": 1.72,
+    "log": "/workspace/work/final-native-logs/tests__storage_json.py.log"
+  },
+  {
+    "test": "tests/storage_files.py",
+    "exitCode": 0,
+    "seconds": 2.19,
+    "log": "/workspace/work/final-native-logs/tests__storage_files.py.log"
+  },
+  {
+    "test": "tests/native_clock.py",
+    "exitCode": 0,
+    "seconds": 0.56,
+    "log": "/workspace/work/final-native-logs/tests__native_clock.py.log"
+  },
+  {
+    "test": "tests/update_channel.py",
+    "exitCode": 0,
+    "seconds": 1.29,
+    "log": "/workspace/work/final-native-logs/tests__update_channel.py.log"
+  },
+  {
+    "test": "tests/update_native.py",
+    "exitCode": 0,
+    "seconds": 1.16,
+    "log": "/workspace/work/final-native-logs/tests__update_native.py.log"
+  },
+  {
+    "test": "tests/update_protocol.py",
+    "exitCode": 0,
+    "seconds": 0.75,
+    "log": "/workspace/work/final-native-logs/tests__update_protocol.py.log"
+  },
+  {
+    "test": "tests/deep-native-fuzz.py",
+    "exitCode": 0,
+    "seconds": 3.15,
+    "log": "/workspace/work/final-native-logs/tests__deep-native-fuzz.py.log"
+  },
+  {
+    "test": "tests/storage-recovery/native-storage.py",
+    "exitCode": 0,
+    "seconds": 0.39,
+    "log": "/workspace/work/final-native-logs/tests__storage-recovery__native-storage.py.log"
+  },
+  {
+    "test": "tests/release_pc.py",
+    "exitCode": 0,
+    "seconds": 0.9,
+    "log": "/workspace/work/final-native-logs/tests__release_pc.py.log"
+  },
+  {
+    "test": "release-tools/tests (11 unit tests)",
+    "exitCode": 0,
+    "log": "/workspace/work/final-native-logs/publisher-unit.log"
+  }
+]

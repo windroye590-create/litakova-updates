@@ -1,0 +1,18 @@
+{
+  "version": "1.2.26",
+  "versionCode": 149,
+  "catalogSigned": false,
+  "backendDeployed": false,
+  "files": [
+    {
+      "path": "Litakova-Komisiia-PC-1.2.26-source.zip",
+      "bytes": 5260063,
+      "sha256": "baea8d14ed7baa710bd07b3ccb76e7055035eaf9654cae0f8ac30eb048233d5a"
+    },
+    {
+      "path": "Litakova-Komisiia-PC.exe",
+      "bytes": 9803026,
+      "sha256": "ae1c8fbef210207520c08de35669e90f52059bb71ad3ad4b4a7dcdb9e17372d1"
+    }
+  ]
+}
