@@ -62,3 +62,15 @@ jobs:
           name: windows-storage-1.2.26
           path: verification/windows-private-storage-1.2.26.json
           if-no-files-found: warn
+  candidate:
+    needs: [models, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Upload and verify the candidate draft without changing latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 release-staging/v1.2.26/upload_candidate.py

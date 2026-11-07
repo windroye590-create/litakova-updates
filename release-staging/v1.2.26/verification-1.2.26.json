@@ -1,0 +1,60 @@
+{
+  "version": "1.2.26",
+  "versionCode": 149,
+  "verifiedUTC": "2026-11-07T18:40:17Z",
+  "exe": {
+    "bytes": 9803026,
+    "sha256": "ae1c8fbef210207520c08de35669e90f52059bb71ad3ad4b4a7dcdb9e17372d1"
+  },
+  "sourceArchive": {
+    "bytes": 5260063,
+    "sha256": "baea8d14ed7baa710bd07b3ccb76e7055035eaf9654cae0f8ac30eb048233d5a"
+  },
+  "nodeSuites": {
+    "total": 68,
+    "passed": 68
+  },
+  "npmTest": "passed",
+  "nativeSuites": {
+    "total": 10,
+    "passed": 10
+  },
+  "windows": {
+    "status": "passed",
+    "passed": 16,
+    "checks": [
+      "Upgrade archives old data and refuses anonymous legacy or global journal access",
+      "Real AES-256-GCM and Windows DPAPI round-trip a private account object",
+      "Lost object acknowledgements retry idempotently without allowing overwrite",
+      "Changing a nonce, GCM tag or ciphertext is rejected even after valid DPAPI rewrapping",
+      "The GCM identity binds both the account owner and the immutable object identifier",
+      "The profile keeps three distinct backups and rejects conflicting commits",
+      "Corrupt profiles restore a verified backup while sharing violations remain visible errors",
+      "If every profile copy is damaged the host refuses an empty reset or overwrite",
+      "A large Unicode journal restores backups and never falsely acknowledges a rolled-back serial",
+      "Collection removes orphan objects and preserves every referenced object and account journal",
+      "Closing the native vault invalidates its capability and exposes backup recovery status",
+      "The remembered vault key is DPAPI-protected and contains no password or bearer token",
+      "A complete Windows host restart restores the saved key, private objects and last journal",
+      "A locked saved-login file reports an error and never falsely acknowledges logout",
+      "A corrupt saved-login cache cannot erase private data and can be repaired by a valid owner",
+      "Explicit logout remains forgotten after another complete Windows restart"
+    ],
+    "actualWindowsHostExecuted": true,
+    "realDPAPIVerified": true,
+    "realCNGGCMVerified": true,
+    "productionRPCRequests": 0,
+    "browserRendered": false
+  },
+  "embeddedAssets": 229,
+  "ci": {
+    "commit": "80b6da2fbe8f2199abf0aefdc6a03b34d9ba2167",
+    "run": 42402081663,
+    "url": "https://github.com/windroye590-create/litakova-updates/actions/runs/42402081663",
+    "windows": "success",
+    "models": "success"
+  },
+  "autoUpdateCatalogSigned": false,
+  "productionBackendDeployed": false,
+  "productionBackendObserved": "pc-1.2.25-cadet-deletion"
+}
