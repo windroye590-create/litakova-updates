@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "passed": 16,
+  "checks": [
+    "Compact view has five columns, including known zero and pending written scores",
+    "Selecting a group and test removes repeated context without removing review access",
+    "Compact CSV contains exactly the searched group and test results",
+    "Ranking ignores the previously selected single test and shows all 27 cadets",
+    "The total is next to the cadet name and the group summary includes all 27 cadets",
+    "Opening a test cell preserves access to the submitted work",
+    "Place, name and total remain visible while the tests scroll, and headers stay above rows",
+    "Ranking search retains the real place and spreadsheet export matches the search",
+    "Both light and dark result views fit normal, narrow, and short PC windows",
+    "Selected compact test survives switching to ranking and back",
+    "An empty selected group shows an empty ranking without borrowing another group",
+    "Resetting the group prevents an unscoped ranking or spreadsheet export",
+    "Truncated history is never presented or exported as a complete ranking",
+    "The preferred results view and group survive restarting the application window",
+    "Time and delete controls keep separate columns at every supported window width",
+    "Confirming one result deletion removes only the selected work"
+  ],
+  "errors": []
+}

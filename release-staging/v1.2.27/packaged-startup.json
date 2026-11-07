@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "version": "1.2.27",
+  "assets": 229,
+  "checks": [
+    "All public assets and JavaScript routes exist in the fixed PE with exact bytes and MIME",
+    "A clean profile reaches login using only files extracted from the EXE",
+    "A saved offline session restores without losing queued answers or drafts",
+    "The post-update return marker opens the profile and retains the queued written answer",
+    "A failed initial read shows recovery and closing cannot overwrite saved data",
+    "A failed journal read cannot open or write an older state and retry restores the last answer",
+    "Closing during a stalled journal read preserves the complete profile and journal",
+    "A missing module shows recovery controls and retry opens the preserved account",
+    "A stalled startup offers recovery and retry opens the cabinet after the disk responds",
+    "Errors after a successful launch cannot replace the opened cabinet with a startup warning"
+  ],
+  "productionWrites": false,
+  "physicalWindowsRuntimeVerified": false
+}

@@ -1,0 +1,37 @@
+{
+  "version": "1.2.27",
+  "code": 150,
+  "sourceCommit": "d5f979d6c3794cae7248b00dd112ca86fcf5b25f",
+  "sourceZipSHA256": "012b053eee26b6d28a7e112ee5bab5b4f3d684a72ab6a52796e037e295da4b9d",
+  "sourceZipBytes": 5260612,
+  "exeSHA256": "c42abbe137a9abfa8e587c4fc82a960dca0ebd40753c745cfa7b103b54471f23",
+  "exeBytes": 9803026,
+  "resultsUnitChecks": 27,
+  "resultsUIChecks": 16,
+  "responsiveUIChecks": 308,
+  "packagedStartupChecks": 10,
+  "packedAssets": 229,
+  "geometry": {
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "viewportWidths": [
+      1920,
+      1440,
+      1280,
+      1024,
+      800,
+      640,
+      480,
+      320
+    ],
+    "zeroAndLongDuration": true,
+    "timeAndActionsDoNotOverlap": true
+  },
+  "originalKeyCatalogVerified": true,
+  "previous125NativeParserAcceptedCatalog": true,
+  "physicalWindowsRuntimeRerun": false,
+  "serverDeploymentRequired": false,
+  "productionAPIWrites": 0
+}

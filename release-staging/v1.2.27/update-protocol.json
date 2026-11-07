@@ -1,0 +1,43 @@
+{
+  "passed": 28,
+  "checks": [
+    "valid",
+    "tampered payload",
+    "tampered signature",
+    "truncated file",
+    "missing newline",
+    "duplicate field",
+    "unknown schema",
+    "path traversal",
+    "external URL",
+    "embedded dots",
+    "oversized binary",
+    "negative version",
+    "zero version",
+    "wrong extension",
+    "invalid hash",
+    "extra CR",
+    "wrong version name",
+    "field order",
+    "NUL value",
+    "length 0",
+    "length 1",
+    "length 9",
+    "length 10",
+    "length 100",
+    "length 522",
+    "length 523",
+    "length 16385",
+    "length 65536"
+  ],
+  "parser": "actual native/update_protocol.h",
+  "rsa": "OpenSSL SHA256withRSA on Linux",
+  "windowsCryptoAPIRuntimeVerified": false,
+  "catalogReferenceVerified": true,
+  "binaryArtifactsVerified": [
+    "windows"
+  ],
+  "signedReleaseBundleVerified": true,
+  "signedReleaseBundleChecks": 4,
+  "networkDownloadVerified": false
+}
