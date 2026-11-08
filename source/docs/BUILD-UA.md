@@ -8,7 +8,7 @@ Linux x86-64: Python 3, Pillow 12.3.0, GCC, GNU binutils з i386pep.
 ```bash
 python3 -m venv ../.venv-build
 source ../.venv-build/bin/activate
-python -m pip install Pillow==12.3.0 cryptography==50.0.2
+python -m pip install Pillow==12.3.0 cryptography==50.0.2 openpyxl==3.1.5
 python build_windows.py
 npm test
 python tests/update_native.py

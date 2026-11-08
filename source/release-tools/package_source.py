@@ -7,6 +7,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = {
+    'web/excel-report.js', 'release-tools/sync_report.py',
     'web/results.js', 'web/exam-session.js', 'web/account-sync.js', 'build_windows.py', 'package.json', 'native/main.c', 'web/app.js', 'web/updater.js', 'web/workspace.js', 'web/durability.js', 'web/learning.js',
     'web/vendor/pdfjs/build/pdf.mjs',
     'web/vendor/pdfjs/build/pdf.worker.mjs',

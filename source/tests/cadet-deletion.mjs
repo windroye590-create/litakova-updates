@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import * as C from '../web/core.js';
-import {api,context,credential,instructorToken,regressionTest,regressionBody,spreadsheet} from './fixtures/server_model.mjs';
+import {api,context,credential,instructorToken,regressionTest,regressionBody,spreadsheet,publicRows as canonicalRows} from './fixtures/server_model.mjs';
 
 const group=api('POST','/api/instructor/groups',instructorToken,{name:'Повне видалення акаунта'}).group;
 const publicSheet=context.publicResultsSpreadsheet_(false).getSheetByName('Результати курсантів');
@@ -16,7 +16,7 @@ const cadet=(username,fullName)=>api('POST','/api/register','',{
 const path=person=>'/api/instructor/users/'+person.user.id;
 const remove=person=>api('DELETE',path(person),instructorToken,{confirmUserId:String(person.user.id)});
 const submit=(person,test,key)=>api('POST','/api/results',person.token,regressionBody(test,key)).result;
-const publicRows=()=>publicSheet.rows.slice(1);
+const publicRows=()=>canonicalRows(publicSheet).slice(1);
 const matchesId=(row,result)=>String(row[7])===String(result.id);
 const withoutIds=result=>Array.from(context.publicResultValues_(result),(value,index)=>index===6||index===7?'':value);
 
@@ -25,7 +25,7 @@ await check('A copied legacy row in the shared spreadsheet is removed with its a
  const removed=submit(a,regressionTest('Робота для видалення'),'same-submission-key');
  const kept=submit(b,regressionTest('Робота іншого курсанта'),'same-submission-key');
  const legacyRow=withoutIds(removed);
- publicSheet.appendRow(legacyRow);
+ context.appendPublicRow_(publicSheet,legacyRow);
  assert.equal(remove(a).deleted,true);
  assert.ok(!publicRows().some(row=>matchesId(row,removed)||row===legacyRow||row[5]===removed.testTitle));
  assert.ok(publicRows().some(row=>matchesId(row,kept)));
@@ -37,13 +37,13 @@ await check('Ambiguous rows in the current spreadsheet and conflicting IDs stop 
  const a=cadet('ambiguous_target','Два однакові рядки'),b=cadet('ambiguous_keep',a.user.fullName);
  const test=regressionTest('Однакові оцінки');
  const first=submit(a,test,'ambiguous-shared-a'),second=submit(b,test,'ambiguous-shared-b');
- publicSheet.appendRow(withoutIds(first));
+ context.appendPublicRow_(publicSheet,withoutIds(first));
  try{reject(()=>remove(a),'PUBLIC_RESULTS_ID_REQUIRED');}
  finally{publicSheet.deleteRows(publicSheet.getLastRow(),1);}
- const row=publicRows().find(row=>matchesId(row,first));
- row[6]=String(b.user.id);
+ const row=publicSheet.rows.find(row=>String(row[publicSheet.rows[0].indexOf('_ID результату')])===String(first.id)),owner=publicSheet.rows[0].indexOf('_ID курсанта');
+ row[owner]=String(b.user.id);
  try{reject(()=>remove(a),'PUBLIC_RESULTS_SCHEMA');}
- finally{row[6]=String(a.user.id);}
+ finally{row[owner]=String(a.user.id);}
  assert.ok(context.findUserById_(a.user.id).active);
  assert.ok(publicRows().some(row=>matchesId(row,second)));
 });
@@ -57,9 +57,9 @@ await check('Legacy-only scores and a historical registration row are removed fr
  const legacy=spreadsheet.insertSheet('Результати курсантів');
  const row=[oldName,1,1,context.formatDuration_(17),50];
  legacy.maxColumns=5;
- legacy.rows=[Array.from(publicSheet.rows[0]).slice(0,5),row];
- publicSheet.appendRow([...row,oldTitle,'','']);
- publicSheet.appendRow([a.user.fullName,'','','','','','','']);
+ legacy.rows=[canonicalRows(publicSheet)[0].slice(0,5),row];
+ context.appendPublicRow_(publicSheet,[...row,oldTitle,'','']);
+ context.appendPublicRow_(publicSheet,[a.user.fullName,'','','','','','','']);
  try{
   assert.equal(remove(a).deleted,true);
   assert.equal(legacy.getLastRow(),1);

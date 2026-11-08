@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import vm from "node:vm";
+import {zipReportParts} from '../../web/excel-report.js';
 
 const {version: releaseName, versionCode: releaseCode} = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url)));
 
@@ -26,21 +27,34 @@ class Range {
     return this;
   }
   getValue() { return this.getValues()[0][0]; }
+  getDisplayValues() {return this.getValues().map(row=>row.map(value=>String(value)));}
   setValue(value) { return this.setValues([[value]]); }
   setFontWeight() { return this; }
   setBackground() { return this; }
+  setBackgrounds() { return this; }
   setFontColor() { return this; }
   setNumberFormat() { return this; }
+  setNumberFormats() { return this; }
+  setWrap() { return this; }
+  setVerticalAlignment() { return this; }
+  getRow() { return this.row; }
+  getColumn() { return this.column; }
+  getNumColumns() { return this.columnCount; }
+  getNumRows() { return this.rowCount; }
+  createFilter() {const range=this,criteria=new Map(),filter={getRange:()=>range,getColumnFilterCriteria:column=>criteria.get(column)||null,setColumnFilterCriteria(column,value){criteria.set(column,value);return filter;},remove(){range.sheet.filter=null;}};this.sheet.filter=filter;return filter;}
+  applyRowBanding() {const b={getRange:()=>this,remove:()=>{this.sheet.bandings=this.sheet.bandings.filter(v=>v!==b);},setHeaderRowColor(){return b;},setFirstRowColor(){return b;},setSecondRowColor(){return b;}};this.sheet.bandings.push(b);return b;}
 }
 
 class Sheet {
   constructor(name) {
+    this.id=crypto.randomInt(1,2000000000);
     this.name = name;
     this.rows = [];
     this.maxColumns = 1;
     this.maxRows = 1000;
     this.hidden = false;
     this.hiddenColumns = new Set();
+    this.bandings=[];this.rules=[];this.filter=null;
   }
   ensureRow(index) {
     while (this.rows.length <= index) this.rows.push([]);
@@ -75,12 +89,27 @@ class Sheet {
   deleteRow(row) { this.rows.splice(row - 1, 1); }
   deleteRows(row,count) { this.rows.splice(row - 1,count); }
   setFrozenRows() {}
+  setFrozenColumns() {}
+  setRowHeight() {}
+  autoResizeRows() {}
+  getFilter() {return this.filter;}
+  getBandings() {return this.bandings;}
+  getConditionalFormatRules() {return this.rules;}
+  setConditionalFormatRules(rules) {this.rules=rules;}
+  moveColumns(range,destination) {
+    const from=range.column-1,to=destination-1,count=range.columnCount;
+    const order=Array.from({length:this.maxColumns},(_,i)=>i);order.splice(to,0,...order.splice(from,count));
+    this.rows=this.rows.map(row=>order.map(i=>row[i]??''));
+    this.hiddenColumns=new Set([...this.hiddenColumns].map(c=>order.indexOf(c-1)+1));
+  }
+  copyTo(book) {const copy=book.insertSheet('Copy '+this.name+' '+book.getSheets().length);copy.rows=this.rows.map(r=>[...r]);copy.maxColumns=this.maxColumns;copy.maxRows=this.maxRows;copy.hiddenColumns=new Set(this.hiddenColumns);return copy;}
   setColumnWidth() {}
   setColumnWidths() {}
   hideColumns(start, count = 1) { for (let i = 0; i < count; i += 1) this.hiddenColumns.add(start + i); }
   showColumns(start, count = 1) { for (let i = 0; i < count; i += 1) this.hiddenColumns.delete(start + i); }
   getName() { return this.name; }
-  setName(name) { this.name = name; return this; }
+  getSheetId() {return this.id;}
+  setName(name) {if(this.book){this.book.sheets.delete(this.name);this.book.sheets.set(name,this);}this.name = name; return this; }
   isSheetHidden() { return this.hidden; }
   hideSheet() { this.hidden = true; }
 }
@@ -93,6 +122,7 @@ class Spreadsheet {
   getSheetByName(name) { return this.sheets.get(name) || null; }
   insertSheet(name) {
     const sheet = new Sheet(name);
+    sheet.book=this;
     this.sheets.set(name, sheet);
     return sheet;
   }
@@ -118,11 +148,17 @@ function bytes(value) {
   return Buffer.from(Array.from(value || [], (item) => item < 0 ? item + 256 : item));
 }
 
+class ModelBlob {
+ constructor(value,type='',name=''){this.value=bytes(value);this.type=type;this.name=name;}
+ getBytes(){return [...this.value];}getDataAsString(){return this.value.toString('utf8');}getName(){return this.name;}
+ setName(name){this.name=name;return this;}setContentType(type){this.type=type;return this;}getContentType(){return this.type;}
+ copyBlob(){return new ModelBlob(this.value,this.type,this.name);}
+}
 const BACKEND_SPREADSHEET_ID = "1acfLVVoxCYs75ruUgTEIvwBLgb072QVz1MgEIW2b1sI";
 const spreadsheet = new Spreadsheet(BACKEND_SPREADSHEET_ID);
 const spreadsheets = new Map([[spreadsheet.id, spreadsheet]]);
 let createdSpreadsheetCounter = 0;
-const properties = new KeyValueStore();
+const properties = new KeyValueStore();properties.setProperty('LK_EXCEL_LAYOUT_ARMED_V1','1');
 const cache = new CacheStore();
 const lock = {tryLock: () => true, waitLock() {}, releaseLock() {}};
 const context = vm.createContext({
@@ -141,6 +177,7 @@ const context = vm.createContext({
   isNaN,
   decodeURIComponent,
   SpreadsheetApp: {
+    newConditionalFormatRule:()=>{const r={whenFormulaSatisfied(v){r.formula=v;return r;},setBackground(){return r;},setFontColor(){return r;},setRanges(v){r.ranges=v;return r;},build(){return {getBooleanCondition:()=>({getCriteriaValues:()=>[r.formula]}),ranges:r.ranges};}};return r;},
     openById: (id) => {
       if (String(id) === BACKEND_SPREADSHEET_ID) return spreadsheet;
       const value = spreadsheets.get(String(id));
@@ -161,10 +198,9 @@ const context = vm.createContext({
     DigestAlgorithm: {SHA_256:"sha256"},
     computeDigest: (algorithm,value) => [...crypto.createHash(algorithm).update(bytes(value)).digest()],
     getUuid: () => crypto.randomUUID(),
-    newBlob: (value) => ({
-      getBytes: () => [...bytes(value)],
-      getDataAsString: () => bytes(value).toString("utf8")
-    }),
+    newBlob: (value,type,name) =>new ModelBlob(value,type,name),
+    zip:(blobs,name)=>new ModelBlob(zipReportParts(blobs.map(b=>({name:b.getName(),data:b.getDataAsString()}))),'application/zip',name),
+    unzip:blob=>{const raw=Buffer.from(blob.getBytes()),parts=[];for(let p=0;p+30<=raw.length&&raw.readUInt32LE(p)===0x04034b50;){assert.equal(raw.readUInt16LE(p+8),0);const size=raw.readUInt32LE(p+18),names=raw.readUInt16LE(p+26),extra=raw.readUInt16LE(p+28),start=p+30+names+extra;parts.push(new ModelBlob(raw.subarray(start,start+size),'application/xml',raw.subarray(p+30,p+30+names).toString('utf8')));p=start+size;}return parts;},
     base64Encode: (value) => bytes(value).toString("base64"),
     base64Decode: (value) => [...Buffer.from(String(value), "base64")],
     base64EncodeWebSafe: (value) => bytes(value).toString("base64url"),
@@ -179,6 +215,9 @@ const context = vm.createContext({
 
 const source = fs.readFileSync(process.env.LITAKOVA_SERVER_SOURCE || new URL("../../Code.gs", import.meta.url), "utf8");
 vm.runInContext(source, context, {filename: "Код.gs"});
+
+
+function publicRows(sheet){return [['ПІБ курсанта','Правильних','Неправильних','Час проходження','Правильних, %','Тест','_ID курсанта','_ID результату','Стан перевірки','Набрано балів','Максимум балів','Підсумковий бал, %','Група','Дата завершення','Результат'],...Array.from(context.publicRowsFromSheet_(sheet),row=>Array.from(row))];}
 
 function credential(password) {
   const salt = crypto.randomBytes(16);
@@ -211,7 +250,7 @@ assert.equal(spreadsheet.getSheetByName("_Результати_дані").rows[0
 const publicSpreadsheet = spreadsheets.get(properties.getProperty("PUBLIC_RESULTS_SPREADSHEET_ID"));
 assert.ok(publicSpreadsheet, "Має бути створено окрему таблицю результатів");
 assert.deepEqual(publicSpreadsheet.getSheetByName("Результати курсантів").rows[0].slice(0, 5),
-  ["ПІБ курсанта", "Правильних", "Неправильних", "Час проходження", "Правильних, %"]);
+  ["ПІБ курсанта", "Група", "Тест", "Дата завершення", "Результат"]);
 
 const initialCode = context.createInitialInstructorCode().match(/[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}/)?.[0];
 assert.ok(initialCode);
@@ -314,7 +353,7 @@ const emptyGroup = api("POST", "/api/instructor/groups", instructorToken, {name:
 assert.equal(api("DELETE", `/api/instructor/groups/${emptyGroup.id}`, instructorToken).deleted, true);
 assert.equal(api("GET", "/api/groups").groups.some((item) => item.name === "Тимчасова"), false);
 
-const visibleRows = publicSpreadsheet.getSheetByName("Результати курсантів").rows;
+const visibleRows = publicRows(publicSpreadsheet.getSheetByName("Результати курсантів"));
 assert.equal(visibleRows.length, 2);
 assert.deepEqual(visibleRows[1].slice(0, 5), ["Тестовий Курсант", 1, 0, "0 хв 42 с", 100]);
 assert.equal(visibleRows[1][5], "Контрольний тест");
@@ -338,7 +377,7 @@ expectCode(() => api("POST", "/api/instructor/register", "", {
 }), "INVALID_INVITE");
 const secondSheetInfo = api("POST", "/api/instructor/results-sheet/sync", secondInstructor.token);
 assert.equal(secondSheetInfo.synced, true);
-assert.equal(secondSheetInfo.url, publicSpreadsheet.getUrl());
+assert.equal(secondSheetInfo.url, publicSpreadsheet.getUrl()+'#gid='+publicSpreadsheet.getSheetByName('Результати курсантів').getSheetId());
 
 const secondCadet = api("POST", "/api/register", "", {
   fullName: "Інший Курсант",
@@ -703,91 +742,51 @@ regression("Different tests for one cadet retain separate titled rows", () => {
   const firstBody = regressionBody(firstTest, "test-column-first");
   const first = api("POST", "/api/results", secondCadetLogin.token, firstBody).result;
   const sheet = publicSpreadsheet.getSheetByName("Результати курсантів");
-  const firstRow = [...sheet.rows.find((row) => String(row[7]) === String(first.id))];
+  const firstRow = [...publicRows(sheet).find((row) => String(row[7]) === String(first.id))];
   const second = api("POST", "/api/results", secondCadetLogin.token,
     regressionBody(secondTest, "test-column-second")).result;
-  assert.equal(sheet.rows.find((row) => String(row[7]) === String(first.id))[5], firstTest.title);
-  assert.equal(sheet.rows.find((row) => String(row[7]) === String(second.id))[5], secondTest.title);
-  assert.deepEqual(sheet.rows.find((row) => String(row[7]) === String(first.id)), firstRow);
+  assert.equal(publicRows(sheet).find((row) => String(row[7]) === String(first.id))[5], firstTest.title);
+  assert.equal(publicRows(sheet).find((row) => String(row[7]) === String(second.id))[5], secondTest.title);
+  assert.deepEqual(publicRows(sheet).find((row) => String(row[7]) === String(first.id)), firstRow);
   const rowCount = sheet.rows.length;
   api("POST", "/api/results", secondCadetLogin.token, firstBody);
   context.publishVisibleResult_(first);
   assert.equal(sheet.rows.length, rowCount);
-  assert.equal(sheet.rows.filter((row) => String(row[7]) === String(first.id)).length, 1);
+  assert.equal(publicRows(sheet).filter((row) => String(row[7]) === String(first.id)).length, 1);
 });
 
-regression("Seven-column migration preserves results, IDs and extra columns once", () => {
-  const sheet = publicSpreadsheet.getSheetByName("Результати курсантів");
-  const savedRows = sheet.rows.map((row) => [...row]);
-  const savedCapacity = sheet.maxColumns;
-  const savedHidden = new Set(sheet.hiddenColumns);
-  try {
-    sheet.rows = savedRows.map((row, index) => row.slice(0, 5).concat(row.slice(6, 8),
-      index === 0 ? "Примітка інструктора" : `Примітка ${index}`));
-    sheet.maxColumns = 8;
-    sheet.hiddenColumns = new Set([6, 7]);
-    const before = sheet.rows.map((row) => [...row]);
-    context.ensurePublicResultsSheet_(publicSpreadsheet);
-    assert.equal(sheet.rows[0][5], "Тест");
-    assert.equal(sheet.maxColumns, 13);
-    assert.equal(sheet.hiddenColumns.has(6), false);
-    assert.equal(sheet.hiddenColumns.has(7), true);
-    assert.equal(sheet.hiddenColumns.has(8), true);
-    before.slice(1).forEach((row, index) => {
-      assert.deepEqual(sheet.rows[index + 1].slice(0, 5), row.slice(0, 5));
-      assert.deepEqual(sheet.rows[index + 1].slice(6,8), row.slice(5,7));
-      assert.equal(sheet.rows[index+1][12],row[7]);
-    });
-    assert.equal(sheet.rows[0][12], "Примітка інструктора");
-    const migrated = sheet.rows.map((row) => [...row]);
-    context.ensurePublicResultsSheet_(publicSpreadsheet);
-    assert.equal(sheet.maxColumns, 13);
-    assert.deepEqual(sheet.rows, migrated);
-  } finally {
-    sheet.rows = savedRows;
-    sheet.maxColumns = savedCapacity;
-    sheet.hiddenColumns = savedHidden;
-  }
+regression("Legacy layout migration preserves results, IDs and manual columns once", () => {
+ const sheet=publicSpreadsheet.getSheetByName('Результати курсантів'),saved=sheet.rows.map(r=>[...r]),capacity=sheet.maxColumns,hidden=new Set(sheet.hiddenColumns);
+ const ready='LK_PUBLIC_LAYOUT_READY_V4_'+publicSpreadsheet.id,backup='LK_PUBLIC_LAYOUT_BACKUP_V1_'+publicSpreadsheet.id;
+ const oldReady=properties.getProperty(ready),oldBackup=properties.getProperty(backup),oldCopy=publicSpreadsheet.sheets.get('Резерв таблиці до Excel');
+ try{
+  sheet.rows=publicRows(sheet).map((r,i)=>r.slice(0,5).concat(r.slice(6,8),i===0?'Примітка інструктора':'Примітка '+i));sheet.maxColumns=8;sheet.hiddenColumns=new Set([6,7]);
+  const before=sheet.rows.map(r=>[...r]);properties.deleteProperty(ready);properties.deleteProperty(backup);publicSpreadsheet.sheets.delete('Резерв таблиці до Excel');context.publicLayouts_=[];
+  context.ensurePublicResultsSheet_(publicSpreadsheet);
+  const headers=sheet.rows[0],canonical=publicRows(sheet);assert.equal(headers[1],'Група');assert.equal(headers[2],'Тест');assert.equal(sheet.maxColumns,16);
+  assert.ok(sheet.hiddenColumns.has(headers.indexOf('_ID курсанта')+1));assert.ok(sheet.hiddenColumns.has(headers.indexOf('_ID результату')+1));
+  before.slice(1).forEach((r,i)=>{assert.deepEqual(canonical[i+1].slice(0,5),r.slice(0,5));assert.deepEqual(canonical[i+1].slice(6,8),r.slice(5,7));assert.equal(sheet.rows[i+1][headers.indexOf('Примітка інструктора')],r[7]);});
+  assert.ok(publicSpreadsheet.getSheetByName('Резерв таблиці до Excel'));
+  const migrated=sheet.rows.map(r=>[...r]);context.ensurePublicResultsSheet_(publicSpreadsheet);assert.deepEqual(sheet.rows,migrated);assert.equal(sheet.maxColumns,16);
+ }finally{sheet.rows=saved;sheet.maxColumns=capacity;sheet.hiddenColumns=hidden;context.publicLayouts_=[];oldReady?properties.setProperty(ready,oldReady):properties.deleteProperty(ready);oldBackup?properties.setProperty(backup,oldBackup):properties.deleteProperty(backup);if(oldCopy)publicSpreadsheet.sheets.set('Резерв таблиці до Excel',oldCopy);else publicSpreadsheet.sheets.delete('Резерв таблиці до Excel');}
 });
 
-regression("Backfill uses result IDs and restores authoritative standard result values", () => {
-  const sheet = publicSpreadsheet.getSheetByName("Результати курсантів");
-  const savedRows = sheet.rows.map((row) => [...row]);
-  try {
-    sheet.rows.slice(1).forEach((row) => { row[5] = ""; });
-    const completed = sheet.rows.find((row, index) => index > 0 && String(row[7] || ""));
-    completed[1] = 77;
-    const before = sheet.rows.map((row) => row.slice(0, 5));
-    const rowCount = sheet.rows.length;
-    assert.match(context.updateResultsTestColumn(), /Колонку «Тест» додано/);
-    const results = new Map(context.listResults_(null).map((result) => [String(result.id), result]));
-    sheet.rows.slice(1).forEach((row,index) => {
-      const result = results.get(String(row[7] || ""));
-      if (result) {
-        assert.equal(row[5], context.safeCellText_(result.testTitle));
-        assert.deepEqual(row.slice(0,5),Array.from(context.publicResultValues_(result)).slice(0,5));
-      } else {assert.equal(row[5], "");assert.deepEqual(row.slice(0,5),before[index+1]);}
-    });
-    assert.equal(sheet.rows.length, rowCount);
-    const filled = sheet.rows.map((row) => [...row]);
-    context.updateResultsTestColumn();
-    assert.deepEqual(sheet.rows, filled);
-  } finally { sheet.rows = savedRows; }
+regression("Filling missing titles repairs managed fields and stays idempotent", () => {
+ const sheet=publicSpreadsheet.getSheetByName('Результати курсантів'),saved=sheet.rows.map(r=>[...r]);
+ try{
+  const title=sheet.rows[0].indexOf('Тест'),correct=sheet.rows[0].indexOf('Правильних');sheet.rows.slice(1).forEach(r=>r[title]='');const index=publicRows(sheet).findIndex((r,i)=>i>0&&r[7]);sheet.rows[index][correct]=77;
+  const before=publicRows(sheet),count=sheet.rows.length;assert.match(context.updateResultsTestColumn(),/Колонку «Тест» додано/);
+  const results=new Map(context.listResults_(null).map(r=>[String(r.id),r]));publicRows(sheet).slice(1).forEach((row,i)=>{const r=results.get(String(row[7]));if(r){assert.equal(row[5],context.safeCellText_(r.testTitle));assert.deepEqual(row.slice(0,5),Array.from(context.publicResultValues_(r)).slice(0,5));}else{assert.equal(row[5],'');assert.deepEqual(row.slice(0,5),before[i+1].slice(0,5));}});
+  assert.equal(sheet.rows.length,count);const filled=sheet.rows.map(r=>[...r]);context.updateResultsTestColumn();assert.deepEqual(sheet.rows,filled);
+ }finally{sheet.rows=saved;context.publicLayouts_=[];}
 });
 
 regression("A historical five-column result is adopted without a duplicate", () => {
-  const sheet = publicSpreadsheet.getSheetByName("Результати курсантів");
-  const savedRows = sheet.rows.map((row) => [...row]);
-  try {
-    const index = sheet.rows.findIndex((row) => String(row[7]) === String(result.id));
-    sheet.rows[index] = sheet.rows[index].slice(0, 5);
-    const rowCount = sheet.rows.length;
-    context.repairPublicResults_();
-    assert.equal(sheet.rows.length, rowCount);
-    assert.equal(sheet.rows[index][5], "Контрольний тест");
-    assert.equal(String(sheet.rows[index][6]), String(result.userId));
-    assert.equal(String(sheet.rows[index][7]), String(result.id));
-  } finally { sheet.rows = savedRows; }
+ const sheet=publicSpreadsheet.getSheetByName('Результати курсантів'),saved=sheet.rows.map(r=>[...r]);
+ try{
+  const index=publicRows(sheet).findIndex(r=>String(r[7])===String(result.id)),row=publicRows(sheet)[index];context.writePublicRows_(sheet,index+1,[row.slice(0,5)]);
+  const count=sheet.rows.length;context.repairPublicResults_();assert.equal(sheet.rows.length,count);const restored=publicRows(sheet)[index];assert.equal(restored[5],'Контрольний тест');assert.equal(String(restored[6]),String(result.userId));assert.equal(String(restored[7]),String(result.id));
+ }finally{sheet.rows=saved;context.publicLayouts_=[];}
 });
 
 // Complete deletion must cascade by IDs, including accounts in other groups.
@@ -828,7 +827,7 @@ regression('Full deletion clears both groups without touching same-name cadets o
     expectCode(()=>api('GET','/api/cadet/workspace',cadet.token),'SESSION_EXPIRED');
     const refs=[['_Результати_дані',1],['_Результати',4],['_Деталі_відповідей',1],['_Повторні_спроби',1]];
     for(const [name,column] of refs)assert.equal(spreadsheet.getSheetByName(name).rows.slice(1).some(r=>String(r[column])===String(cadet.user.id)),false,name);
-    assert.equal(publicSpreadsheet.getSheetByName('Результати курсантів').rows.slice(1).some(r=>String(r[6])===String(cadet.user.id)),false);
+    assert.equal(publicRows(publicSpreadsheet.getSheetByName('Результати курсантів')).slice(1).some(r=>String(r[6])===String(cadet.user.id)),false);
     const audit=spreadsheet.getSheetByName('_Журнал_дій').rows.slice(1).filter(r=>String(r[4])==='cadet'&&String(r[5])===String(cadet.user.id));
     assert.equal(audit.length,1);assert.equal(audit[0][3],'CADET_DELETE');assert.equal(audit[0][6],'');
   }
@@ -855,9 +854,9 @@ regression('Configured public spreadsheet access failure prevents any deletion',
 
 regression('Unidentified public rows stop safely before deleting another same-name person',()=>{
  const cadet=deletionCadet(),sheet=publicSpreadsheet.getSheetByName('Результати курсантів');
- const saved=sheet.rows[0].slice();sheet.rows[0][6]='Без ID';
+ const saved=sheet.rows[0].slice();sheet.rows[0][sheet.rows[0].indexOf('_ID курсанта')]='Без ID';context.publicLayouts_=[];
  try{expectCode(()=>deleteAccount(cadet),'PUBLIC_RESULTS_SCHEMA');assert.ok(context.findUserById_(cadet.user.id)?.active);}
- finally{sheet.rows[0]=saved;}
+ finally{sheet.rows[0]=saved;context.publicLayouts_=[];}
 });
 
 regression('Old five-column migration source is cleaned only with unambiguous complete result identity',()=>{
@@ -894,4 +893,4 @@ if (failures.length) {
 }
 console.log(`Server regression checks passed: ${regressionCount}/${regressionCount}.`);
 
-export {context, api, credential, spreadsheet, lock, instructorToken, regressionTest, regressionBody, seedLegacyRetry};
+export {context, api, credential, spreadsheet, lock, instructorToken, regressionTest, regressionBody, seedLegacyRetry, publicRows};

@@ -5,7 +5,7 @@ import {compactResults} from '../web/results.js';
 import {completedTestIds} from '../web/core.js';
 
 process.env.LITAKOVA_SERVER_SOURCE=new URL('../Code.gs',import.meta.url).pathname;
-const {api,context,credential,instructorToken,spreadsheet,regressionTest,regressionBody}=await import('./fixtures/server_model.mjs');
+const {api,context,credential,instructorToken,spreadsheet,regressionTest,regressionBody,publicRows:canonicalRows}=await import('./fixtures/server_model.mjs');
 const checks=[];
 function check(name,run){run();checks.push(name);console.log('PASS '+name);}
 function rejected(run,code){assert.throws(run,error=>error.code===code);}
@@ -21,7 +21,7 @@ const removed=api('POST','/api/results',a.token,targetBody).result;
 const other=api('POST','/api/results',b.token,regressionBody(target,'remove-result-b')).result;
 const retained=api('POST','/api/results',a.token,regressionBody(live,'retained-result')).result;
 const publicSheet=context.publicResultsSheet_();
-const hasPublic=id=>publicSheet.rows.slice(1).some(row=>String(row[7])===String(id));
+const hasPublic=id=>canonicalRows(publicSheet).slice(1).some(row=>String(row[7])===String(id));
 const route=id=>'/api/instructor/results/'+id;
 const erase=(id,token=instructorToken)=>api('DELETE',route(id),token,{confirmResultId:String(id)});
 
@@ -36,7 +36,7 @@ check('Only an instructor can delete a confirmed result ID',()=>{
 check('Ambiguous old rows without IDs prevent deletion before any data is changed',()=>{
  const legacy=spreadsheet.insertSheet('Результати курсантів');
  legacy.maxColumns=5;
- legacy.rows=[Array.from(publicSheet.rows[0]).slice(0,5),Array.from(context.publicResultValues_(removed)).slice(0,5)];
+ legacy.rows=[canonicalRows(publicSheet)[0].slice(0,5),Array.from(context.publicResultValues_(removed)).slice(0,5)];
  try{
   rejected(()=>erase(removed.id),'PUBLIC_RESULTS_ID_REQUIRED');
   assert.ok(hasPublic(removed.id));
@@ -94,7 +94,7 @@ check('A failure after public deletion leaves a retryable operation and blocks r
  assert.equal(erase(retained.id).deleted,true);
  assert.ok(!hasPublic(retained.id)&&hasPublic(other.id));
  rejected(()=>api('POST','/api/tests/'+live.id+'/start',a.token,{submissionId:'pc-deleted-attempt-123'}),'ALREADY_COMPLETED');
- assert.ok(publicSheet.rows.some(row=>String(row[6])===String(a.user.id)&&!row[7]));
+ assert.ok(canonicalRows(publicSheet).some(row=>String(row[6])===String(a.user.id)&&!row[7]));
 });
 
 check('A late written-grading draft cannot restore a deleted work',()=>{

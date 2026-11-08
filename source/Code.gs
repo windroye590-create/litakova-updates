@@ -85,9 +85,15 @@ const HEADERS = Object.freeze({
   audit: ['ID', 'ID інструктора', 'Інструктор', 'Дія', 'Тип об’єкта', 'ID об’єкта', 'Назва об’єкта', 'Деталі', 'Створено']
 });
 
-const PUBLIC_RESULTS_HEADERS = Object.freeze([
+const PUBLIC_RESULTS_CANONICAL_HEADERS = Object.freeze([
   'ПІБ курсанта', 'Правильних', 'Неправильних', 'Час проходження', 'Правильних, %',
-  'Тест', '_ID курсанта', '_ID результату', 'Стан перевірки', 'Набрано балів', 'Максимум балів', 'Підсумковий бал, %'
+  'Тест', '_ID курсанта', '_ID результату', 'Стан перевірки', 'Набрано балів', 'Максимум балів', 'Підсумковий бал, %',
+  'Група', 'Дата завершення', 'Результат'
+]);
+const PUBLIC_RESULTS_HEADERS = Object.freeze([
+  'ПІБ курсанта', 'Група', 'Тест', 'Дата завершення', 'Результат', 'Підсумковий бал, %',
+  'Набрано балів', 'Максимум балів', 'Час проходження', 'Правильних', 'Неправильних', 'Правильних, %',
+  'Стан перевірки', '_ID курсанта', '_ID результату'
 ]);
 
 const GROUP_PREFIX = '[[LK-GROUPS:';
@@ -100,6 +106,7 @@ var workspaceWriteRequest_ = false;
 var spreadsheetCache_ = null;
 var publicResultsSpreadsheetCache_ = null;
 var publicResultsSheetCache_ = null;
+var publicLayouts_ = [];
 var testAccessCache_ = null;
 var testAccessGroupsCache_ = null;
 var publicSyncActor_ = null;
@@ -111,7 +118,7 @@ function doGet() {
     ok: true,
     service: 'Літакова Комісія',
     version: API_VERSION,
-    serverBuild: 'pc-api26-e162a03c1a061bc0',
+    serverBuild: 'pc-api26-0000000000000000',
     resultDeletion: true,
     singleAttempt: true,
     privateLocalStorage: true,
@@ -134,6 +141,9 @@ function doGet() {
     cadetDeletion: true,
     cadetTransfer: true,
     cadetCard: true,
+    formattedReports: true,
+    formattedResultsReady: publicReportLayoutReady_(),
+    intakeArchives: true,
     recentResultsRead: true,
     status: 'online',
     price: 'Безкоштовно'
@@ -178,7 +188,7 @@ function setAppDownloadUrl(url, versionCode, versionName) {
 
 function doPost(e) {
   workspaceMutation_ = null; workspaceWriteRequest_ = false;
-  publicSyncActor_ = null; publicSyncScan_ = null; publicSyncCacheBypass_ = false;
+  publicSyncActor_ = null; publicSyncScan_ = null; publicSyncCacheBypass_ = false; publicLayouts_ = [];
   testAccessCache_ = null;
   testAccessGroupsCache_ = null;
   var lock = null;
@@ -195,6 +205,7 @@ function doPost(e) {
       if (!lock.tryLock(2000)) fail_('Сервер зайнятий. Результат буде надіслано повторно.', 'BUSY');
     }
     workspaceWriteRequest_ = Boolean(lock);
+    if(request&&request.action==='api'&&request.method==='GET'&&request.path==='/api/groups'&&request.body&&request.body.initializeReports===true)PropertiesService.getScriptProperties().setProperty('LK_EXCEL_LAYOUT_ARMED_V1','1');
     ensureSchema_(Boolean(lock));
     recoverWorkspaceChange_(Boolean(lock));
     if(request&&request.action==='local-storage-authorize'){
@@ -351,7 +362,7 @@ function intakeJob_(id) {
 }
 function intakePublic_(job) {
   var v=job.value;
-  return {id:v.id,state:v.phase===INTAKE_PHASES.length?'completed':'running',phase:v.phase,steps:INTAKE_PHASES.length,cadets:v.cadets,results:v.results,tests:v.tests,startedAt:v.startedAt,finishedAt:v.finishedAt||'',error:v.error||''};
+  return {id:v.id,state:v.phase===INTAKE_PHASES.length?'completed':'running',phase:v.phase,steps:INTAKE_PHASES.length,cadets:v.cadets,results:v.results,tests:v.tests,startedAt:v.startedAt,finishedAt:v.finishedAt||'',error:v.error||'',archiveRequired:v.archiveRequired===true,archiveName:v.archiveName||'',archive:v.archive||null};
 }
 function intakeStatus_(){var id=PropertiesService.getScriptProperties().getProperty('LK_INTAKE_ACTIVE');return id?intakePublic_(intakeJob_(id)):null;}
 function saveIntakeJob_(job){sheet_('intakeJobs').getRange(job.rowNumber,4,1,2).setValues([[JSON.stringify(job.value),new Date()]]);}
@@ -392,7 +403,7 @@ function startIntake_(actor,body) {
   var signed=readSignedDocument_(body.previewToken,'INVALID_PREVIEW'),snapshot=intakeSnapshot_();
   if(!signed||signed.kind!=='new-intake'||signed.actorId!==String(actor.id)||signed.expiresAt<Date.now())fail_('Підтвердження застаріло. Відкрийте підготовку набору ще раз.','PREVIEW_EXPIRED');
   if(signed.digest!==snapshot.digest)fail_('Склад курсантів, тести або результати змінилися. Перевірте оновлені кількості перед очищенням.','REVISION_CONFLICT');
-  var id='intake-'+Utilities.getUuid(),now=new Date(),value={id:id,requestId:body.requestId,actorId:String(actor.id),previewToken:body.previewToken,phase:0,cadets:snapshot.counts.cadets,results:snapshot.counts.results,tests:snapshot.counts.tests,startedAt:now.toISOString(),error:''};
+  var id='intake-'+Utilities.getUuid(),now=new Date(),value={id:id,requestId:body.requestId,actorId:String(actor.id),previewToken:body.previewToken,phase:0,cadets:snapshot.counts.cadets,results:snapshot.counts.results,tests:snapshot.counts.tests,startedAt:now.toISOString(),error:'',archiveRequired:true,archiveName:cleanText_(body.archiveName,80)||'Набір '+now.toISOString().slice(0,10),timezoneOffsetMinutes:Number.isFinite(body.timezoneOffsetMinutes)&&Math.abs(body.timezoneOffsetMinutes)<=840?body.timezoneOffsetMinutes:0};
   var rows=[[id,'job','',JSON.stringify(value),now]].concat(snapshot.cadets.map(function(u){return [id,'cadet',String(u.id),'',now];})),sheet=sheet_('intakeJobs'),first=sheet.getLastRow()+1;
   if(sheet.getMaxRows()<first+rows.length-1)sheet.insertRowsAfter(sheet.getMaxRows(),first+rows.length-1-sheet.getMaxRows());
   sheet.getRange(first,1,rows.length,5).setValues(rows);
@@ -436,6 +447,7 @@ function continueIntake_(actor,body) {
   var phase=INTAKE_PHASES[job.value.phase],done=true,targets=Object.create(null);job.targets.forEach(function(id){targets[id]=true;});
   function all(){return true;}
   try{
+    if(ensureIntakeArchive_(actor,job))return {intake:intakePublic_(job)};
     if(phase==='close')closeAllTests_(actor);
     else if(phase==='public'||phase==='legacyPublic')done=intakeDeleteRows_(intakePublicSheets_()[phase],all);
     else if(phase==='pcState'){
@@ -512,7 +524,7 @@ function workspaceRevisions_(user,all) {
 function conditionalWorkspace_(user,body) {
   var all=body.allResults===true,known=body.known||{},before=workspaceRevisions_(user,all),props=PropertiesService.getScriptProperties();
   var busy=props.getProperty('LK_WORKSPACE_WRITE'),changes={},out={workspaceProtocol:1,user:publicUser_(user),revisions:before,changes:changes,
-    capabilities:{singleAttempt:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
+    capabilities:{singleAttempt:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true,formattedReports:true,intakeArchives:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
   if(user.role===ROLE_INSTRUCTOR)out.intake=intakeStatus_();
   if(known.groups!==before.groups)changes.groups=listGroups_();
   if(known.tests!==before.tests)changes.tests=listTestsForUser_(user);
@@ -614,6 +626,9 @@ function routeApi_(request) {
   if(testAccessMatch && method === 'GET')return instructorTestAccess_(decodePart_(testAccessMatch[1]));
   if(testAccessMatch && method === 'POST')return changeTestAccess_(user,decodePart_(testAccessMatch[1]),body);
 
+  if(method==='GET'&&path==='/api/instructor/reports/results')return instructorReportData_(user,body);
+  if(method==='GET'&&path==='/api/instructor/intake/archives')return listIntakeArchives_();
+  if(method==='GET'&&path==='/api/instructor/intake/archive')return intakeArchiveContent_(body);
   if (method === 'GET' && path === '/api/instructor/dashboard') return instructorDashboard_();
   var lessonMatch = path.match(/^\/api\/instructor\/lesson\/([^/]+)\/([^/]+)$/);
   if (method === 'GET' && lessonMatch) {
@@ -689,6 +704,7 @@ function routeApi_(request) {
 }
 
 function requiresWriteLock_(request) {
+  if(request&&request.action==='api'&&request.method==='GET'&&request.path==='/api/groups'&&request.body&&request.body.initializeReports===true)return true;
   if(request&&request.action==='local-storage-authorize')return false;
   if (!request || request.action !== 'api') return true;
   var method = String(request.method || '').toUpperCase();
@@ -742,13 +758,16 @@ function createInitialInstructorCode() {
 
 function ensureSchema_(lockHeld, force) {
   var cache = CacheService.getScriptCache();
-  if (!force && cache.get('LK_SCHEMA_READY_API25') === '1' && cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1') === '1' && cache.get('LK_SCHEMA_CADET_CARD_V1') === '1') return;
+  var schemaReady=cache.get('LK_SCHEMA_READY_API25')==='1'&&cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1')==='1'&&cache.get('LK_SCHEMA_CADET_CARD_V1')==='1';
+  if(!force&&schemaReady&&cache.get('LK_SCHEMA_EXCEL_V1')==='1')return;
   var ownLock = null;
   if (!lockHeld) {
     ownLock = LockService.getScriptLock();
     if (!ownLock.tryLock(2000)) fail_('Сервер зайнятий. Спробуйте ще раз.', 'BUSY');
   }
   try {
+    var properties=PropertiesService.getScriptProperties();
+    if(force||!schemaReady){
     var spreadsheet = spreadsheet_();
     Object.keys(SHEETS).forEach(function (key) {
       ensureSheet_(spreadsheet, SHEETS[key], HEADERS[key], false);
@@ -774,6 +793,9 @@ function ensureSchema_(lockHeld, force) {
     cache.put('LK_SCHEMA_READY_API25', '1', 21600);
     cache.put('LK_SCHEMA_READY_PUBLIC_CADETS_V1', '1', 21600);
     cache.put('LK_SCHEMA_CADET_CARD_V1','1',21600);
+    }
+    migratePublicReports_();
+    if(publicReportLayoutReady_())cache.put('LK_SCHEMA_EXCEL_V1','1',21600);
   } finally {
     if (ownLock) ownLock.releaseLock();
   }
@@ -798,7 +820,7 @@ function ensureSheet_(spreadsheet, name, headers, visible) {
 }
 
 function getResultsTableLink() {
-  return publicResultsSpreadsheet_(true).getUrl();
+  publicResultsSpreadsheet_(true);return resultsSheetInfo_().url;
 }
 
 /** Додає назви тестів до наявної таблиці без повторного запису оцінок. */
@@ -861,38 +883,99 @@ function publicResultsSpreadsheet_(createIfMissing) {
   return created;
 }
 
+function publicReportLayoutReady_(){var p=PropertiesService.getScriptProperties(),id=p.getProperty(PUBLIC_RESULTS_PROPERTY);return p.getProperty('LK_EXCEL_LAYOUT_ARMED_V1')==='1'&&(!id||p.getProperty('LK_PUBLIC_LAYOUT_READY_V4_'+id)==='1');}
+function migratePublicReports_(){
+ var props=PropertiesService.getScriptProperties(),id=props.getProperty(PUBLIC_RESULTS_PROPERTY);if(props.getProperty('LK_EXCEL_LAYOUT_ARMED_V1')!=='1'||!id||publicReportLayoutReady_()||Date.now()<Number(props.getProperty('LK_PUBLIC_FORMAT_RETRY_V4')||0))return;
+ try{ensurePublicResultsSheet_(SpreadsheetApp.openById(id));props.deleteProperty('LK_PUBLIC_FORMAT_ERROR_V4');props.deleteProperty('LK_PUBLIC_FORMAT_RETRY_V4');}
+ catch(error){props.setProperty('LK_PUBLIC_FORMAT_ERROR_V4',String(error.message||error).slice(0,500));props.setProperty('LK_PUBLIC_FORMAT_RETRY_V4',String(Date.now()+30000));console.warn('Оформлення таблиці буде повторено: '+String(error.message||error));}
+}
+function publicLayout_(sheet) {
+  var found=publicLayouts_.filter(function(entry){return entry.sheet===sheet;})[0];if(found)return found;
+  var headers=sheet.getRange(1,1,1,sheet.getMaxColumns()).getValues()[0].map(String);
+  var columns=PUBLIC_RESULTS_CANONICAL_HEADERS.map(function(name){var index=headers.indexOf(name);return index>=0?index:name==='ПІБ курсанта'?headers.indexOf('ПІБ'):name==='Правильних, %'?headers.indexOf('Оцінка, %'):-1;});
+  found={sheet:sheet,headers:headers,columns:columns,modern:headers.indexOf('Група')>=0&&headers.indexOf('Дата завершення')>=0&&headers.indexOf('Результат')>=0};publicLayouts_.push(found);return found;
+}
+function publicCanonicalRow_(sheet,row,legacyValues) {
+  var layout=publicLayout_(sheet),out=layout.columns.map(function(index){return index<0?'':row[index]==null?'':row[index];});
+  // Legacy matching and deletion use the original values, irrespective of display order.
+  if(!legacyValues&&typeof out[3]==='number')out[3]=formatDuration_(Math.round(out[3]*86400));
+  [4,11].forEach(function(index){if(!legacyValues&&typeof out[index]==='number'&&layout.modern)out[index]=Math.round(out[index]*10000)/100;});
+  var shown=String(out[3]||'').match(/^(\d+):(\d{2})(?::(\d{2}))?$/);if(shown)out[3]=formatDuration_(shown[3]==null?Number(shown[1])*60+Number(shown[2]):Number(shown[1])*3600+Number(shown[2])*60+Number(shown[3]));
+  if(out[13] instanceof Date)out[13]=out[13].toISOString();
+  return out;
+}
+function publicRowsFromSheet_(sheet,legacyValues) {
+  var count=Math.max(0,sheet.getLastRow()-1);if(!count)return [];var rows=sheet.getRange(2,1,count,sheet.getMaxColumns()).getValues(),time=publicLayout_(sheet).columns[3];
+  if(time>=0&&rows.some(function(row){return row[time] instanceof Date;})){var displayed=sheet.getRange(2,time+1,count,1).getDisplayValues();rows.forEach(function(row,index){if(row[time] instanceof Date)row[time]=displayed[index][0];});}
+  return rows.map(function(row){return publicCanonicalRow_(sheet,row,legacyValues);});
+}
+function publicPhysicalValue_(index,value,modern) {
+  if(modern===false)return value==null?'':value;
+  if(value===''||value==null)return '';
+  if(index===4||index===11)return Number(value)/100;
+  if(index===13){var ms=Date.parse(value);return isFinite(ms)?new Date(ms):'';}
+  if(index===3){var text=String(value),match=text.match(/^(\d+):(\d{2})$/),uk=text.match(/^(?:(\d+) год )?(\d+) хв (\d+) с$/);return match?(Number(match[1])*60+Number(match[2]))/86400:uk?(Number(uk[1]||0)*3600+Number(uk[2])*60+Number(uk[3]))/86400:value;}
+  return value;
+}
+function writePublicRows_(sheet,first,rows) {
+  if(!rows.length)return;
+  var needed=first+rows.length-1,grew=sheet.getMaxRows()<needed;if(grew)sheet.insertRowsAfter(sheet.getMaxRows(),Math.max(250,needed-sheet.getMaxRows()));
+  var layout=publicLayout_(sheet),pairs=[];layout.columns.forEach(function(column,index){if(column>=0)pairs.push({column:column,index:index});});pairs.sort(function(a,b){return a.column-b.column;});
+  for(var from=0;from<pairs.length;){var to=from+1;while(to<pairs.length&&pairs[to].column===pairs[to-1].column+1)to++;
+    var fields=pairs.slice(from,to);sheet.getRange(first,fields[0].column+1,rows.length,fields.length).setValues(rows.map(function(row){return fields.map(function(field){return publicPhysicalValue_(field.index,row[field.index],layout.modern);});}));from=to;
+  }
+  if(grew&&layout.modern)formatPublicResults_(sheet);
+}
+function appendPublicRow_(sheet,row){var layout=publicLayout_(sheet),columns=layout.columns,width=Math.max.apply(null,columns)+1,values=Array(width).fill(''),grew=sheet.getLastRow()+1>sheet.getMaxRows();if(grew)sheet.insertRowsAfter(sheet.getMaxRows(),250);columns.forEach(function(column,index){if(column>=0)values[column]=publicPhysicalValue_(index,row[index],layout.modern);});sheet.appendRow(values);if(grew&&layout.modern)formatPublicResults_(sheet);}
+function publicPlaceholder_(user){return [safeCellText_(user.fullName),'','','','','',String(user.id),'','','','','',safeCellText_(user.groupName),'','Не проходив'];}
 function ensurePublicResultsSheet_(spreadsheet) {
-  var sheet = spreadsheet.getSheetByName(PUBLIC_RESULTS_SHEET);
-  if (!sheet) {
-    var sheets = spreadsheet.getSheets ? spreadsheet.getSheets() : [];
-    sheet = sheets.length === 1 && sheetIsEmpty_(sheets[0]) ? sheets[0] : spreadsheet.insertSheet(PUBLIC_RESULTS_SHEET);
-    if (sheet.getName && sheet.getName() !== PUBLIC_RESULTS_SHEET && sheet.setName) sheet.setName(PUBLIC_RESULTS_SHEET);
+  var sheet=spreadsheet.getSheetByName(PUBLIC_RESULTS_SHEET);
+  if(!sheet){var sheets=spreadsheet.getSheets?spreadsheet.getSheets():[];sheet=sheets.length===1&&sheetIsEmpty_(sheets[0])?sheets[0]:spreadsheet.insertSheet(PUBLIC_RESULTS_SHEET);if(sheet.getName()!==PUBLIC_RESULTS_SHEET)sheet.setName(PUBLIC_RESULTS_SHEET);}
+  if(sheetIsEmpty_(sheet)){if(sheet.getMaxColumns()<PUBLIC_RESULTS_HEADERS.length)sheet.insertColumnsAfter(sheet.getMaxColumns(),PUBLIC_RESULTS_HEADERS.length-sheet.getMaxColumns());sheet.getRange(1,1,1,PUBLIC_RESULTS_HEADERS.length).setValues([PUBLIC_RESULTS_HEADERS]);}
+  var headers=sheet.getRange(1,1,1,sheet.getMaxColumns()).getValues()[0].map(String),modern=headers.indexOf('Група')>=0&&headers.indexOf('Дата завершення')>=0&&headers.indexOf('Результат')>=0;
+  var props=PropertiesService.getScriptProperties(),readyKey='LK_PUBLIC_LAYOUT_READY_V4_'+spreadsheet.getId(),ready=props.getProperty(readyKey)==='1',backup=null;
+  // Keep a sheet-level copy, including instructor formulas and extra columns,
+  // before moving an existing legacy layout. Retries reuse the same copy.
+  if(!ready&&sheet.getLastRow()>1){
+    var key='LK_PUBLIC_LAYOUT_BACKUP_V1_'+spreadsheet.getId(),backupName=props.getProperty(key);
+    if(!backupName){backupName=spreadsheet.getSheetByName('Резерв таблиці до Excel')?'Резерв Excel '+Utilities.getUuid().slice(0,8):'Резерв таблиці до Excel';props.setProperty(key,backupName);}
+    backup=spreadsheet.getSheetByName(backupName);if(!backup)backup=sheet.copyTo(spreadsheet).setName(backupName);if(!backup.isSheetHidden())backup.hideSheet();
   }
-  // Insert before the old hidden IDs so existing result links and any extra
-  // columns move together. The new header makes repeated runs a no-op.
-  if (sheet.getMaxColumns() >= 6 && String(sheet.getRange(1, 6).getValue() || '') === '_ID курсанта') {
-    sheet.insertColumnsAfter(5, 1);
+  if(headers[0]==='ПІБ'){sheet.getRange(1,1).setValue('ПІБ курсанта');headers[0]='ПІБ курсанта';}
+  if(!modern&&headers[4]==='Оцінка, %'){sheet.getRange(1,5).setValue('Правильних, %');headers[4]='Правильних, %';}
+  PUBLIC_RESULTS_HEADERS.forEach(function(name){
+    if(headers.filter(function(v){return v===name;}).length>1)fail_('У таблиці повторюється колонка «'+name+'». Усуньте повтор перед синхронізацією.','PUBLIC_RESULTS_SCHEMA');
+    if(headers.indexOf(name)>=0)return;
+    var column=sheet.getMaxColumns()+1;sheet.insertColumnsAfter(column-1,1);sheet.getRange(1,column).setValue(name);while(headers.length<column-1)headers.push('');headers.push(name);
+  });
+  PUBLIC_RESULTS_HEADERS.forEach(function(name,index){var from=headers.indexOf(name);if(from!==index){sheet.moveColumns(sheet.getRange(1,from+1,sheet.getMaxRows(),1),index+1);headers.splice(index,0,headers.splice(from,1)[0]);}});
+  publicLayouts_=publicLayouts_.filter(function(entry){return entry.sheet!==sheet;});
+  if(!ready&&sheet.getLastRow()>1){
+    // Rebuild only managed fields from authoritative IDs; user columns remain intact.
+    var results=Object.create(null),users=Object.create(null);listResults_(null).forEach(function(r){results[String(r.id)]=r;});listUsers_().forEach(function(u){users[String(u.id)]=u;});
+    var rows=publicRowsFromSheet_(backup||sheet,true).map(function(row){var result=results[String(row[7])];if(result)return publicResultValues_(result);if(!row[7]&&users[String(row[6])]&&row.slice(1,5).every(function(v){return v==='';}))return publicPlaceholder_(users[String(row[6])]);return row;});
+    writePublicRows_(sheet,2,rows);
   }
-  // Preserve instructor columns to the right of the stable hidden IDs.
-  if (sheet.getMaxColumns()>8 && String(sheet.getRange(1,9).getValue()||'')!=='Стан перевірки') {
-    var occupied=sheet.getRange(1,9,Math.max(1,sheet.getLastRow()),Math.min(4,sheet.getMaxColumns()-8)).getValues().some(function(row){return row.some(function(v){return v!=='' && v!=null;});});
-    if(occupied)sheet.insertColumnsAfter(8,4);
-  }
-  if (sheet.getMaxColumns() < PUBLIC_RESULTS_HEADERS.length) {
-    sheet.insertColumnsAfter(sheet.getMaxColumns(), PUBLIC_RESULTS_HEADERS.length - sheet.getMaxColumns());
-  }
-  sheet.getRange(1, 1, 1, PUBLIC_RESULTS_HEADERS.length).setValues([PUBLIC_RESULTS_HEADERS]);
-  sheet.setFrozenRows(1);
-  sheet.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#17365d').setFontColor('#ffffff');
-  sheet.setColumnWidth(1, 300);
-  sheet.setColumnWidths(2, 2, 145);
-  sheet.setColumnWidth(4, 165);
-  sheet.setColumnWidth(5, 145);
-  sheet.setColumnWidth(6, 260);
-  if (sheet.getMaxRows() > 1) sheet.getRange(2, 5, sheet.getMaxRows() - 1, 1).setNumberFormat('0"%"');
-  sheet.showColumns(6);
-  try { sheet.hideColumns(7, 2); } catch (ignored) {}
+  formatPublicResults_(sheet);props.setProperty(readyKey,'1');
   return sheet;
+}
+function ensurePublicFilter_(sheet) {
+  var filter=sheet.getFilter(),width=PUBLIC_RESULTS_HEADERS.length,height=sheet.getMaxRows(),criteria=[];
+  if(filter){var old=filter.getRange();if(old.getRow()!==1||old.getColumn()!==1)return;if(old.getNumRows()>=height&&old.getNumColumns()>=width)return;var previous=old.getNumColumns();width=Math.max(width,previous);for(var column=1;column<=previous;column++)criteria.push(filter.getColumnFilterCriteria(column));filter.remove();}
+  var created=sheet.getRange(1,1,height,width).createFilter();criteria.forEach(function(value,index){if(value)created.setColumnFilterCriteria(index+1,value);});
+}
+function formatPublicResults_(sheet) {
+  var width=PUBLIC_RESULTS_HEADERS.length,body=Math.max(1,sheet.getMaxRows()-1),range=sheet.getRange(1,1,sheet.getMaxRows(),width);
+  sheet.setFrozenRows(1);sheet.setFrozenColumns(2);
+  range.setWrap(true).setVerticalAlignment('middle');
+  sheet.getRange(1,1,1,width).setFontWeight('bold').setBackground('#17365d').setFontColor('#ffffff');sheet.setRowHeight(1,42);
+  [300,180,340,185,200,165,150,155,155,140,150,160,190,130,130].forEach(function(size,index){sheet.setColumnWidth(index+1,size);});
+  sheet.getRange(2,4,body,1).setNumberFormat('dd.mm.yyyy hh:mm');sheet.getRange(2,6,body,1).setNumberFormat('0%');sheet.getRange(2,9,body,1).setNumberFormat('[m]:ss');sheet.getRange(2,12,body,1).setNumberFormat('0%');
+  sheet.showColumns(1,9);sheet.hideColumns(10,6);
+  ensurePublicFilter_(sheet);
+  var bandings=sheet.getBandings(),keep=false;bandings.forEach(function(b){var r=b.getRange();if(r.getColumn()>width)return;if(!keep&&r.getRow()===1&&r.getColumn()===1&&r.getNumColumns()===width&&r.getNumRows()===sheet.getMaxRows())keep=true;else b.remove();});if(!keep)range.applyRowBanding().setHeaderRowColor('#17365d').setFirstRowColor('#ffffff').setSecondRowColor('#f4f7fb');
+  var rules=sheet.getConditionalFormatRules().filter(function(rule){var c=rule.getBooleanCondition();return !c||c.getCriteriaValues().every(function(v){return String(v).indexOf('LK_REPORT_V1')<0;});});
+  [['Складено','#e8f5ec','#166534'],['Не складено','#fdecec','#991b1b'],['Очікує перевірки','#fff4d6','#854d0e']].forEach(function(item){rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=($E2="'+item[0]+'")*(N("LK_REPORT_V1")=0)').setBackground(item[1]).setFontColor(item[2]).setRanges([sheet.getRange(2,5,body,2)]).build());});sheet.setConditionalFormatRules(rules);
 }
 
 function sheetIsEmpty_(sheet) {
@@ -908,7 +991,7 @@ function migrateLegacyVisibleResults_(target) {
     if (rows.length) {
       var expanded = rows.map(function (row) { return row.concat(['', '', '', '', '', '', '']); });
       ensureRowCapacity_(target, expanded.length + 1);
-      target.getRange(2, 1, expanded.length, PUBLIC_RESULTS_HEADERS.length).setValues(expanded);
+      writePublicRows_(target,2,expanded);
     }
   }
   properties.setProperty('PUBLIC_RESULTS_MIGRATED_V1', '1');
@@ -918,7 +1001,8 @@ function publicResultsSheet_() {
   if (publicResultsSheetCache_) return publicResultsSheetCache_;
   var spreadsheet = publicResultsSpreadsheet_(true);
   var sheet = spreadsheet.getSheetByName(PUBLIC_RESULTS_SHEET);
-  var key = 'LK_PUBLIC_FORMAT_READY_V3_' + spreadsheet.getId();
+  if(sheet&&PropertiesService.getScriptProperties().getProperty('LK_EXCEL_LAYOUT_ARMED_V1')!=='1'){publicResultsSheetCache_=sheet;return sheet;}
+  var key = 'LK_PUBLIC_FORMAT_READY_V4_' + spreadsheet.getId();
   var cache = CacheService.getScriptCache();
   if (!sheet || cache.get(key) !== '1') {
     sheet = ensurePublicResultsSheet_(spreadsheet);
@@ -931,14 +1015,15 @@ function publicResultsSheet_() {
 function publicResultRows_() {
   var sheet = publicResultsSheet_();
   var lastRow = sheet.getLastRow();
-  return lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, PUBLIC_RESULTS_HEADERS.length).getValues();
+  return publicRowsFromSheet_(sheet);
 }
 
 function resultsSheetInfo_() {
   var spreadsheet = publicResultsSpreadsheet_(false);
+  var sheet=spreadsheet&&spreadsheet.getSheetByName(PUBLIC_RESULTS_SHEET);
   return {
     available: Boolean(spreadsheet),
-    url: spreadsheet ? spreadsheet.getUrl() : '',
+    url: spreadsheet ? spreadsheet.getUrl().split('#')[0]+(sheet?'#gid='+sheet.getSheetId():'') : '',
     title: PUBLIC_RESULTS_TITLE
   };
 }
@@ -976,7 +1061,7 @@ function repairPublicResults_() {
   });
   rows.forEach(function(row,index){var key=String(row[7]||'');if(key)(publicIndexes[key]|| (publicIndexes[key]=[])).push(index);});
   if (titlesChanged) {
-    sheet.getRange(2, 6, rows.length, 1).setValues(rows.map(function (row) { return [row[5] || '']; }));
+    writePublicRows_(sheet,2,rows);
   }
 
   // Adopt rows copied from older releases before appending anything. This
@@ -989,7 +1074,7 @@ function repairPublicResults_() {
     if (matches.length !== 1) return;
     var match = matches[0], key = String(match.id);
     if (!resultsById[key] || resultIds[key]) return;
-    sheet.getRange(index + 2, 6, 1, 3).setValues([[safeCellText_(match.testTitle), String(match.userId), String(match.id)]]);
+    writePublicRows_(sheet,index+2,[publicResultValues_(match)]);
     row[5] = safeCellText_(match.testTitle);
     row[6] = String(match.userId);
     row[7] = String(match.id);
@@ -1003,7 +1088,7 @@ function repairPublicResults_() {
       var expected=publicResultValues_(result);
       (publicIndexes[String(result.id)]||[]).forEach(function(existingIndex){
         if(expected.some(function(value,column){return String(rows[existingIndex][column]==null?'':rows[existingIndex][column])!==String(value);})) {
-          sheet.getRange(existingIndex+2,1,1,PUBLIC_RESULTS_HEADERS.length).setValues([expected]);
+          writePublicRows_(sheet,existingIndex+2,[expected]);
           rows[existingIndex]=expected;
         }
       });
@@ -1019,10 +1104,10 @@ function repairPublicResults_() {
     }
     var values = publicResultValues_(result);
     if (targetIndex >= 0) {
-      sheet.getRange(targetIndex + 2, 1, 1, PUBLIC_RESULTS_HEADERS.length).setValues([values]);
+      writePublicRows_(sheet,targetIndex+2,[values]);
       rows[targetIndex] = values;
     } else {
-      sheet.appendRow(values);
+      appendPublicRow_(sheet,values);
       rows.push(values);
     }
     userIds[String(result.userId)] = true;
@@ -1033,8 +1118,8 @@ function repairPublicResults_() {
     return user.role === ROLE_CADET && !cadetDeletionPending_(user.id, properties);
   }).forEach(function (user) {
     if (userIds[String(user.id)]) return;
-    var values = [safeCellText_(user.fullName), '', '', '', '', '', String(user.id), ''];
-    sheet.appendRow(values);
+    var values = publicPlaceholder_(user);
+    appendPublicRow_(sheet,values);
     rows.push(values);
     userIds[String(user.id)] = true;
   });
@@ -1066,7 +1151,7 @@ function publicResultValues_(result) {
   var count=result.choiceTotal == null ? result.total : result.choiceTotal;
   return [safeCellText_(result.userName),result.correct,Math.max(0,count-result.correct),
     formatDuration_(result.durationSeconds),count ? Math.round(result.correct*100/count) : '',safeCellText_(result.testTitle),String(result.userId),String(result.id),
-    result.gradingStatus==='pending_review'?'Очікує перевірки':'Перевірено',result.earnedPoints==null?result.correct:result.earnedPoints,result.maxPoints==null?result.total:result.maxPoints,result.score==null?'':result.score];
+    result.gradingStatus==='pending_review'?'Очікує перевірки':'Перевірено',result.earnedPoints==null?result.correct:result.earnedPoints,result.maxPoints==null?result.total:result.maxPoints,result.score==null?'':result.score,safeCellText_(result.groupName),result.completedAt||'',result.gradingStatus==='pending_review'?'Очікує перевірки':result.passed?'Складено':'Не складено'];
 }
 
 function publicRowMatchesStoredResult_(row, result) {
@@ -2154,7 +2239,7 @@ function requireAttemptNotDeleted_(userId,testId) {
 
 function plannedRowNumbers_(rows,predicate) {
   var indices=[];
-  rows.forEach(function(row,index){if(predicate(row))indices.push(index+2);});
+  rows.forEach(function(row,index){if(predicate(row,index))indices.push(index+2);});
   return indices;
 }
 
@@ -2178,7 +2263,8 @@ function planPublicResultDeletion_(sheet,result,allResults,legacySheet) {
   if(resultColumn<0&&!legacySheet)fail_('У таблиці немає ID результатів. Спочатку натисніть «Оновити таблицю».','PUBLIC_RESULTS_SCHEMA');
   var titleColumn=headers.indexOf('Тест');
   var rows=sheet.getRange(2,1,sheet.getLastRow()-1,width).getValues();
-  return plannedRowNumbers_(rows,function(row){
+  var canonicalRows=publicRowsFromSheet_(sheet,headers.indexOf('Група')<0);
+  return plannedRowNumbers_(rows,function(row,index){
     var rowId=resultColumn<0?'':String(row[resultColumn]||'');
     var owner=userColumn<0?'':String(row[userColumn]||'');
     if(rowId){
@@ -2186,10 +2272,11 @@ function planPublicResultDeletion_(sheet,result,allResults,legacySheet) {
       if(owner&&owner!==String(result.userId))fail_('ID роботи й курсанта в таблиці не збігаються. Оновіть таблицю.','PUBLIC_RESULTS_SCHEMA');
       return true;
     }
-    if((owner&&owner!==String(result.userId))||row.slice(1,5).every(function(value){return value==='';}))return false;
+    var canonical=canonicalRows[index];
+    if((owner&&owner!==String(result.userId))||canonical.slice(1,5).every(function(value){return value==='';}))return false;
     // Legacy rows without IDs can be removed only if their full values match
     // exactly one server result. A repeated name or score alone is insufficient.
-    var legacy=row.slice(0,5).concat([titleColumn<0?'':row[titleColumn]]);
+    var legacy=canonical.slice(0,6);
     function matches(candidate){
       if(owner&&String(candidate.userId)!==owner)return false;
       return publicRowMatchesStoredResult_(legacy,candidate);
@@ -2692,7 +2779,8 @@ function deleteCadet_(id, actor, body) {
       fail_('У таблиці результатів немає ID. Спочатку оновіть її через «Оновити таблицю».', 'PUBLIC_RESULTS_SCHEMA');
     }
     var titleColumn = headers.indexOf('Тест');
-    plan(sheet, sheet.getRange(2, 1, sheet.getLastRow() - 1, width).getValues(), function (row) {
+    var canonicalRows=publicRowsFromSheet_(sheet,headers.indexOf('Група')<0);
+    plan(sheet, sheet.getRange(2, 1, sheet.getLastRow() - 1, width).getValues(), function (row,index) {
       var owner = String(row[userColumn] || ''), resultId = String(row[resultColumn] || '');
       var resultOwner = resultOwners[resultId] || '';
       if (owner && resultOwner && owner !== resultOwner && (owner === id || resultOwner === id)) {
@@ -2701,7 +2789,7 @@ function deleteCadet_(id, actor, body) {
       if (owner || resultOwner) return owner === id || resultOwner === id;
       var name = normalize_(row[0]);
       if (!names[name] || !names[name][id]) return false;
-      var visible = row.slice(0,5).concat([row[titleColumn] || '']);
+      var visible=canonicalRows[index].slice(0,6);
       var owners = !resultId && visible.slice(1).every(function(value){return value === '';})
         ? Object.keys(names[name])
         : (candidates[name] || []).filter(function(result){return publicRowMatchesStoredResult_(visible,result);})
@@ -2834,14 +2922,14 @@ function addVisibleCadetPlaceholder_(user) {
   var exists = rows.some(function (row) {
     return String(row[6]) === String(user.id);
   });
-  if (!exists) sheet.appendRow([safeCellText_(user.fullName), '', '', '', '', '', String(user.id), '']);
+  if (!exists) appendPublicRow_(sheet,publicPlaceholder_(user));
 }
 
 function publishVisibleResult_(result) {
   var sheet = publicResultsSheet_();
   var rows = publicResultRows_();
   var existingIndex=rows.findIndex(function(row){return String(row[7]||'')===String(result.id);});
-  if(existingIndex>=0){sheet.getRange(existingIndex+2,1,1,PUBLIC_RESULTS_HEADERS.length).setValues([publicResultValues_(result)]);return;}
+  if(existingIndex>=0){writePublicRows_(sheet,existingIndex+2,[publicResultValues_(result)]);return;}
   var targetRow = -1;
   for (var index = 0; index < rows.length; index += 1) {
     if (String(rows[index][6]) === String(result.userId)
@@ -2851,8 +2939,8 @@ function publishVisibleResult_(result) {
     }
   }
   var values = [publicResultValues_(result)];
-  if (targetRow > 0) sheet.getRange(targetRow, 1, 1, PUBLIC_RESULTS_HEADERS.length).setValues(values);
-  else sheet.appendRow(values[0]);
+  if (targetRow > 0) writePublicRows_(sheet,targetRow,values);
+  else appendPublicRow_(sheet,values[0]);
 }
 
 function visibleTestForUser_(test, user) {
@@ -3827,3 +3915,204 @@ function legacyMultiChoiceResponse_(response){
   if(response.completion)legacyMultiChoiceResponse_(response.completion);
   return response;
 }
+
+/** Report data contains visible learning results, never credentials or answer keys. */
+function instructorReportData_(actor,body,options) {
+  requireRole_(actor,ROLE_INSTRUCTOR);body=body||{};options=options||{};
+  if(!options.allowIntake&&PropertiesService.getScriptProperties().getProperty('LK_INTAKE_ACTIVE'))fail_('Триває підготовка набору. Завантажте збережений архів або дочекайтеся завершення.','INTAKE_IN_PROGRESS');
+  var revision=JSON.stringify(workspaceRevisions_(actor,true)),groups=listGroups_(),results=listResults_(null),cadets=listUsers_().filter(function(u){return u.role===ROLE_CADET&&!cadetDeletionPending_(u.id);}).map(publicUser_);
+  var tests=listTests_(false).filter(function(t){return !isArchivedTest_(t)&&!isRetakeTest_(t);}).map(function(t){var assigned=assignedGroups_(t.description);return {id:String(t.id),title:t.title,published:t.published&&assigned!==null,assignedGroups:assigned||[]};});
+  var groupId=cleanText_(body.groupId,100),testId=cleanText_(body.testId,100),query=normalize_(cleanText_(body.query,180)),scope=[];
+  if(groupId){var group=groups.filter(function(g){return String(g.id)===groupId;})[0];if(!group)fail_('Групу більше не знайдено. Оновіть фільтри.','GROUP_NOT_FOUND');results=results.filter(function(r){return r.groupName===group.name;});cadets=cadets.filter(function(u){return u.groupName===group.name;});tests=tests.filter(function(t){return !t.assignedGroups.length||t.assignedGroups.indexOf(group.name)>=0||results.some(function(r){return String(r.testId)===t.id;});});scope.push(group.name);}
+  if(testId){var test=tests.filter(function(t){return t.id===testId;})[0],historical=results.filter(function(r){return String(r.testId)===testId;})[0];if(!test&&!historical)fail_('Тест більше не знайдено. Оновіть фільтри.','TEST_NOT_FOUND');results=results.filter(function(r){return String(r.testId)===testId;});tests=test?[test]:[{id:testId,title:historical.testTitle,historical:true}];scope.push((test||historical).title||historical.testTitle);}
+  if(query){
+    results=results.filter(function(r){return normalize_([r.userName,r.groupName,r.testTitle].join(' ')).indexOf(query)>=0;});
+    var present=Object.create(null);results.forEach(function(r){present[String(r.userId)]=true;});
+    var namedTests=tests.filter(function(t){return normalize_(t.title).indexOf(query)>=0;});
+    cadets=cadets.filter(function(u){return namedTests.length||present[String(u.id)]||normalize_([u.fullName,u.username,u.groupName].join(' ')).indexOf(query)>=0;});
+    scope.push('Пошук: '+cleanText_(body.query,180));
+  }
+  if(JSON.stringify(workspaceRevisions_(actor,true))!==revision)fail_('Результати зараз змінюються. Повторіть експорт.','STATE_BUSY');
+  return {reportProtocol:1,userId:String(actor.id),generatedAt:options.generatedAt||new Date().toISOString(),scope:options.name||scope.join(' · ')||'Усі групи та тести',results:results,cadets:cadets,tests:tests,groups:groups};
+}
+function archiveDigest_(bytes){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,bytes).map(function(b){return ('0'+(b<0?b+256:b).toString(16)).slice(-2);}).join('');}
+function readIntakeArchiveBytes_(jobId,archive) {
+  if(!Number.isSafeInteger(archive.parts)||archive.parts<1||archive.parts>2000||!Number.isSafeInteger(archive.size)||archive.size<1||archive.size>64*1024*1024)fail_('Пошкоджено опис архіву.','ARCHIVE_UNAVAILABLE');
+  var parts=Array(archive.parts),seen=Object.create(null),file=SpreadsheetApp.openById(archive.id).getSheetByName('_Файл_Excel');if(!file)fail_('Архівний файл більше не доступний.','ARCHIVE_UNAVAILABLE');
+  var rows=file.getLastRow()>1?file.getRange(2,1,file.getLastRow()-1,4).getValues():[];rows.forEach(function(row){if(String(row[0])!==jobId||String(row[1])!==archive.generation)return;var index=Number(row[2]);if(!Number.isSafeInteger(index)||index<0||index>=archive.parts||seen[index]||String(row[3]).indexOf('base64:')!==0)fail_('Пошкоджено частини архіву. Очищення призупинено.','ARCHIVE_UNAVAILABLE');seen[index]=true;parts[index]=String(row[3]).slice(7);});
+  if(Object.keys(seen).length!==archive.parts)fail_('Архів збережено не повністю. Очищення призупинено.','ARCHIVE_UNAVAILABLE');
+  var raw=Utilities.base64Decode(parts.join(''));if(raw.length!==archive.size||archiveDigest_(raw)!==archive.sha256)fail_('Архів не пройшов перевірку цілісності.','ARCHIVE_UNAVAILABLE');return raw;
+}
+function writeIntakeArchiveBook_(book,model) {
+  model.sheets.forEach(function(item,index){
+    var sheet=book.getSheetByName(item.name);if(!sheet){var initial=book.getSheets();sheet=index===0&&initial.length===1&&sheetIsEmpty_(initial[0])?initial[0].setName(item.name):book.insertSheet(item.name);}
+    var width=item.columns.length,height=Math.max(4,item.rows.length+3);if(sheet.getMaxColumns()<width)sheet.insertColumnsAfter(sheet.getMaxColumns(),width-sheet.getMaxColumns());if(sheet.getMaxRows()<height)sheet.insertRowsAfter(sheet.getMaxRows(),height-sheet.getMaxRows());
+    var data=[[model.title+' · '+item.name],[model.meta],item.columns.map(function(c){return c[0];})].concat(item.rows.map(function(row){return row.map(function(v){return v&&typeof v==='object'&&Object.prototype.hasOwnProperty.call(v,'v')?v.v:v;});}));
+    data=data.map(function(row){return Array.from({length:width},function(_,i){var v=row[i];return v==null?'':typeof v==='string'?safeCellText_(v):v;});});sheet.getRange(1,1,data.length,width).setValues(data);
+    sheet.setFrozenRows(3);sheet.setFrozenColumns(item.freezeColumns||1);sheet.getRange(1,1,data.length,width).setWrap(true).setVerticalAlignment('middle');sheet.getRange(3,1,1,width).setFontWeight('bold').setBackground('#17365d').setFontColor('#ffffff');sheet.setRowHeight(3,42);sheet.autoResizeRows(1,data.length);
+    item.columns.forEach(function(c,i){sheet.setColumnWidth(i+1,Math.min(420,Math.round(c[1]*7)));if(c[2])sheet.hideColumns(i+1);});
+    if(item.rows.length){var formats=item.rows.map(function(row){return row.map(function(cell){var style=cell&&typeof cell==='object'?cell.s:0;return [2,12,13,14].indexOf(style)>=0?'0%':style===3?'[m]:ss':style===4?'dd.mm.yyyy hh:mm':'General';});});sheet.getRange(4,1,item.rows.length,width).setNumberFormats(formats);var backgrounds=item.rows.map(function(row,index){return row.map(function(cell){var style=cell&&typeof cell==='object'?cell.s:0;return [5,12].indexOf(style)>=0?'#e8f5ec':[6,13].indexOf(style)>=0?'#fdecec':style===7?'#fff4d6':style===8?'#f1f5f9':index%2?'#f4f7fb':'#ffffff';});});sheet.getRange(4,1,item.rows.length,width).setBackgrounds(backgrounds);}
+    if(!sheet.getFilter())sheet.getRange(3,1,Math.max(1,item.rows.length+1),width).createFilter();
+  });
+}
+function ensureIntakeArchive_(actor,job) {
+  if(!job.value.archiveRequired)return false;
+  if(job.value.archive){if(job.value.phase===0)readIntakeArchiveBytes_(job.value.id,job.value.archive);return false;}
+  var data=instructorReportData_(actor,{}, {allowIntake:true,generatedAt:job.value.startedAt,name:job.value.archiveName}),model=LKReport_.reportModel(data,{name:job.value.archiveName,timezoneOffsetMinutes:job.value.timezoneOffsetMinutes||0});
+  var parts=LKReport_.xlsxParts(model),contentDigest=sha256Hex_(JSON.stringify(parts)),saved=[];
+  dataRows_('intakeJobs').forEach(function(row){if(String(row[0])!==job.value.id||row[1]!=='archive-meta')return;var v;try{v=JSON.parse(String(row[3]));}catch(ignored){return;}if(v&&v.protocol===1&&v.contentDigest===contentDigest)saved.push(v);});
+  var archive=saved.length?saved[saved.length-1]:null;
+  if(archive)readIntakeArchiveBytes_(job.value.id,archive);
+  else{
+    // SpreadsheetApp already has the commission's existing consent. No new
+    // Drive permission or public sharing is required for cohort archives.
+    if(!job.value.archiveBookId){var created=SpreadsheetApp.create('Літакова Комісія — Архів — '+job.value.archiveName+' — '+job.value.startedAt.slice(0,10));job.value.archiveBookId=created.getId();saveIntakeJob_(job);}
+    var book=SpreadsheetApp.openById(job.value.archiveBookId);writeIntakeArchiveBook_(book,model);
+    var name=LKReport_.reportFilename(job.value.archiveName.slice(0,30)+'_'+job.value.id,job.value.startedAt,job.value.timezoneOffsetMinutes||0),blobs=parts.map(function(p){return Utilities.newBlob(p.data,'application/xml',p.name);}),blob=Utilities.zip(blobs,name),raw=blob.getBytes();
+    if(raw.length>64*1024*1024)fail_('Архів перевищує 64 МБ. Збережіть окремі групи перед підготовкою набору.','ARCHIVE_TOO_LARGE');
+    var base64=Utilities.base64Encode(raw),generation=Utilities.getUuid(),chunks=[];for(var pos=0;pos<base64.length;pos+=48000)chunks.push(base64.slice(pos,pos+48000));
+    archive={protocol:1,id:book.getId(),name:name,url:book.getUrl(),sha256:archiveDigest_(raw),size:raw.length,parts:chunks.length,generation:generation,contentDigest:contentDigest,createdAt:job.value.startedAt};
+    var file=book.getSheetByName('_Файл_Excel')||book.insertSheet('_Файл_Excel'),rows=chunks.map(function(part,index){return [job.value.id,generation,index,'base64:'+part];});
+    if(file.getMaxColumns()<4)file.insertColumnsAfter(file.getMaxColumns(),4-file.getMaxColumns());file.getRange(1,1,1,4).setValues([['Операція','Покоління','Частина','Файл Base64']]);
+    var count=Math.max(rows.length,file.getLastRow()-1);while(rows.length<count)rows.push(['','','','']);if(file.getMaxRows()<count+1)file.insertRowsAfter(file.getMaxRows(),count+1-file.getMaxRows());file.getRange(2,1,count,4).setValues(rows);file.hideSheet();
+    readIntakeArchiveBytes_(job.value.id,archive);
+    sheet_('intakeJobs').appendRow([job.value.id,'archive-meta',generation,JSON.stringify(archive),new Date()]);
+  }
+  job.value.archive=archive;saveIntakeJob_(job);return true;
+}
+function listIntakeArchives_() {
+  var archives=[];dataRows_('intakeJobs').forEach(function(row){if(row[1]!=='job')return;var value;try{value=JSON.parse(String(row[3]));}catch(ignored){return;}if(value&&value.archive)archives.push({jobId:value.id,name:value.archiveName||'Набір',startedAt:value.startedAt,cadets:value.cadets,results:value.results,archive:value.archive});});
+  archives.sort(function(a,b){return String(b.startedAt).localeCompare(String(a.startedAt));});return {archiveProtocol:1,archives:archives.slice(0,50)};
+}
+function intakeArchiveContent_(body) {
+  var id=cleanText_(body.jobId,100);if(!/^intake-[A-Za-z0-9_-]{16,100}$/.test(id))fail_('Некоректний архів.','BAD_REQUEST');
+  var job=intakeJob_(id),archive=job.value.archive,part=body.part==null?0:body.part;if(!archive)fail_('Архів ще не збережено.','ARCHIVE_UNAVAILABLE');
+  if(!Number.isSafeInteger(part)||part<0)fail_('Некоректна частина архіву.','BAD_REQUEST');
+  var raw=readIntakeArchiveBytes_(id,archive);
+  var base64=Utilities.base64Encode(raw),chunk=480000,total=Math.ceil(base64.length/chunk);if(part>=total)fail_('Некоректна частина архіву.','BAD_REQUEST');
+  return {archiveProtocol:1,jobId:id,name:archive.name,size:archive.size,sha256:archive.sha256,part:part,totalParts:total,data:base64.slice(part*chunk,(part+1)*chunk)};
+}
+
+
+// BEGIN GENERATED EXCEL REPORT
+var LKReport_=(function(){
+// The same report model and XML run in the browser and in Apps Script.
+// Values are written as numbers or explicit strings; cell text is never a formula.
+const rptMime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const rptId=value=>String(value??'');
+const rptPending=r=>r.gradingStatus==='pending_review';
+const rptScore=r=>!rptPending(r)&&typeof r.score==='number'&&Number.isFinite(r.score)?r.score/100:null;
+const rptStatus=r=>rptPending(r)?'Очікує перевірки':r.passed?'Складено':'Не складено';
+const rptText=value=>String(value??'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g,'').slice(0,32767);
+const rptXml=value=>rptText(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+const rptNumber=value=>typeof value==='number'&&Number.isFinite(value)?value:null;
+const rptCell=(v,s=0)=>({v:v??'',s});
+const rptPercent=(v,s=2)=>rptCell(v,s);
+function rptDate(value,offset){const ms=Date.parse(value);return Number.isFinite(ms)?(ms-offset*60000)/86400000+25569:'';}
+function rptTime(value){return Number.isFinite(Number(value))?Math.max(0,Number(value))/86400:'';}
+function rptTestLabel(t){return rptText(t.title||t.testTitle||'Тест')+' · #'+rptId(t.id||t.testId);}
+function rptSort(a,b){return String(a).localeCompare(String(b),'uk');}
+function rptChoice(r){return Number.isInteger(r.choiceTotal)?r.choiceTotal:Number(r.total)||0;}
+
+function reportFilename(name='',now=new Date().toISOString(),offset=0){
+ const ms=Date.parse(now),local=Number.isFinite(ms)?new Date(ms-offset*60000).toISOString():String(now);
+ const stamp=local.replace(/[:.]/g,'-').replace('T','_').replace(/Z$/,'');
+ const title=rptText(name).normalize('NFKC').replace(/[<>:"/\\|?*\u0000-\u001f]/g,' ').trim().replace(/[. ]+$/,'').slice(0,80)||'Результати';
+ return 'Літакова-Комісія_'+title+'_'+stamp+'.xlsx';
+}
+
+function reportModel(data,options={}){
+ const results=(data.results||[]).filter(r=>r&&rptId(r.userId)&&rptId(r.testId)),cadets=data.cadets||[],tests=data.tests||[];
+ const generatedAt=data.generatedAt||new Date().toISOString(),offset=Number.isFinite(options.timezoneOffsetMinutes)?options.timezoneOffsetMinutes:0;
+ const scope=options.name||data.scope||'Усі групи та тести',stamp=new Date(generatedAt);
+ const meta=scope+' · Сформовано '+(Number.isFinite(stamp.getTime())?new Date(stamp.getTime()-offset*60000).toISOString().slice(0,19).replace('T',' '):generatedAt)+' · UTC'+(offset<=0?'+':'−')+Math.abs(offset/60);
+ const columns=[['ПІБ курсанта',34],['Група',20],['Тест',38],['Дата завершення',22],['Результат',24],['Підсумковий бал',20],['Набрано балів',17],['Максимум балів',18],['Час проходження',18],['Правильних',16,true],['Неправильних',17,true],['Правильних, %',19,true],['ID курсанта',18,true],['ID результату',18,true],['Підтвердження збереженої роботи',38]];
+ const ordered=results.slice().sort((a,b)=>(Date.parse(b.completedAt)||0)-(Date.parse(a.completedAt)||0)||rptSort(a.userName,b.userName));
+ const resultRows=ordered.map(r=>{const state=rptPending(r)?7:r.passed?5:6,choice=rptChoice(r);return [r.userName,r.groupName,r.testTitle,rptCell(rptDate(r.completedAt,offset),4),rptCell(rptStatus(r),state),rptPercent(rptScore(r),state===7?2:r.passed?12:13),rptNumber(r.earnedPoints)??r.correct,rptNumber(r.maxPoints)??r.total,rptCell(rptTime(r.durationSeconds),3),choice?r.correct:'',choice?Math.max(0,choice-r.correct):'',rptPercent(choice?(Number(r.correct)||0)/choice:null),rptId(r.userId),rptId(r.id),r.examRecovered?'Підтвердив: '+(r.recoveredBy||'інструктор')+'; час зі збереженої роботи':''];});
+ const byTest=new Map(),members=new Map(),latest=new Map();
+ for(const t of tests)if(t&&rptId(t.id))byTest.set(rptId(t.id),t);
+ for(const u of cadets){if(u.role&&u.role!=='cadet')continue;const group=String(u.groupName||'');members.set(JSON.stringify([rptId(u.id),group]),{id:rptId(u.id),name:u.fullName||u.username||'',username:u.username||'',group});}
+ for(const r of ordered){
+  const tid=rptId(r.testId),person=JSON.stringify([rptId(r.userId),String(r.groupName||'')]);
+  if(!byTest.has(tid))byTest.set(tid,{id:tid,title:r.testTitle,historical:true});
+  if(!members.has(person))members.set(person,{id:rptId(r.userId),name:r.userName,group:String(r.groupName||''),historical:true});
+  const key=JSON.stringify([person,tid]);if(!latest.has(key))latest.set(key,r);
+ }
+ const testList=[...byTest.values()].sort((a,b)=>rptSort(a.title,b.title)||rptSort(rptId(a.id),rptId(b.id)));
+ const matrixColumns=[['ПІБ курсанта',34],['Група',20],['Логін / ID',20],...testList.map(t=>[rptTestLabel(t),25]),['Пройдено тестів',19],['Середній бал перевірених',27]];
+ const matrixRows=[...members.entries()].sort((a,b)=>rptSort(a[1].group,b[1].group)||rptSort(a[1].name,b[1].name)||rptSort(a[1].id,b[1].id)).map(([person,u])=>{
+  let completed=0;const scores=[];
+  const cells=testList.map(t=>{const r=latest.get(JSON.stringify([person,rptId(t.id)]));if(r){completed++;const score=rptScore(r);if(score!==null)scores.push(score);return rptPending(r)?rptCell('Очікує перевірки',7):rptPercent(score,r.passed?12:13);}
+   const assigned=Array.isArray(t.assignedGroups)?t.assignedGroups:[];
+   const applicable=!t.historical&&t.published!==false&&(!assigned.length||assigned.includes(u.group));
+   return rptCell(applicable?'Не проходив':'—',8);
+  });
+  return [u.name,u.group,u.username||'#'+u.id,...cells,completed,rptPercent(scores.length?scores.reduce((n,v)=>n+v,0)/scores.length:null)];
+ });
+ const groupNames=new Set([...cadets.map(u=>String(u.groupName||'')),...results.map(r=>String(r.groupName||''))]);
+ const summaries=[...groupNames].sort(rptSort).map(group=>rptSummary(group,results.filter(r=>String(r.groupName||'')===group),cadets.filter(u=>String(u.groupName||'')===group)));
+ const summaryColumns=[['Група',27],['Курсантів',16],['Робіт',14],['Перевірено',17],['Склали',14],['Не склали',16],['Очікують перевірки',24],['Середній бал перевірених',28],['Успішність перевірених',27]];
+ summaries.push(rptSummary('Разом',results,cadets));
+ return {title:'Літакова Комісія',generatedAt,scope,meta,sheets:[
+  {name:'Результати',columns,rows:resultRows,freezeColumns:2},
+  {name:'Відомість групи',columns:matrixColumns,rows:matrixRows,freezeColumns:3},
+  {name:'Зведення',columns:summaryColumns,rows:summaries,freezeColumns:1}
+ ]};
+}
+function rptSummary(name,results,cadets){
+ const graded=results.filter(r=>rptScore(r)!==null),scores=graded.map(rptScore),passed=graded.filter(r=>r.passed).length;
+ const users=new Set([...cadets.map(u=>rptId(u.id)),...results.map(r=>rptId(r.userId))].filter(Boolean));
+ return [name,users.size,results.length,graded.length,passed,graded.length-passed,results.filter(rptPending).length,rptPercent(scores.length?scores.reduce((n,v)=>n+v,0)/scores.length:null),rptPercent(graded.length?passed/graded.length:null)];
+}
+function rptColumn(index){let text='';for(let n=index+1;n;n=Math.floor((n-1)/26))text=String.fromCharCode(65+(n-1)%26)+text;return text;}
+function rptRowHeight(values,columns,minimum=32){let lines=1;values.forEach((cell,index)=>{const raw=cell&&typeof cell==='object'?cell.v:cell,width=Math.max(8,(columns[index]?.[1]||20)-2);lines=Math.max(lines,String(raw??'').split('\n').reduce((n,s)=>n+Math.max(1,Math.ceil(s.length/width)),0));});return Math.min(409,Math.max(minimum,lines*14+12));}
+function rptStyles(){
+ const fonts='<font><sz val="11"/><name val="Calibri"/><color rgb="FF172B4D"/></font><font><b/><sz val="11"/><name val="Calibri"/><color rgb="FFFFFFFF"/></font><font><b/><sz val="17"/><name val="Calibri"/><color rgb="FF17365D"/></font><font><sz val="10"/><name val="Calibri"/><color rgb="FF64748B"/></font>';
+ const fills=['<patternFill patternType="none"/>','<patternFill patternType="gray125"/>',...['17365D','E8F5EC','FDECEC','FFF4D6','F1F5F9'].map(c=>'<patternFill patternType="solid"><fgColor rgb="FF'+c+'"/><bgColor indexed="64"/></patternFill>')].map(x=>'<fill>'+x+'</fill>').join('');
+ const xf=(num=0,fill=0,font=0)=>'<xf numFmtId="'+num+'" fontId="'+font+'" fillId="'+fill+'" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1" applyFont="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>';
+ const formats=[xf(),xf(0,2,1),xf(164),xf(165),xf(166),xf(0,3),xf(0,4),xf(0,5),xf(0,6),xf(0,0,2),xf(0,0,3),xf(1),xf(164,3),xf(164,4),xf(164,6),xf(0,6),xf(164,6),xf(165,6),xf(166,6)];
+ return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="0%"/><numFmt numFmtId="165" formatCode="[m]:ss"/><numFmt numFmtId="166" formatCode="dd.mm.yyyy hh:mm"/></numFmts><fonts count="4">'+fonts+'</fonts><fills count="7">'+fills+'</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1">'+xf()+'</cellStyleXfs><cellXfs count="'+formats.length+'">'+formats.join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+}
+function rptValue(value,index,row,banded=false){
+ const cell=value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'v')?value:{v:value,s:0};
+ let style=cell.s||0;if(banded)style=({0:15,2:16,3:17,4:18})[style]??style;
+ const ref=rptColumn(index)+row,raw=cell.v;
+ if(raw===null||raw===undefined||raw==='')return '<c r="'+ref+'" s="'+style+'"/>';
+ return typeof raw==='number'&&Number.isFinite(raw)?'<c r="'+ref+'" s="'+style+'"><v>'+raw+'</v></c>':'<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+rptXml(raw)+'</t></is></c>';
+}
+function rptWorksheet(sheet,model){
+ if(sheet.columns.length>16384||sheet.rows.length>1048573)throw Error('Забагато даних для одного аркуша Excel. Оберіть групу або тест.');
+ const last=rptColumn(Math.max(0,sheet.columns.length-1)),lastRow=Math.max(3,sheet.rows.length+3),freeze=sheet.freezeColumns||1;
+ const metaHeight=rptRowHeight([model.meta],[[null,sheet.columns.reduce((n,c)=>n+c[1],0)]],28),headerHeight=rptRowHeight(sheet.columns.map(c=>c[0]),sheet.columns,42);
+ const rows='<row r="1" ht="28" customHeight="1">'+rptValue(rptCell(model.title+' · '+sheet.name,9),0,1)+'</row><row r="2" ht="'+metaHeight+'" customHeight="1">'+rptValue(rptCell(model.meta,10),0,2)+'</row><row r="3" ht="'+headerHeight+'" customHeight="1">'+sheet.columns.map((c,i)=>rptValue(rptCell(c[0],1),i,3)).join('')+'</row>'+sheet.rows.map((values,index)=>'<row r="'+(index+4)+'" ht="'+rptRowHeight(values,sheet.columns)+'" customHeight="1">'+values.map((v,i)=>rptValue(v,i,index+4,index%2===1)).join('')+'</row>').join('');
+ return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:'+last+lastRow+'"/><sheetViews><sheetView workbookViewId="0" zoomScale="90"><pane xSplit="'+freeze+'" ySplit="3" topLeftCell="'+rptColumn(freeze)+'4" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>'+sheet.columns.map((c,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+c[1]+'" customWidth="1"'+(c[2]?' hidden="1"':'')+'/>').join('')+'</cols><sheetData>'+rows+'</sheetData><autoFilter ref="A3:'+last+lastRow+'"/><mergeCells count="2"><mergeCell ref="A1:'+last+'1"/><mergeCell ref="A2:'+last+'2"/></mergeCells><printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';
+}
+function xlsxParts(model){
+ const rel='http://schemas.openxmlformats.org/officeDocument/2006/relationships/',main='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+ const xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+ const parts=[{name:'[Content_Types].xml',data:xml+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+model.sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'},
+ {name:'_rels/.rels',data:xml+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+rel+'officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+ {name:'xl/workbook.xml',data:xml+'<workbook xmlns="'+main+'" xmlns:r="'+rel.slice(0,-1)+'"><bookViews><workbookView/></bookViews><sheets>'+model.sheets.map((s,i)=>'<sheet name="'+rptXml(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets><definedNames>'+model.sheets.map((s,i)=>'<definedName name="_xlnm.Print_Titles" localSheetId="'+i+'">'+rptXml("'"+s.name.replace(/'/g,"''")+"'!$1:$3")+'</definedName>').join('')+'</definedNames></workbook>'},
+ {name:'xl/_rels/workbook.xml.rels',data:xml+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+model.sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="'+rel+'worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(model.sheets.length+1)+'" Type="'+rel+'styles" Target="styles.xml"/></Relationships>'},
+ {name:'xl/styles.xml',data:rptStyles()},...model.sheets.map((s,i)=>({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:rptWorksheet(s,model)}))];
+ return parts;
+}
+function rptCRC(bytes){let crc=0xffffffff;const table=rptCRC.table||(rptCRC.table=Array.from({length:256},(_,i)=>{let v=i;for(let n=0;n<8;n++)v=v&1?0xedb88320^(v>>>1):v>>>1;return v>>>0;}));for(const b of bytes)crc=table[(crc^b)&255]^(crc>>>8);return (crc^0xffffffff)>>>0;}
+function xlsxBytes(model){
+ return zipReportParts(xlsxParts(model));
+}
+function zipReportParts(parts){
+ const encoder=new TextEncoder(),entries=parts.map(p=>({name:encoder.encode(p.name),data:encoder.encode(p.data)}));
+ const total=entries.reduce((n,e)=>n+30+e.name.length+e.data.length+46+e.name.length,22);if(total>64*1024*1024)throw Error('Файл Excel перевищує 64 МБ. Оберіть групу або тест.');
+ const out=new Uint8Array(total),view=new DataView(out.buffer);let pos=0;
+ const u16=(at,v)=>view.setUint16(at,v,true),u32=(at,v)=>view.setUint32(at,v,true);
+ for(const e of entries){e.offset=pos;e.crc=rptCRC(e.data);u32(pos,0x04034b50);u16(pos+4,20);u16(pos+6,0x800);u16(pos+8,0);u16(pos+12,0x21);u32(pos+14,e.crc);u32(pos+18,e.data.length);u32(pos+22,e.data.length);u16(pos+26,e.name.length);out.set(e.name,pos+30);out.set(e.data,pos+30+e.name.length);pos+=30+e.name.length+e.data.length;}
+ const start=pos;
+ for(const e of entries){u32(pos,0x02014b50);u16(pos+4,20);u16(pos+6,20);u16(pos+8,0x800);u16(pos+14,0x21);u32(pos+16,e.crc);u32(pos+20,e.data.length);u32(pos+24,e.data.length);u16(pos+28,e.name.length);u32(pos+42,e.offset);out.set(e.name,pos+46);pos+=46+e.name.length;}
+ u32(pos,0x06054b50);u16(pos+8,entries.length);u16(pos+10,entries.length);u32(pos+12,pos-start);u32(pos+16,start);return out;
+}
+const XLSX_MIME=rptMime;
+
+return {reportModel:reportModel,xlsxParts:xlsxParts,reportFilename:reportFilename};
+})();
+// END GENERATED EXCEL REPORT

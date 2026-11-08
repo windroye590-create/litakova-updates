@@ -132,6 +132,7 @@ await check('Cleanup mutations require the existing short script lock',()=>{
  assert.equal(preview().intake.phase,0);
 });
 await check('A transient spreadsheet failure retains the exact cleanup step for another instructor to resume',()=>{
+ job=api('POST','/api/instructor/intake/continue',instructorToken,{jobId:job.id}).intake;assert.equal(job.phase,0);assert.ok(job.archive?.sha256);
  job=api('POST','/api/instructor/intake/continue',instructorToken,{jobId:job.id}).intake;assert.equal(job.phase,1);
  const publicBook=context.publicResultsSpreadsheet_(false),sheet=publicBook.getSheetByName('Результати курсантів'),saved=sheet.deleteRows;
  sheet.deleteRows=()=>{throw Error('Injected interrupted public cleanup');};

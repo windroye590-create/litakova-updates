@@ -44,7 +44,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - run: python3 -m pip install Pillow==12.3.0 cryptography==50.0.2
+      - run: python3 -m pip install Pillow==12.3.0 cryptography==50.0.2 openpyxl==3.1.5
       - name: Check actual credentials without deployment
         if: github.event_name == 'workflow_dispatch' && inputs.check_credentials && github.ref == 'refs/heads/main'
         env:
@@ -70,6 +70,7 @@ jobs:
           npm install --ignore-scripts --no-audit --no-fund --no-package-lock
           npx playwright install --with-deps chromium
           node tests/private-storage-ui.mjs
+          node tests/excel-report-ui.mjs
           node tests/cadet-card-ui.mjs
           node tests/section-filters-ui.mjs
           node tests/results-ui.mjs

@@ -13,7 +13,7 @@ const draft=()=>({...C.newDraft(),title:'Reliability Test '+(++serial),questions
 async function create(){return api('POST','/api/instructor/tests',instructorToken,await C.publicationBody(draft(),true)).test;}
 const users=spreadsheet.getSheetByName('_Користувачі'),catalog=spreadsheet.getSheetByName('_Тести');
 const publicSheet=context.publicResultsSheet_(),userRow=u=>users.rows.find(row=>String(row[0])===String(u.user.id));
-const publicRows=u=>publicSheet.rows.filter(row=>String(row[6])===String(u.user.id));
+const publicRows=u=>Array.from(context.publicRowsFromSheet_(publicSheet)).filter(row=>String(row[6])===String(u.user.id));
 const pending=u=>api('GET','/api/public-table-sync',u?.token||instructorToken).publicTableSync;
 const one=cadet(),test=await create();
 api('POST',`/api/instructor/tests/${test.id}/access`,instructorToken,{expectedRevision:1,scope:'all',open:true});
@@ -144,7 +144,7 @@ await check('Deleting cadets are excluded from placeholder publication and statu
  assert.equal(pending().pendingCount,0);assert.equal(publicRows(account).length,1);
 });
 await check('Upgrade queues prior cadets once and repairs a previously missing placeholder',()=>{
- const account=cadet(),row=publicSheet.rows.findIndex(r=>String(r[6])===String(account.user.id));publicSheet.rows.splice(row,1);
+ const account=cadet(),row=publicSheet.rows.findIndex(r=>String(r[publicSheet.rows[0].indexOf('_ID курсанта')])===String(account.user.id));publicSheet.rows.splice(row,1);
  props.deleteProperty('LK_CADET_PUBLIC_MIGRATED_V1');context.CacheService.getScriptCache().remove('LK_SCHEMA_READY_PUBLIC_CADETS_V1');
  api('GET','/api/app-info');assert.equal(userRow(account)[9],'pending');
  const queued=users.rows.slice(1).filter(r=>r[9]==='pending').length;assert.ok(queued>0);

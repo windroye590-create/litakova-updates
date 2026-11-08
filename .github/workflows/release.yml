@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install pinned build dependencies
-        run: python3 -m pip install Pillow==12.3.0 cryptography==50.0.2
+        run: python3 -m pip install Pillow==12.3.0 cryptography==50.0.2 openpyxl==3.1.5
       - name: Check signing and Google credential configuration
         env:
           GAS_CREDENTIALS: ${{ secrets.GAS_CREDENTIALS }}
@@ -41,6 +41,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ inputs.version }}
         run: python3 release-tools/release_pipeline.py prepare --version "$RELEASE_VERSION"
+      - name: Check shared Excel model
+        run: python3 source/release-tools/sync_report.py --check
       - name: Inspect current Apps Script and preserve its deployment
         env:
           GAS_CREDENTIALS: ${{ secrets.GAS_CREDENTIALS }}
@@ -61,6 +63,7 @@ jobs:
           npm install --ignore-scripts --no-audit --no-fund --no-package-lock
           npx playwright install --with-deps chromium
           node tests/private-storage-ui.mjs
+          node tests/excel-report-ui.mjs
           node tests/cadet-card-ui.mjs
           node tests/section-filters-ui.mjs
           node tests/results-ui.mjs
@@ -90,6 +93,8 @@ jobs:
         env:
           GAS_CREDENTIALS: ${{ secrets.GAS_CREDENTIALS }}
         run: python3 release-tools/appscript_deploy.py apply --receipt "$RUNNER_TEMP/server-plan.json"
+      - name: Finish public spreadsheet migration with the new server
+        run: python3 release-tools/verify_report_schema.py --receipt "$RUNNER_TEMP/server-plan.json"
       - name: Publish verified update after server success
         env:
           GITHUB_TOKEN: ${{ github.token }}

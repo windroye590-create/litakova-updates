@@ -80,7 +80,7 @@ try{
   await instructor.page.screenshot({path:new URL('../verification/intake-confirmation.png',import.meta.url).pathname});await instructor.page.locator('#modal [data-action=cancel-modal]').click();assert.equal(context.listUsers_().filter(u=>u.role==='cadet').length,count);
  });
  await check('The optional export downloads all current results before cleanup',async()=>{
-  await newIntakeDialog();const waiting=instructor.page.waitForEvent('download');await action(instructor.page,'intake-export').click();const file=await waiting;assert.match(file.suggestedFilename(),/course-results.*\.csv$/);const bytes=fs.readFileSync(await file.path());assert.equal(bytes[0],0xef);assert.ok(bytes.toString('utf8').includes('Курсант UI А'));await instructor.page.locator('#modal [data-action=cancel-modal]').click();
+  await newIntakeDialog();const waiting=instructor.page.waitForEvent('download');await action(instructor.page,'intake-export').click();const file=await waiting;assert.match(file.suggestedFilename(),/\.xlsx$/);const bytes=fs.readFileSync(await file.path());assert.equal(bytes.subarray(0,2).toString(),'PK');assert.ok(bytes.toString('utf8').includes('Курсант UI А'));await instructor.page.locator('#modal [data-action=cancel-modal]').click();
  });
  await check('Cleanup requires the checkbox and exact phrase; a changed roster invalidates the preview',async()=>{
   await newIntakeDialog();const before=calls.filter(p=>p.path==='/api/instructor/intake/start').length;
@@ -90,7 +90,7 @@ try{
  });
  await check('A lost cleanup reply retains a resumable operation across PC restart',async()=>{
   await newIntakeDialog();await instructor.page.locator('[name=intakeReviewed]').check();await instructor.page.locator('[name=intakeConfirmation]').fill('НОВИЙ НАБІР');dropCleanupReply=true;await instructor.page.locator('#modal button.primary').click();await instructor.page.locator('#toast').filter({hasText:'можна продовжити'}).waitFor();
-  await instructor.page.locator('[data-action=resume-intake]:not([disabled])').waitFor();const before=states.get('instructor').accounts[first.user.id].intake;assert.equal(before.phase,1);await instructor.page.reload();await instructor.page.locator('[data-action=resume-intake]:not([disabled])').waitFor();assert.equal(states.get('instructor').accounts[first.user.id].intake.id,before.id);
+  await instructor.page.locator('[data-action=resume-intake]:not([disabled])').waitFor();const before=states.get('instructor').accounts[first.user.id].intake;assert.equal(before.phase,0);assert.ok(before.archive?.sha256);await instructor.page.reload();await instructor.page.locator('[data-action=resume-intake]:not([disabled])').waitFor();assert.equal(states.get('instructor').accounts[first.user.id].intake.id,before.id);
  });
  await check('Another instructor can finish cleanup without deleting instructors, groups or the test catalog',async()=>{
   await refresh(resumer.page);await action(resumer.page,'resume-intake').click();await resumer.page.locator('#toast').filter({hasText:'Новий набір підготовлено'}).waitFor({timeout:30000});

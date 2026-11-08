@@ -321,3 +321,11 @@ body.dark .choice-review.incorrect{border-color:#f87171;background:#450a0a}
 .test-state{font-weight:700}.test-state-open{border-color:var(--ink);background:var(--soft);color:var(--ink)}
 .test-state-closed{border-style:dashed;color:var(--muted)}.test-state-draft{background:var(--soft);color:var(--muted)}
 .test-card .test-access-note{flex-basis:100%;text-align:right;font-size:11px;color:var(--muted)}
+
+.intake-archive-list{display:grid;gap:12px;max-height:55vh;overflow:auto}
+.intake-archive-entry{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px;border:1px solid var(--line);border-radius:12px}
+.intake-archive-entry>div{min-width:0;flex:1;overflow-wrap:anywhere}
+.intake-archive-entry strong,.intake-archive-entry small{display:block}
+.intake-archive-entry small,.intake-archive-entry p{color:var(--muted);margin:6px 0 0}
+.intake-archive-entry button{flex-shrink:0}
+@media(max-width:480px){.intake-archive-entry{flex-wrap:wrap}.intake-archive-entry button{width:100%}}
