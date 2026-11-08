@@ -1,9 +1,10 @@
-param([string]$SigningArchive = '', [switch]$CheckOnly, [switch]$CheckBootstrap)
+param([string]$SigningArchive = '', [switch]$CheckOnly, [switch]$CheckBootstrap, [switch]$MirrorOnly)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $OutputEncoding = [Text.UTF8Encoding]::new($false)
 $repo = 'windroye590-create/litakova-updates'
 $claspVersion = '3.4.1'
+$archiveCacheBase = 'https://raw.githubusercontent.com/windroye590-create/litakova-updates/6ed911b3cf28bf3f7401e0b80c79b8713d7ff61f/release-tools/vendor/'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 function Assert-NativeSuccess([string]$Operation) {
@@ -20,13 +21,17 @@ function Get-PortableDefinition([string]$Command) {
         $hash = '98d0cfa794721665d7973dd728c78aff7bd836d58f10f6d7a03568eccb0a22e0'
         $asset = '679195750'
         if ($arm) { $arch = 'arm64'; $hash = '197211c98687d7770ac331fe8a3b6c198c389108c1536cdbedf659fe4703e484'; $asset = '679195799' }
-        return @{ Version = '2.103.3'; Arch = $arch; Exe = 'gh.exe'; SHA256 = $hash; Url = "https://api.github.com/repos/cli/cli/releases/assets/$asset"; FallbackUrl = "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_$arch.zip" }
+        $mirror = $null
+        if (-not $arm) { $mirror = $archiveCacheBase + 'gh_2.103.3_windows_amd64.zip' }
+        return @{ Version = '2.103.3'; Arch = $arch; Exe = 'gh.exe'; SHA256 = $hash; MirrorUrl = $mirror; Url = "https://api.github.com/repos/cli/cli/releases/assets/$asset"; FallbackUrl = "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_$arch.zip" }
     }
     if ($Command -eq 'node') {
         $arch = 'x64'
         $hash = 'dcc60d59a0746999f99064a01c020445d54d84228c691cdbf25b49ac3b59150a'
         if ($arm) { $arch = 'arm64'; $hash = 'a9427139595156ef484e1fb08957676e09d4232368dd1743a2a9f93f3d241b14' }
-        return @{ Version = '26.13.0'; Arch = $arch; Exe = 'node.exe'; SHA256 = $hash; Url = "https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-$arch.zip" }
+        $mirror = $null
+        if (-not $arm) { $mirror = $archiveCacheBase + 'node-v26.13.0-win-x64.zip' }
+        return @{ Version = '26.13.0'; Arch = $arch; Exe = 'node.exe'; SHA256 = $hash; MirrorUrl = $mirror; Url = "https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-$arch.zip" }
     }
     throw "Unknown setup tool: $Command"
 }
@@ -42,8 +47,13 @@ function Install-PortableTool([string]$Command, [string]$ToolsRoot) {
             $download = Join-Path $stage 'package.zip'
             Write-Host "Downloading official $Command $($definition.Version)..."
             $verified = $false
-            $urls = @($definition.Url)
-            if ($definition.FallbackUrl) { $urls += $definition.FallbackUrl }
+            $urls = @()
+            if ($definition.MirrorUrl) { $urls += $definition.MirrorUrl }
+            if (-not $MirrorOnly) {
+                $urls += $definition.Url
+                if ($definition.FallbackUrl) { $urls += $definition.FallbackUrl }
+            }
+            if ($urls.Count -eq 0) { throw 'The raw archive cache currently supports Windows x64 only.' }
             foreach ($url in $urls) {
                 try {
                     $headers = @{ Accept = 'application/octet-stream' }

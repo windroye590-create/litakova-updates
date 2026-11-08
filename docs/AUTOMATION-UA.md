@@ -14,7 +14,7 @@
 На своєму Windows ПК відкрийте PowerShell і виконайте:
 
 ```powershell
-Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/windroye590-create/litakova-updates/main/release-tools/setup-automation.ps1?portable=1' -OutFile "$env:TEMP\litakova-setup-automation.ps1" -ErrorAction Stop; if ($?) { powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$env:TEMP\litakova-setup-automation.ps1" }
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/windroye590-create/litakova-updates/main/release-tools/setup-automation.ps1?cache=2' -OutFile "$env:TEMP\litakova-setup-automation.ps1" -ErrorAction Stop; if ($?) { powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$env:TEMP\litakova-setup-automation.ps1" }
 ```
 
 [Переглянути скрипт перед запуском](../release-tools/setup-automation.ps1).
@@ -22,10 +22,16 @@ Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/windroye590-create/lit
 
 Скрипт:
 
-1. За потреби завантажує закріплені portable-версії GitHub CLI та Node.js
-   з офіційних сайтів, перевіряє SHA-256 та розпаковує в
+1. За потреби завантажує закріплені portable-версії GitHub CLI та Node.js,
+   перевіряє SHA-256 та розпаковує в
    `%LOCALAPPDATA%\LitakovaReleaseTools`. `winget` і права адміністратора
    не потрібні. PATH змінюється лише всередині процесу налаштування.
+   Для x64 спочатку використовується копія незмінених офіційних ZIP з
+   `raw.githubusercontent.com`, оскільки завантаження релізів GitHub на
+   ПК власника повертало 502/503. Походження й контрольні суми записані
+   в `release-tools/vendor/provenance.json`. Є резервні офіційні посилання.
+   Параметр `-MirrorOnly` обмежує завантаження інструментів цією копією;
+   саме так перевіряється встановлення в Windows CI.
 2. Відкриває вхід GitHub, якщо він ще не налаштований, і перевіряє право
    керувати секретами саме `windroye590-create/litakova-updates`.
 3. Пропонує вибрати оригінальний `Litakova-Komisiia-v1.4.1-source-and-signing.zip`.
