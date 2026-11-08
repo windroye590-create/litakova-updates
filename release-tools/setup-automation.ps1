@@ -111,6 +111,34 @@ function Test-GitHubLogin {
     }
 }
 
+function Invoke-SetupProcess([string]$Executable, [string]$Arguments) {
+    # A closed stdin keeps gh's browser authorization separate from Git setup.
+    $info = [Diagnostics.ProcessStartInfo]::new()
+    $info.FileName = $Executable
+    $info.Arguments = $Arguments
+    $info.UseShellExecute = $false
+    $info.RedirectStandardInput = $true
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $info
+    try {
+        [void]$process.Start()
+        $process.StandardInput.Close()
+        $process.WaitForExit()
+        return $process.ExitCode
+    } finally { $process.Dispose() }
+}
+
+function Test-SetupProcessWithoutGit {
+    $powershellPath = Join-Path ([Environment]::GetFolderPath('System')) 'WindowsPowerShell\v1.0\powershell.exe'
+    $savedPath = $env:Path
+    try {
+        $env:Path = ''
+        $arguments = '-NoProfile -NonInteractive -Command "if (Get-Command git -ErrorAction SilentlyContinue) { exit 93 }; if (-not [Console]::IsInputRedirected) { exit 91 }; if ([Console]::In.ReadToEnd().Length -ne 0) { exit 92 }; exit 0"'
+        if ((Invoke-SetupProcess $powershellPath $arguments) -ne 0) { throw 'Browser login process must work without Git and with closed stdin.' }
+        if ((Invoke-SetupProcess $powershellPath '-NoProfile -NonInteractive -Command "exit 23"') -ne 23) { throw 'Setup must retain child process error status.' }
+    } finally { $env:Path = $savedPath }
+}
+
 function Test-PortableBootstrap {
     $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('litakova-bootstrap-test-' + [Guid]::NewGuid().ToString('N'))
     try {
@@ -168,6 +196,7 @@ function Set-ActionSecret([string]$Name, [string]$Value) {
 }
 
 if ($CheckOnly) {
+    Test-SetupProcessWithoutGit
     $fixture = '{"tokens":{"litakova-release":{"client_id":"id","client_secret":"secret","refresh_token":"refresh"},"other":{"refresh_token":"must-not-be-uploaded"}}}' | ConvertFrom-Json
     $selected = Select-GoogleCredential $fixture
     if ($selected.Contains('must-not-be-uploaded') -or -not $selected.Contains('refresh_token')) { throw 'Credential account isolation failed.' }
@@ -197,8 +226,10 @@ $nodeMajor = [int]((& node --version).TrimStart('v').Split('.')[0])
 if ($nodeMajor -lt 22) { throw 'Install Node.js 22 or newer, then run this script again.' }
 
 if (-not (Test-GitHubLogin)) {
-    & gh auth login --hostname github.com --git-protocol https --web --skip-ssh-key
-    Assert-NativeSuccess 'GitHub sign-in'
+    Write-Host 'Authorize GitHub CLI using the one-time code printed below. Git installation is not required.'
+    Start-Process 'https://github.com/login/device'
+    $loginExit = Invoke-SetupProcess (Get-Command gh).Source 'auth login --hostname github.com --git-protocol https --web --skip-ssh-key'
+    if ($loginExit -ne 0 -and -not (Test-GitHubLogin)) { throw "GitHub sign-in failed (exit $loginExit)." }
 }
 & gh api "repos/$repo/actions/secrets/public-key" 1>$null
 if ($LASTEXITCODE -ne 0) { throw 'GitHub login cannot manage repository secrets. Run: gh auth refresh --hostname github.com --scopes repo' }

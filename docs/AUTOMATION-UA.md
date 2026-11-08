@@ -34,6 +34,8 @@ Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/windroye590-create/lit
    саме так перевіряється встановлення в Windows CI.
 2. Відкриває вхід GitHub, якщо він ще не налаштований, і перевіряє право
    керувати секретами саме `windroye590-create/litakova-updates`.
+   Git для цього не потрібен: авторизація через браузер не налаштовує Git
+   credential helper. Уже збережений вхід використовується повторно.
 3. Пропонує вибрати оригінальний `Litakova-Komisiia-v1.4.1-source-and-signing.zip`.
    Ключ і пароль читаються з ZIP у пам'ять; код з цього старого архіву не використовується.
 4. Відкриває [налаштування Apps Script API](https://script.google.com/home/usersettings).
