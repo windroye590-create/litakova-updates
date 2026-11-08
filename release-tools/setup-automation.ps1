@@ -1,5 +1,6 @@
 param([string]$SigningArchive = '', [switch]$CheckOnly)
 $ErrorActionPreference = 'Stop'
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
 $repo = 'windroye590-create/litakova-updates'
 $claspVersion = '3.4.1'
 
@@ -76,10 +77,10 @@ if ($CheckOnly) {
             $entry = $zip.CreateEntry('release-source/signing/litakova-release.jks').Open()
             try { $entry.Write([byte[]](97,98,99), 0, 3) } finally { $entry.Dispose() }
             $writer = [IO.StreamWriter]::new($zip.CreateEntry('release-source/signing/storepass.txt').Open())
-            try { $writer.Write('fixture-password') } finally { $writer.Dispose() }
+            try { $writer.Write('fixture-' + [char]0x0443) } finally { $writer.Dispose() }
         } finally { $zip.Dispose() }
         $data = Read-SigningArchive $testZip
-        if ($data.Key -ne 'YWJj' -or $data.Password -ne 'fixture-password') { throw 'Signing ZIP read failed.' }
+        if ($data.Key -ne 'YWJj' -or $data.Password -ne ('fixture-' + [char]0x0443)) { throw 'Signing ZIP read failed.' }
     } finally { if (Test-Path $testZip) { Remove-Item -LiteralPath $testZip } }
     Write-Host 'Windows setup verified: selected Google account and signing ZIP parsing; no network calls.'
     exit 0

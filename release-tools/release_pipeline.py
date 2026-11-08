@@ -34,7 +34,7 @@ def secret_check():
 def load_key():
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.serialization import pkcs12
-    data = base64.b64decode(os.environ['LK_SIGNING_PKCS12_BASE64'], validate=True)
+    data = base64.b64decode(os.environ['LK_SIGNING_PKCS12_BASE64'].strip(), validate=True)
     require(0 < len(data) < 256 * 1024, 'Invalid signing container size')
     password = os.environ['LK_SIGNING_PASSWORD'].strip().encode()
     key, certificate, _ = pkcs12.load_key_and_certificates(data, password)
