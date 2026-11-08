@@ -155,5 +155,5 @@ export function createMaterials(ctx){
  document.addEventListener('input',ev=>{if(ev.target.id==='material-search'){const at=ev.target.selectionStart;const a=state();a.sectionSearches??={};a.sectionSearches.materials=ev.target.value;ctx.scheduleSave?.();ctx.resetPage('materials');render();const f=document.querySelector('#material-search');f?.focus();f?.setSelectionRange(at,at);}});
  modal.addEventListener('cancel',ev=>{if(viewer){ev.preventDefault();closeViewer();}});
  modal.addEventListener('keydown',ev=>{if(viewer&&['ArrowRight','ArrowLeft'].includes(ev.key)){ev.preventDefault();action(ev.key==='ArrowRight'?'material-next':'material-prev','').catch(x=>toast(x.message));}});
- return {get busy(){return busy||!!progressFlight;},html,openList,refresh,action,close:closeViewer,syncProgress:flushProgress,reset:()=>{lastBytes=null;error='';}};
+ return {get busy(){return busy||!!progressFlight;},html,openList,refresh,action,close:closeViewer,syncProgress:flushProgress,reset:()=>{lastBytes=null;error='';clearTimeout(progressTimer);if(viewer)void closeViewer().catch(()=>{});}};
 }

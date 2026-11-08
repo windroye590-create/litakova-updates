@@ -58,7 +58,7 @@ try{
  page=await browser.newPage({viewport:{width:1440,height:1000},locale:'uk-UA'});page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/?key=section-filters`);await page.locator('.layout').waitFor();await settled();
  await check('One update button shares a single workspace and account sync across repeated clicks',async()=>{
-  assert.equal(await page.locator('.topbar [data-action="sync-account"]').count(),0);assert.equal(await page.locator('.topbar [data-action="refresh"]').count(),1);assert.match(await page.locator('.topbar [data-action="refresh"]').innerText(),/Оновити дані/);
+  assert.equal(await page.locator('.topbar [data-action="sync-account"]').count(),0);assert.equal(await page.locator('.topbar [data-action="refresh"]').count(),1);await page.waitForFunction(()=>document.querySelector('.topbar [data-action="refresh"]:not([disabled])')?.textContent.includes('Оновити дані'));
   const first=calls.length;await page.evaluate(async()=>{const m=await import('/app.js'),button=document.querySelector('.topbar [data-action="refresh"]');await Promise.all([m.clickAction(button),m.clickAction(button),m.clickAction(button)]);});
   const delta=calls.slice(first);assert.equal(delta.filter(p=>p.path==='/api/workspace').length,1);assert.equal(delta.filter(p=>p.path==='/api/account-state').length,1);
  });
@@ -116,6 +116,29 @@ try{
   await nav('results');assert.equal(await page.locator('#shared-group').inputValue(),'g1');assert.equal(await page.locator('#shared-test').inputValue(),'t1');
   await nav('materials');assert.equal(await page.locator('#material-search').inputValue(),'Посібник другої');
   await analyticsPage();assert.equal(await page.locator('#shared-group').inputValue(),'g2');assert.equal(await page.locator('#shared-test').inputValue(),'t2');
+ });
+ await check('A delayed analytics reply cannot replace statistics for the currently selected group',async()=>{
+  await analyticsPage();
+  let entered,release;const reached=new Promise(r=>entered=r),held=new Promise(r=>release=r);
+  const delay=async route=>{const p=route.request().postDataJSON();if(p?.path==='/api/instructor/analytics'&&p.body.groupName==='Група 1'){entered();await held;}await route.continue();};
+  await page.route('**/rpc',delay);
+  try{
+   await page.locator('#shared-group').selectOption('g1');await reached;
+   await page.locator('#shared-group').selectOption('g2');await page.waitForFunction(()=>document.querySelector('.cards .value')?.textContent==='1');
+   const oldReply=page.waitForResponse(r=>r.url().endsWith('/rpc')&&r.request().postDataJSON()?.path==='/api/instructor/analytics'&&r.request().postDataJSON().body.groupName==='Група 1');
+   release();await oldReply;await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   assert.equal(await page.locator('#shared-group').inputValue(),'g2');assert.equal(await page.locator('.cards .value').first().innerText(),'1');
+  }finally{release();await page.unroute('**/rpc',delay);}
+ });
+ await check('Leaving Settings while analytics loads cannot navigate the application back after a slow reply',async()=>{
+  await nav('more');let entered,release;const reached=new Promise(r=>entered=r),held=new Promise(r=>release=r);
+  const delay=async route=>{if(route.request().postDataJSON()?.path==='/api/instructor/analytics'){entered();await held;}await route.continue();};
+  await page.route('**/rpc',delay);
+  try{
+   await click('analytics');await reached;await nav('tests');
+   const oldReply=page.waitForResponse(r=>r.url().endsWith('/rpc')&&r.request().postDataJSON()?.path==='/api/instructor/analytics');release();await oldReply;
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal(await page.locator('#test-list').count(),1);
+  }finally{release();await page.unroute('**/rpc',delay);}
  });
  await check('Local controls fit narrow windows in both themes, including expanded material filters',async()=>{
   for(const theme of ['light','dark']){
