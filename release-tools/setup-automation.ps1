@@ -26,6 +26,7 @@ function Ensure-Tool([string]$Command, [string]$Package) {
 }
 
 function Read-SigningArchive([string]$Path) {
+    Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Path).Path)
     try {
@@ -66,6 +67,7 @@ if ($CheckOnly) {
     $fixture = '{"tokens":{"litakova-release":{"client_id":"id","client_secret":"secret","refresh_token":"refresh"},"other":{"refresh_token":"must-not-be-uploaded"}}}' | ConvertFrom-Json
     $selected = Select-GoogleCredential $fixture
     if ($selected.Contains('must-not-be-uploaded') -or -not $selected.Contains('refresh_token')) { throw 'Credential account isolation failed.' }
+    Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $testZip = Join-Path ([IO.Path]::GetTempPath()) (([IO.Path]::GetRandomFileName()) + '.zip')
     try {

@@ -28,7 +28,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Validate Windows setup without installing tools or signing in
+      - name: Validate setup in Windows PowerShell 5.1
+        shell: powershell
+        run: ./release-tools/setup-automation.ps1 -CheckOnly
+      - name: Validate setup in PowerShell 7 without installing tools or signing in
         shell: pwsh
         run: ./release-tools/setup-automation.ps1 -CheckOnly
   verify:
