@@ -12,5 +12,16 @@
   "productionServerHealth": "pc-1.2.26-audit-reliability / API26 / online",
   "productionAPIWrites": 0,
   "realGoogleDeploymentCredentialsVerified": false,
-  "signingSecretsConfigured": "not yet observable with current integration"
+  "signingSecretsConfigured": false,
+  "codeVerification": "passed",
+  "codeVerificationCommit": "527012a605fdc2161a68c4e6d7c54a22469b00bf",
+  "codeVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42471841153",
+  "windowsPowerShell51SetupVerified": true,
+  "powerShell7SetupVerified": true,
+  "setupVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42471992980",
+  "missingSecrets": [
+    "GAS_CREDENTIALS",
+    "LK_SIGNING_PKCS12_BASE64",
+    "LK_SIGNING_PASSWORD"
+  ]
 }
