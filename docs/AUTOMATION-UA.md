@@ -14,7 +14,7 @@
 На своєму Windows ПК відкрийте PowerShell і виконайте:
 
 ```powershell
-Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/windroye590-create/litakova-updates/main/release-tools/setup-automation.ps1?cache=2' -OutFile "$env:TEMP\litakova-setup-automation.ps1" -ErrorAction Stop; if ($?) { powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$env:TEMP\litakova-setup-automation.ps1" }
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/windroye590-create/litakova-updates/main/release-tools/setup-automation.ps1?cache=3' -OutFile "$env:TEMP\litakova-setup-automation.ps1" -ErrorAction Stop; if ($?) { powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$env:TEMP\litakova-setup-automation.ps1" }
 ```
 
 [Переглянути скрипт перед запуском](../release-tools/setup-automation.ps1).

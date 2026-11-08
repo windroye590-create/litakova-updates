@@ -32,5 +32,8 @@
   "portableNodeVersion": "26.13.0",
   "rawBootstrapCacheVerified": true,
   "rawBootstrapCacheCommit": "6ed911b3cf28bf3f7401e0b80c79b8713d7ff61f",
-  "rawBootstrapWindowsVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42474040074/job/128711244217"
+  "rawBootstrapWindowsVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42474040074/job/128711244217",
+  "gitlessSetupProcessVerified": true,
+  "gitlessSetupVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42475355448/job/128715337957",
+  "existingGitHubAuthorizationRecoveryObserved": true
 }
