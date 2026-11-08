@@ -23,5 +23,11 @@
     "GAS_CREDENTIALS",
     "LK_SIGNING_PKCS12_BASE64",
     "LK_SIGNING_PASSWORD"
-  ]
+  ],
+  "portableBootstrapWithoutWinget": "passed",
+  "portableBootstrapWindowsPowerShell51": true,
+  "portableBootstrapPowerShell7Parsing": true,
+  "portableBootstrapVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42473288604/job/128708871006",
+  "portableGitHubCLIVersion": "2.103.3",
+  "portableNodeVersion": "26.13.0"
 }
