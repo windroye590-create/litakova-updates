@@ -29,5 +29,8 @@
   "portableBootstrapPowerShell7Parsing": true,
   "portableBootstrapVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42473288604/job/128708871006",
   "portableGitHubCLIVersion": "2.103.3",
-  "portableNodeVersion": "26.13.0"
+  "portableNodeVersion": "26.13.0",
+  "rawBootstrapCacheVerified": true,
+  "rawBootstrapCacheCommit": "6ed911b3cf28bf3f7401e0b80c79b8713d7ff61f",
+  "rawBootstrapWindowsVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42474040074/job/128711244217"
 }
