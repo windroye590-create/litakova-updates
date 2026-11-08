@@ -112,11 +112,30 @@ function storageNotice(compact=false){
  const message=problem?'Не збережено на диску: '+problem:(v.pending||scheduledSave||journalPending)?'Зберігаємо на цьому ПК…':pending.some(p=>p.permanent)?'Потрібна дія: перевірте результати в черзі.':pending.length?'Збережено на ПК · очікують сервера: '+pending.length:cloud.conflicts.length?'Є інша версія чернетки з другого ПК. Оберіть, яку продовжити.':cloud.error?cloud.error+' Дані на цьому ПК збережено.':cloud.busy?'Синхронізуємо акаунт…':cloud.pending?'Збережено на ПК · чекаємо синхронізації з акаунтом.':cloud.ready?'Синхронізовано з акаунтом · можна продовжити на іншому ПК.':'Завантажуємо дані акаунта…';
  const warning=problem||cloud.error||cloud.conflicts.length||pending.some(p=>p.permanent);
  if(compact&&!warning&&!recoveryMessage)return '<div id="durability-status" hidden></div>';
- return `<div id="durability-status" class="sync-status ${problem||cloud.error||cloud.conflicts.length||pending.some(p=>p.permanent)?'warn':''}" role="status"><span>${e(message)}</span>${problem?'<button class="small" data-action="retry-save">Повторити збереження</button>':cloud.conflicts.length?'<button class="small" data-action="sync-conflicts">Переглянути зміни</button>':compact?'':'<button class="small" data-action="sync-account" '+(cloud.busy?'disabled':'')+'>Синхронізувати</button>'}${recoveryMessage?'<span class="storage-recovery">'+e(recoveryMessage)+'</span>':''}</div>`;
+ return `<div id="durability-status" class="sync-status ${problem||cloud.error||cloud.conflicts.length||pending.some(p=>p.permanent)?'warn':''}" role="status"><span>${e(message)}</span>${problem?'<button class="small" data-action="retry-save">Повторити збереження</button>':cloud.conflicts.length?'<button class="small" data-action="sync-conflicts">Переглянути зміни</button>':compact?'':'<button class="small" data-action="refresh" '+(cloud.busy?'disabled':'')+'>Оновити дані</button>'}${recoveryMessage?'<span class="storage-recovery">'+e(recoveryMessage)+'</span>':''}</div>`;
 }
 function syncAccountButton(){
  const cloud=accountSync.status(),message=cloud.error||cloud.conflicts.length?'Потрібна увага: перегляньте повідомлення про синхронізацію.':cloud.busy?'Синхронізуємо акаунт…':cloud.pending?'Є зміни, які очікують синхронізації.':cloud.ready?'Синхронізовано з акаунтом · можна продовжити на іншому ПК.':'Завантажуємо дані акаунта…';
- return `<button id="account-sync-button" data-action="sync-account" title="${e(message)}" ${cloud.busy?'disabled aria-busy="true"':''}>${cloud.busy?'Синхронізуємо…':'⇅ Синхронізувати'}</button>`;
+ const busy=updateData.flight?.token===S.session?.token||refreshing===S.session?.token||cloud.busy||syncing===S.session?.token||page==='cadet-card'&&(cadetCard.loading||cadetCard.saving);
+ return `<button id="account-sync-button" data-action="refresh" title="${e(message)}" ${busy?'disabled aria-busy="true"':''}>${busy?'Оновлюємо…':'↻ Оновити дані'}</button>`;
+}
+function updateData(){
+ if(updateApplying||!user()||!alive())return Promise.resolve();
+ const token=S.session.token,a=account();if(updateData.flight?.token===token)return updateData.flight.promise;
+ const flight={token,promise:null},current=()=>S.session?.token===token&&account()===a&&alive()&&!updateApplying;
+ updateData.flight=flight;refresh.manualToken=token;
+ flight.promise=Promise.resolve().then(async()=>{
+  render();await persist();if(!current())return;
+  const queue=syncQueue.completion;if(queue?.token===token)await queue.promise;if(!current())return;
+  await syncQueue(true);if(!current())return;
+  await materials.syncProgress();if(!current())return;
+  await refresh(true);const workspace=refresh.completion;if(workspace?.token===token)await workspace.promise;if(!current())return;
+  if(pendingReviewsPage()&&reviewQueueFlight?.token===token)await reviewQueueFlight.promise;if(!current())return;
+  if(page==='bank')await navigate('bank');else if(page==='analytics')await loadAnalytics();if(!current())return;
+  await accountSync.sync(true);if(!current())return;
+  await publicTableSync.tick(true);
+ }).finally(()=>{if(refresh.manualToken===token)delete refresh.manualToken;if(updateData.flight===flight){updateData.flight=null;if(current())render();}});
+ return flight.promise;
 }
 function updateStorageNotice(){const b=$('#account-sync-button'),n=$('#durability-status');if(n)n.outerHTML=storageNotice(Boolean(b));if(b)b.outerHTML=syncAccountButton();}
 function publicTableSyncNotice(){const pending=account().publicTableSync?.state==='pending';return `<div id="public-table-sync-status" ${pending?'class="notice warn" role="status"':'hidden'}>${pending?'Результати збережено в застосунку. Спільна Google Таблиця очікує синхронізації; повторимо автоматично після відновлення зв’язку.':''}</div>`;}
@@ -236,7 +255,7 @@ async function bulkAssignment(){
 function layout(content){
  const nav=instructor()?[['home','Головна'],['tests','Тести'],['materials','Матеріали'],['groups','Групи'],['cadets','Курсанти'],['results','Результати'],['bank','Банк питань']]:[['home','Головна'],['tests','Мої тести'],['materials','Матеріали'],['results','Мої результати'],['more','Профіль']];
  const u=user(),a=account(),navPage=page==='cadet-card'||page==='grading'&&grading?.origin?.page==='cadet-card'?'cadets':instructor()&&['grading','reviews'].includes(page)?'results':page;
- return `<div class="layout"><aside class="sidebar${menuOpen?' menu-open':''}"><div class="sidebar-top"><div class="brand"><img src="/icon.png" alt=""><div><strong>Літакова<br>Комісія</strong><small>Версія для ПК</small></div></div><button class="menu-toggle" data-action="toggle-menu" aria-expanded="${menuOpen}" aria-controls="primary-navigation">${svg('menu')}<span>${menuOpen?'Закрити меню':'Меню'}</span></button></div><div class="sidebar-panel" id="primary-navigation"><div><div class="eyebrow" style="margin:0 12px 10px">${instructor()?'Кабінет інструктора':'Кабінет курсанта'}</div><nav class="nav" aria-label="Головне меню">${nav.map(([n,l])=>`<button data-action="nav" data-page="${n}" class="${navPage===n?'active':''}" ${navPage===n?'aria-current="page"':''}>${svg(n)}${l}${n==='results'&&instructor()?reviewCountBadge():''}</button>`).join('')}</nav></div><div class="sidebar-footer">${instructor()?`<nav class="nav nav-settings" aria-label="Налаштування"><button data-action="nav" data-page="more" class="${page==='more'?'active':''}" ${page==='more'?'aria-current="page"':''}>${svg('more')}Налаштування</button></nav>`:''}<div class="user"><div class="avatar">${e(C.nameOf(u).split(' ').map(w=>w[0]||'').slice(0,2).join(''))}</div><div class="info"><strong>${e(C.nameOf(u))}</strong><small>${e(C.titleOf(u))}</small></div></div><button data-action="logout" class="small">Вийти з облікового запису</button><small style="font-size:10px">Windows · ${e(C.APP_VERSION)}${C.PREVIEW_BUILD?' · Перегляд':''}</small></div></div></aside><main class="main${page==='results'&&rankingActive()?' ranking-page':''}"><header class="topbar"><small>${status()}</small><div class="top-actions">${a.pending.length?`<button data-action="sync">Черга: ${a.pending.length}</button>`:''}${syncAccountButton()}<button data-action="theme" aria-label="Змінити тему">${S.theme==='dark'?'☀ Світла':'◐ Темна'}</button><button data-action="refresh" ${refreshing?'disabled':''}>${refreshing?'Оновлюємо…':'↻ Оновити'}</button></div></header>${storageNotice(true)}${publicTableSyncNotice()}${notice()}${intakeNotice()}${content}</main></div>`;
+ return `<div class="layout"><aside class="sidebar${menuOpen?' menu-open':''}"><div class="sidebar-top"><div class="brand"><img src="/icon.png" alt=""><div><strong>Літакова<br>Комісія</strong><small>Версія для ПК</small></div></div><button class="menu-toggle" data-action="toggle-menu" aria-expanded="${menuOpen}" aria-controls="primary-navigation">${svg('menu')}<span>${menuOpen?'Закрити меню':'Меню'}</span></button></div><div class="sidebar-panel" id="primary-navigation"><div><div class="eyebrow" style="margin:0 12px 10px">${instructor()?'Кабінет інструктора':'Кабінет курсанта'}</div><nav class="nav" aria-label="Головне меню">${nav.map(([n,l])=>`<button data-action="nav" data-page="${n}" class="${navPage===n?'active':''}" ${navPage===n?'aria-current="page"':''}>${svg(n)}${l}${n==='results'&&instructor()?reviewCountBadge():''}</button>`).join('')}</nav></div><div class="sidebar-footer">${instructor()?`<nav class="nav nav-settings" aria-label="Налаштування"><button data-action="nav" data-page="more" class="${page==='more'?'active':''}" ${page==='more'?'aria-current="page"':''}>${svg('more')}Налаштування</button></nav>`:''}<div class="user"><div class="avatar">${e(C.nameOf(u).split(' ').map(w=>w[0]||'').slice(0,2).join(''))}</div><div class="info"><strong>${e(C.nameOf(u))}</strong><small>${e(C.titleOf(u))}</small></div></div><button data-action="logout" class="small">Вийти з облікового запису</button><small style="font-size:10px">Windows · ${e(C.APP_VERSION)}${C.PREVIEW_BUILD?' · Перегляд':''}</small></div></div></aside><main class="main${page==='results'&&rankingActive()?' ranking-page':''}"><header class="topbar"><small>${status()}</small><div class="top-actions">${a.pending.length?`<button data-action="sync">Черга: ${a.pending.length}</button>`:''}<button data-action="theme" aria-label="Змінити тему">${S.theme==='dark'?'☀ Світла':'◐ Темна'}</button>${syncAccountButton()}</div></header>${storageNotice(true)}${publicTableSyncNotice()}${notice()}${intakeNotice()}${content}</main></div>`;
 }
 function renderAuth(){
  const reg=authMode==='register';
@@ -296,7 +315,7 @@ function rankingControls(){
 }
 function results(){
  const a=account(),ranking=rankingActive(),pending=pendingReviewsActive();
- const actions=pending?'<button data-action="refresh">Оновити список</button>':(instructor()&&!ranking?'<button class="primary" data-action="group-statement">Відомість групи PDF</button>':'')+`<button data-action="${ranking?'export-ranking':'export-csv'}">↓ ${ranking?'Рейтинг':'CSV'} для Excel</button>`;
+ const actions=pending?'':(instructor()&&!ranking?'<button class="primary" data-action="group-statement">Відомість групи PDF</button>':'')+`<button data-action="${ranking?'export-ranking':'export-csv'}">↓ ${ranking?'Рейтинг':'CSV'} для Excel</button>`;
  const controls=ranking?rankingControls():(instructor()?sharedFilterBar():'')+`<div class="toolbar"><input id="filter" placeholder="ПІБ, група або назва тесту…" value="${e(filter)}" aria-label="Пошук результатів"></div>`;
  const incomplete=instructor()&&!pending&&a.resultTotal>a.results.length?'<div class="notice">Показано останні результати. Натисніть «Оновити», щоб завантажити повний список для рейтингу.</div>':'';
  const queue=!ranking&&!pending&&a.pending.length?`<div class="notice"><strong>Очікують відправлення: ${a.pending.length}</strong>${a.pending.map(p=>`<p style="margin-top:7px">${e(p.testTitle)} · ${p.failure?e(p.failure):'Результат збережено на ПК'} ${p.permanent?'':'<button data-action="sync" class="small">Повторити зараз</button>'}</p>`).join('')}</div>`:'';
@@ -321,7 +340,7 @@ async function refresh(force=false){
  // The token identifies the owner of the in-flight workspace request.
  if(refreshing===S.session.token){refreshQueued=true;forceQueued=forceQueued||force;return;}
  if(refreshing){refreshQueued=false;forceQueued=false;}
- const session=S.session,a=account(),resultWriteVersion=a.resultWriteVersion||0;refreshing=session.token;if(force)render();
+ const session=S.session,a=account(),resultWriteVersion=a.resultWriteVersion||0;let completion=refresh.completion;if(completion?.token!==session.token){let resolve;const promise=new Promise(done=>resolve=done);completion={token:session.token,promise,resolve};refresh.completion=completion;}const finish=()=>{completion.resolve();if(refresh.completion===completion)refresh.completion=null;};refreshing=session.token;if(force)render();
  try{
   let response=null,request;
   if(force||Date.now()>=workspaceUnavailableUntil){
@@ -386,11 +405,11 @@ async function refresh(force=false){
   if(page==='materials'||(!instructor()&&page==='home'&&(force||a.materialCatalogRevision!==response?.revisions.materials))){await materials.refresh();if(response)a.materialCatalogRevision=response.revisions.materials;}
   if(page==='more'&&instructor())await loadInstructors();
   if(page==='cadet-card'&&instructor())await cadetCard.load();
-  if(S.session?.token===session.token){await accountSync.sync(force);if(!instructor())await examSession.discover();}
+  if(S.session?.token===session.token){if(refresh.manualToken!==session.token)await accountSync.sync(force);if(!instructor())await examSession.discover();}
  }catch(x){if(S.session?.token===session.token)lastError=x.message;}
  finally{if(refreshing===session.token){refreshing=false;if(user()&&page!=='editor'&&page!=='runner'&&page!=='result'&&page!=='grading')render();
-  if(refreshQueued){const again=forceQueued;refreshQueued=false;forceQueued=false;if(S.session?.token===session.token)setTimeout(()=>refresh(again),0);}
- }}
+  if(refreshQueued){const again=forceQueued;refreshQueued=false;forceQueued=false;if(S.session?.token===session.token&&!updateApplying)setTimeout(()=>{if(S.session?.token===session.token&&!updateApplying&&page!=='runner')refresh(again);else finish();},0);else finish();}else finish();
+ }else finish();}
 }
 
 async function loadGroups(){try{S.groups=(await rpc('GET','/api/groups')).groups||[];lastError='';await persist();}catch(x){lastError=x.message;}if(!user()&&!working)render();}
@@ -605,7 +624,7 @@ async function finishRun(ask=true,forcedUptime=null){
 }
 async function syncQueue(force=false){
  // A pending result request belongs to its originating account.
- if(updateApplying||!user()||instructor()||syncing===S.session.token||!alive())return;const session=S.session,a=account();syncing=session.token;
+ if(updateApplying||!user()||instructor()||syncing===S.session.token||!alive())return;const session=S.session,a=account();let resolve;const completion={token:session.token,promise:new Promise(done=>resolve=done)};syncQueue.completion=completion;syncing=session.token;
  try{
   for(const p of [...a.pending]){
    if(S.session?.token!==session.token)break;if((p.permanent&&!force)||(!force&&p.nextAt>Date.now()))continue;
@@ -641,7 +660,7 @@ async function syncQueue(force=false){
     await persist();lastError=p.failure;break;
    }
   }
- }finally{if(syncing===session.token){syncing=false;if(S.session?.token===session.token&&page!=='runner'&&page!=='editor')render();}}
+ }finally{resolve();if(syncQueue.completion===completion)syncQueue.completion=null;if(syncing===session.token){syncing=false;if(S.session?.token===session.token&&page!=='runner'&&page!=='editor')render();}}
 }
 function download(content,name,type){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 function officeReview(d){
@@ -737,7 +756,7 @@ async function clickAction(button){
   return pendingReviewsActive()?loadReviewQueue(false,false,true):refreshResults();
  }
  if(act==='review-recovery')return openExamRecovery(tid);
- if(act==='refresh'){if(page==='cadet-card')return cadetCard.load();if(page==='materials')return materials.openList();if(pendingReviewsPage())return loadReviewQueue();await refresh(true);if(page==='bank')return navigate('bank');return syncQueue(true);}
+ if(act==='refresh'||act==='sync-account')return updateData();
  if(act==='toggle-material-filters'){const focused=document.activeElement===button;a.materialFiltersOpen=!a.materialFiltersOpen;scheduleSave();render();if(focused)$('[data-action="toggle-material-filters"]')?.focus({preventScroll:true});return;}
  if(act==='reset-filters'){Object.assign(sharedFilters(page),{groupId:'',testId:''});delete sharedTestSearches.get(a)?.[page];if(['tests','cadets'].includes(page)){filter='';a.sectionSearches??={};a.sectionSearches[page]='';}resetPage(page);if(page==='results')resetPage('ranking');await persist();if(page==='analytics')await loadAnalytics();render();return;}
  if(act==='toggle-archive'){a.showArchived=!a.showArchived;resetPage('groups');await persist();render();return;}
@@ -748,7 +767,6 @@ async function clickAction(button){
  if(act==='intake-export'){const r=await rpc('GET','/api/instructor/results');if(!Array.isArray(r.results))throw Error('Не вдалося завантажити всі результати.');download(C.resultCSV(r.results),'Litakova-course-results-'+new Date().toLocaleDateString('sv-SE')+'.csv','text/csv;charset=utf-8');toast('Результати збережено у CSV для Excel.');return;}
  if(act==='archive-group'){const g=S.groups.find(v=>id(v.id)===id(tid));if(!g)throw Error('Групу не знайдено.');return confirmAction(g.archived?'Повернути групу?':'Архівувати групу?',`<strong>${e(g.name)}</strong><p>Курсанти та результати збережуться.${g.archived?' Реєстрація в групу знову стане доступною.':' Нові курсанти не зможуть обрати цю групу.'}</p>`,async()=>{const r=await rpc('POST','/api/instructor/groups/'+encodeURIComponent(g.id)+'/archive',{archived:!g.archived,expectedRevision:g.revision||1});if(id(r.group?.id)!==id(g.id)||r.group.archived===g.archived)throw Error('Сервер не підтвердив зміну групи.');await refresh(true);},g.archived?'Повернути':'Архівувати');}
  if(act==='retry-save'){await retrySave();return;}
- if(act==='sync-account'){await persist();await syncQueue(true);await accountSync.sync(true);return;}
  if(act==='sync-conflicts'){
   const conflicts=accountSync.status().conflicts;
   dialog('Зміни з іншого ПК',`<p>Обидві версії збережено. Оберіть, яку продовжити. Копія попередньої версії залишиться на цьому ПК.</p>${conflicts.map(({key,document:d})=>`<section class="panel"><strong>${e(key==='test-draft'?'Чернетка тесту':key==='training'?'Тренування':'Перевірка роботи №'+key.slice(8))}</strong><p>Інший ПК: ${e(date(d.updatedAt))}${d.value?.title?' · '+e(d.value.title):''}</p><div class="actions"><button type="button" data-action="sync-use-local" data-id="${e(key)}">Зберегти цю версію</button><button type="button" data-action="sync-use-remote" data-id="${e(key)}">Продовжити з іншого ПК</button></div></section>`).join('')}`,()=>{},'Закрити');return;
@@ -887,7 +905,7 @@ window.addEventListener('focus',()=>{if(!document.hidden)away=false;});
 window.addEventListener('beforeunload',event=>{if(!alive())return;if(scheduledSave||journalPending||diskWriter.status().pending||journalError||(user()?.role==='cadet'&&examSession.status().pending)){event.preventDefault();event.returnValue='';}});
 window.addEventListener('pagehide',()=>{if(diskStateLoaded&&alive()&&!updateApplying){clearTimeout(saveTimer);if(user()&&account().run)checkpoint=stamp(runCheckpoint(account().run.test.mode==='exam'));else if(checkpoint)checkpoint={serial:++S.journalSerial,...Object.fromEntries(Object.entries(checkpoint).filter(([k])=>k!=='serial'))};if(typeof secureStorage!=='undefined'&&secureStorage.enabled){if(checkpoint)secureStorage.beacon(checkpoint);}else{if(checkpoint)navigator.sendBeacon('/journal?key='+encodeURIComponent(key),JSON.stringify(checkpoint));const raw=JSON.stringify(S);if(new TextEncoder().encode(raw).length<60000)navigator.sendBeacon('/state?key='+encodeURIComponent(key),raw);}}});
 const updater=createUpdater({local,
- canApply:()=>user()&&account().run?'Оновлення готове. Установимо його автоматично після завершення поточного тесту.':working||refreshing||syncing||rpcFlights||modal.open||materials.busy?'Оновлення готове. Чекаємо завершення поточної дії…':'',
+ canApply:()=>user()&&account().run?'Оновлення готове. Установимо його автоматично після завершення поточного тесту.':working||refreshing||syncing||updateData.flight||rpcFlights||modal.open||materials.busy?'Оновлення готове. Чекаємо завершення поточної дії…':'',
  save:async release=>{clearTimeout(saveTimer);S.updateReturnPage='more';S.updateTargetCode=release.code;await journalSaving.catch(()=>{});if(checkpoint){const r=secureStorage.enabled?await secureStorage.saveJournal(checkpoint):await local('/journal',checkpoint);if(r.ok===false)throw Error(r.error||'Не вдалося зберегти дані на диску.');}await persist();},
  freeze:(active,message)=>{updateApplying=active;if(active){modal.close();app.innerHTML=`<div class="boot" role="status">Оновлення застосунку<small>${e(message)}</small></div>`;}else{delete S.updateReturnPage;delete S.updateTargetCode;render();}},
  info:value=>{updateInfo=value;const label=$('#update-message');if(label)label.textContent=value.message;const button=$('button[data-action="check-update"]');if(button)button.disabled=updater.requested||updater.applying;},
@@ -904,8 +922,8 @@ async function init(){
  timerInterval=setInterval(()=>{if(updateApplying)return;reviewPresence.expire();tick();if(user()?.role==='cadet'&&account().run&&uptime()-lastTimerSaved>=10000){lastTimerSaved=uptime();scheduleSave();}},1000);
  setInterval(()=>{if(alive()&&!updateApplying)getClock().then(()=>tick()).catch(()=>{});},10000);
  setInterval(()=>{if(updateApplying||!alive()||!instructor())return;if(page==='grading')reviewPresence.tick();else if(pendingReviewsPage()&&!document.hidden)pollReviewPresence();},25000);
- setInterval(()=>{if(!updateApplying&&!document.hidden&&alive()){if(user()){syncQueue();if(page!=='runner'&&page!=='editor')refresh();}}},45000+Math.floor(Math.random()*15000));
- setInterval(()=>{if(!updateApplying&&alive()){if(diskWriter.status().error||journalError)retrySave().catch(()=>{});if(user()){syncQueue();publicTableSync.tick();materials.syncProgress();accountSync.sync();if(!instructor())examSession.sync().then(()=>{if(page==='home')render();}).catch(()=>{});}}},10000);
+ setInterval(()=>{if(!updateApplying&&!document.hidden&&alive()){if(user()&&updateData.flight?.token!==S.session.token){syncQueue();if(page!=='runner'&&page!=='editor')refresh();}}},45000+Math.floor(Math.random()*15000));
+ setInterval(()=>{if(!updateApplying&&alive()){if(diskWriter.status().error||journalError)retrySave().catch(()=>{});if(user()){if(updateData.flight?.token!==S.session.token){syncQueue();publicTableSync.tick();materials.syncProgress();accountSync.sync();}if(!instructor())examSession.sync().then(()=>{if(page==='home')render();}).catch(()=>{});}}},10000);
  }catch(x){diskStateLoaded=false;window.dispatchEvent(new Event('lk:startup-failed'));if(!document.querySelector('[data-startup-error]'))app.innerHTML=`<div class="boot">Не вдалося відкрити програму<small>${e(x.message)}</small></div>`;}
 }
 init();
@@ -927,7 +945,7 @@ function reviewQueueContent(){
  const known=reviewQueueToken===S.session?.token,rows=reviewQueue.filter(matchesResultQuery),recoveries=examRecoveryQueue.filter(matchesResultQuery);
  const banner='<div id="review-queue-status">'+(reviewQueueError?'<div class="notice warn" role="status">'+e(reviewQueueError)+'</div>':'')+'</div>';
  const heading='<div class="results-section-heading"><div><h2>Перевірка робіт</h2><p>Письмові відповіді та збережені іспити для підтвердження.</p></div></div>';
- if(!known)return heading+banner+`<div class="empty" role="status"><h3>${reviewQueueError?'Список робіт не завантажено':'Завантажуємо роботи…'}</h3><p>Натисніть «Оновити список», щоб отримати актуальні роботи.</p></div>`;
+ if(!known)return heading+banner+`<div class="empty" role="status"><h3>${reviewQueueError?'Список робіт не завантажено':'Завантажуємо роботи…'}</h3><p>Натисніть «Оновити дані», щоб отримати актуальні роботи.</p></div>`;
  const items=[...recoveries.map(value=>({kind:'recovery',value})),...rows.map(value=>({kind:'written',value}))],p=paginate('reviews',items);
  const content=p.items.map(({kind,value:r})=>kind==='recovery'?`<article class="panel review-queue-item recovery-queue-item"><span class="tag">Підтвердження іспиту</span><h3>${e(r.userName)}</h3><small>${e(r.groupName)}</small><p>${e(r.testTitle)}</p><p class="muted">Збережений іспит · час потребує підтвердження.</p><button data-action="review-recovery" data-id="${e(r.id)}">Переглянути збережену роботу</button></article>`:`<article class="panel review-queue-item"><span class="tag">Письмова робота</span><h3>${e(r.userName)}</h3><small>${e(r.groupName)}</small><p>${e(r.testTitle)}</p><small>${date(r.completedAt)} · Письмових без оцінки: ${r.pendingWritten}</small><div data-review-presence="${e(r.id)}">${reviewPresenceMarkup(queueReviewPresence(r),{queue:true})}</div><button data-action="grade-result" data-id="${e(r.id)}">${queueReviewPresence(r)?.state==='busy'?'Переглянути':'Почати перевірку'}</button></article>`).join('');
  return heading+banner+(items.length?`<div class="review-queue-grid">${content}</div><p class="search-note">Робіт у списку: ${items.length}. Оцінки та коментарі зберігаються окремо для кожної роботи.</p>`+p.controls:empty('Немає неперевірених робіт','Перевірте вибрану групу, тест і пошуковий запит.'));

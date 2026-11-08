@@ -24,7 +24,7 @@ export function createCadetCard(ctx){
  }
  function html(){
   const a=ctx.account(),s=state(),d=data(),u=d?.cadet||a.cadets.find(u=>id(u.id)===id(a.openCadetId));
-  const header=`<div class="page-head"><div><h1>Картка курсанта</h1><p>${esc(u?.fullName||'Завантажуємо…')}</p></div><div class="actions"><button data-action="nav" data-page="cadets">← До курсантів</button><button data-action="card-refresh" ${s.loading?'disabled':''}>${s.loading?'Завантажуємо…':'Оновити картку'}</button></div></div>`;
+  const header=`<div class="page-head"><div><h1>Картка курсанта</h1><p>${esc(u?.fullName||'Завантажуємо…')}</p></div><div class="actions"><button data-action="nav" data-page="cadets">← До курсантів</button></div></div>`;
   if(!d)return header+(s.error?`<div class="notice warn" role="alert">${esc(s.error)}</div>`:'<p role="status">Завантажуємо історію та навчальні матеріали…</p>');
   const pending=d.results.filter(pendingReview).length,graded=d.results.filter(r=>!pendingReview(r)&&typeof r.score==='number'),passed=graded.filter(r=>r.passed===true).length;
   const stat=(label,value)=>`<div class="stat"><div class="eyebrow">${label}</div><div class="value">${value}</div></div>`;
@@ -60,5 +60,5 @@ export function createCadetCard(ctx){
   return true;
  }
  function input(el){if(el.id!=='cadet-note'||ctx.session()?.user.role!=='instructor')return;const v=draft();v.text=el.value;v.requestId='';ctx.scheduleSave();}
- return {html,load,action,input,get saving(){return state().saving;}};
+ return {html,load,action,input,get loading(){return state().loading;},get saving(){return state().saving;}};
 }

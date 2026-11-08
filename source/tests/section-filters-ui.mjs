@@ -57,6 +57,11 @@ try{
  browser=await chromium.launch({headless:true,args:['--no-sandbox'],...(process.env.LITAKOVA_CHROMIUM_EXECUTABLE?{executablePath:process.env.LITAKOVA_CHROMIUM_EXECUTABLE}:{})});
  page=await browser.newPage({viewport:{width:1440,height:1000},locale:'uk-UA'});page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/?key=section-filters`);await page.locator('.layout').waitFor();await settled();
+ await check('One update button shares a single workspace and account sync across repeated clicks',async()=>{
+  assert.equal(await page.locator('.topbar [data-action="sync-account"]').count(),0);assert.equal(await page.locator('.topbar [data-action="refresh"]').count(),1);assert.match(await page.locator('.topbar [data-action="refresh"]').innerText(),/Оновити дані/);
+  const first=calls.length;await page.evaluate(async()=>{const m=await import('/app.js'),button=document.querySelector('.topbar [data-action="refresh"]');await Promise.all([m.clickAction(button),m.clickAction(button),m.clickAction(button)]);});
+  const delta=calls.slice(first);assert.equal(delta.filter(p=>p.path==='/api/workspace').length,1);assert.equal(delta.filter(p=>p.path==='/api/account-state').length,1);
+ });
  await check('Home shows the complete overview without inheriting the old shared filters',async()=>{
   assert.equal(await page.locator('#shared-group,#shared-test,.shared-filters').count(),0);
   assert.deepEqual(await page.locator('.cards .value').allTextContents(),['4','4','2','2']);
