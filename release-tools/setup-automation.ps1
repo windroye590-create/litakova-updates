@@ -18,8 +18,9 @@ function Get-PortableDefinition([string]$Command) {
     if ($Command -eq 'gh') {
         $arch = 'amd64'
         $hash = '98d0cfa794721665d7973dd728c78aff7bd836d58f10f6d7a03568eccb0a22e0'
-        if ($arm) { $arch = 'arm64'; $hash = '197211c98687d7770ac331fe8a3b6c198c389108c1536cdbedf659fe4703e484' }
-        return @{ Version = '2.103.3'; Arch = $arch; Exe = 'gh.exe'; SHA256 = $hash; Url = "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_$arch.zip" }
+        $asset = '679195750'
+        if ($arm) { $arch = 'arm64'; $hash = '197211c98687d7770ac331fe8a3b6c198c389108c1536cdbedf659fe4703e484'; $asset = '679195799' }
+        return @{ Version = '2.103.3'; Arch = $arch; Exe = 'gh.exe'; SHA256 = $hash; Url = "https://api.github.com/repos/cli/cli/releases/assets/$asset"; FallbackUrl = "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_$arch.zip" }
     }
     if ($Command -eq 'node') {
         $arch = 'x64'
@@ -40,10 +41,24 @@ function Install-PortableTool([string]$Command, [string]$ToolsRoot) {
         try {
             $download = Join-Path $stage 'package.zip'
             Write-Host "Downloading official $Command $($definition.Version)..."
-            Invoke-WebRequest -UseBasicParsing -Uri $definition.Url -OutFile $download
-            if ((Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash -ne $definition.SHA256) {
-                throw "The downloaded $Command archive failed SHA-256 verification."
+            $verified = $false
+            $urls = @($definition.Url)
+            if ($definition.FallbackUrl) { $urls += $definition.FallbackUrl }
+            foreach ($url in $urls) {
+                try {
+                    $headers = @{ Accept = 'application/octet-stream' }
+                    if ($url.StartsWith('https://api.github.com/')) { $headers['X-GitHub-Api-Version'] = '2022-11-28' }
+                    Invoke-WebRequest -UseBasicParsing -Uri $url -Headers $headers -UserAgent 'Litakova-release-setup' -OutFile $download -TimeoutSec 90
+                    if ((Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash -ne $definition.SHA256) {
+                        throw "The downloaded $Command archive failed SHA-256 verification."
+                    }
+                    $verified = $true
+                    break
+                } catch {
+                    Write-Host "Download attempt for $Command failed: $($_.Exception.Message)"
+                }
             }
+            if (-not $verified) { throw "Could not download the verified official $Command archive. Run setup again to retry." }
             $expanded = Join-Path $stage 'expanded'
             Expand-Archive -LiteralPath $download -DestinationPath $expanded
             $executables = @(Get-ChildItem -LiteralPath $expanded -Recurse -File -Filter $definition.Exe)
