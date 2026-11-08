@@ -19,6 +19,10 @@ class VersionTests(unittest.TestCase):
             destination = self.source / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(pipeline.SOURCE / name, destination)
+        package_path = self.source / 'package.json'
+        package = json.loads(package_path.read_text())
+        package.update(version='1.2.27', versionCode=150)
+        package_path.write_text(json.dumps(package))
         self.override = patch.object(pipeline, 'SOURCE', self.source)
         self.override.start()
         self.addCleanup(self.override.stop)
@@ -40,6 +44,8 @@ class VersionTests(unittest.TestCase):
 
     def test_stable_build_updates_an_installed_preview_and_clears_its_label(self):
         core=self.source/'web/core.js'
+        core.write_text(core.read_text().replace('export const PREVIEW_BUILD=false;',
+                                                'export const PREVIEW_BUILD=true;'))
         if 'export const PREVIEW_BUILD=' not in core.read_text():
             core.write_text(core.read_text()+'\nexport const PREVIEW_BUILD=true;\n')
         result=pipeline.prepare('1.2.28',151,'1.2.27')

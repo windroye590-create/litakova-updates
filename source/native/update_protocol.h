@@ -1,6 +1,6 @@
 /* Strict signed release catalog format. No URLs or paths from JSON. */
 #define UPDATE_MAX_SIZE (64u*1024u*1024u)
-#define PC_VERSION_CODE 151u
+#define PC_VERSION_CODE 152u
 #define PC_VERSION_NAME "1.2.28"
 #define UPDATE_HOST L"github.com"
 #define UPDATE_PATH_PREFIX L"/windroye590-create/litakova-updates/releases/latest/download/"

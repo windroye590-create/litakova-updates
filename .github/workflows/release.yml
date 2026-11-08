@@ -61,7 +61,10 @@ jobs:
           npm install --ignore-scripts --no-audit --no-fund --no-package-lock
           npx playwright install --with-deps chromium
           node tests/results-ui.mjs
+          node tests/written-ui.mjs
+          node tests/review-presence-ui.mjs
           node tests/responsive-ui.mjs
+          node tests/ui.mjs
           node tests/packaged-startup.mjs
       - name: Sign the four public update files
         env:
