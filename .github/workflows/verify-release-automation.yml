@@ -69,6 +69,7 @@ jobs:
         run: |
           npm install --ignore-scripts --no-audit --no-fund --no-package-lock
           npx playwright install --with-deps chromium
+          node tests/section-filters-ui.mjs
           node tests/results-ui.mjs
           node tests/responsive-ui.mjs
           node tests/packaged-startup.mjs

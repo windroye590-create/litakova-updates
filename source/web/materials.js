@@ -19,7 +19,7 @@ async function loadPDF(bytes){
 }
 export function createMaterials(ctx){
  const {account,session,rpc,persist,toast,render,dialog,confirmAction,modal,esc:e,groups,tests,startTest}=ctx;
- let error='',busy=false,filter='',viewer=null,progressTimer,loadSerial=0,lastBytes=null,progressFlight=null;
+ let error='',busy=false,viewer=null,progressTimer,loadSerial=0,lastBytes=null,progressFlight=null;
  const same=s=>ctx.alive()&&session()?.token===s.token;
  const guard=s=>{if(!same(s))throw Error('Обліковий запис змінився. Відкрийте матеріал знову.');};
  const state=()=>{const a=account();a.materials??=[];a.materialProgress??={};a.materialSaved??={};return a;};
@@ -50,8 +50,8 @@ export function createMaterials(ctx){
  }
  async function openList(){try{await refresh();}catch{}render();}
  function html(){
-  const a=state(),instructor=session().user.role==='instructor',q=filter.toLocaleLowerCase('uk-UA'),p=ctx.paginate('materials',a.materials.filter(m=>(!ctx.matches||ctx.matches(m))&&(!q||(m.title+' '+m.topic).toLocaleLowerCase('uk-UA').includes(q)))),items=p.items,groupNames=new Map(groups().map(g=>[String(g.id),g.name]));
-  return `<div class="page-head"><div><h1>Навчальні матеріали</h1><p>Презентації та посібники. PDF до 8 МБ, до 500 сторінок.</p></div>${instructor?'<button class="primary" data-action="material-new">+ Додати матеріал</button>':''}</div>${error?`<div class="notice warn">${e(error)} Доступні раніше збережені матеріали.</div>`:''}<label class="field">Тема або назва<input id="material-search" value="${e(filter)}" placeholder="Пошук матеріалів"></label><div class="grid">${items.map(m=>{
+  const a=state(),instructor=session().user.role==='instructor',filter=a.sectionSearches?.materials||'',q=filter.toLocaleLowerCase('uk-UA'),p=ctx.paginate('materials',a.materials.filter(m=>(!ctx.matches||ctx.matches(m))&&(!q||(m.title+' '+m.topic).toLocaleLowerCase('uk-UA').includes(q)))),items=p.items,groupNames=new Map(groups().map(g=>[String(g.id),g.name]));
+  return `<div class="page-head"><div><h1>Навчальні матеріали</h1><p>Презентації та посібники. PDF до 8 МБ, до 500 сторінок.</p></div>${instructor?'<button class="primary" data-action="material-new">+ Додати матеріал</button>':''}</div>${ctx.filters?.()||''}${error?`<div class="notice warn">${e(error)} Доступні раніше збережені матеріали.</div>`:''}<label class="field">Тема або назва<input id="material-search" value="${e(filter)}" placeholder="Пошук матеріалів"></label><div class="grid">${items.map(m=>{
    const p=a.materialProgress[m.id],saved=a.materialSaved[m.id]?.revision===m.revision;
    return `<article class="test-card"><span class="tag">${e(m.topic||'Навчальний матеріал')}</span><h3>${e(m.title)}</h3><p>${e(m.description)}</p><small>${m.pageCount} стор. · ${(m.size/1048576).toFixed(1)} МБ${saved?' · Збережено офлайн':''}</small>${p?.revision===m.revision?`<small>Остання сторінка: ${p.lastPage}/${m.pageCount}${p.pending?' · очікує синхронізації':''}</small>`:''}<div class="actions"><button data-action="material-open" data-id="${e(m.id)}">Відкрити</button><button data-action="material-${saved?'remove-offline':'download'}" data-id="${e(m.id)}">${saved?'Прибрати з ПК':'Зберегти для офлайну'}</button></div>${instructor?`<small>Групи: ${e(m.groupIds.map(id=>groupNames.get(String(id))).filter(Boolean).join(', '))}</small><div class="actions"><button data-action="material-edit" data-id="${e(m.id)}">Редагувати</button><button data-action="material-readers" data-id="${e(m.id)}">Перегляди</button><button class="danger" data-action="material-delete" data-id="${e(m.id)}">Видалити</button></div>`:''}</article>`;
   }).join('')}</div>${p.controls}${items.length?'':'<div class="empty"><h3>Матеріалів поки немає</h3><p>Опубліковані інструктором матеріали з’являться тут.</p></div>'}`;
@@ -152,8 +152,8 @@ export function createMaterials(ctx){
   }finally{busy=false;}
   return true;
  }
- document.addEventListener('input',ev=>{if(ev.target.id==='material-search'){const at=ev.target.selectionStart;filter=ev.target.value;ctx.resetPage('materials');render();const f=document.querySelector('#material-search');f?.focus();f?.setSelectionRange(at,at);}});
+ document.addEventListener('input',ev=>{if(ev.target.id==='material-search'){const at=ev.target.selectionStart;const a=state();a.sectionSearches??={};a.sectionSearches.materials=ev.target.value;ctx.scheduleSave?.();ctx.resetPage('materials');render();const f=document.querySelector('#material-search');f?.focus();f?.setSelectionRange(at,at);}});
  modal.addEventListener('cancel',ev=>{if(viewer){ev.preventDefault();closeViewer();}});
  modal.addEventListener('keydown',ev=>{if(viewer&&['ArrowRight','ArrowLeft'].includes(ev.key)){ev.preventDefault();action(ev.key==='ArrowRight'?'material-next':'material-prev','').catch(x=>toast(x.message));}});
- return {get busy(){return busy||!!progressFlight;},html,openList,refresh,action,close:closeViewer,syncProgress:flushProgress,reset:()=>{lastBytes=null;filter='';error='';}};
+ return {get busy(){return busy||!!progressFlight;},html,openList,refresh,action,close:closeViewer,syncProgress:flushProgress,reset:()=>{lastBytes=null;error='';}};
 }

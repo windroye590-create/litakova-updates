@@ -71,17 +71,22 @@ try{
  if(process.env.LITAKOVA_PERFORMANCE_VALIDATE!=='0'){
   report.checks=[];
   await page.evaluate(async()=>(await import('/app.js')).navigate('tests'));
+  assert.equal(await page.locator('#shared-test').count(),0);
+  await page.locator('#filter').fill('Тест 1999');await page.waitForFunction(()=>document.querySelectorAll('.test-card').length===1);
+  await page.evaluate(async()=>(await import('/app.js')).navigate('results'));assert.equal(await page.locator('#shared-test').inputValue(),'');
   assert.ok(await page.locator('#shared-test option').count()<=52);
   await page.locator('#shared-test-search').fill('Тест 1999');await page.locator('#shared-test').selectOption('t1999');
-  await page.waitForFunction(()=>document.querySelectorAll('.test-card').length===1);
+  await page.waitForFunction(()=>document.querySelectorAll('.compact-results tbody tr').length===5);
+  await page.evaluate(async()=>(await import('/app.js')).navigate('tests'));assert.equal(await page.locator('#filter').inputValue(),'Тест 1999');assert.equal(await page.locator('#shared-test').count(),0);
   await page.evaluate(async()=>(await import('/app.js')).navigate('results'));assert.equal(await page.locator('#shared-test').inputValue(),'t1999');
   await page.locator('#shared-test-search').fill('Тест 12');assert.equal(await page.locator('#shared-test').inputValue(),'t1999');
   await page.locator('#shared-test-search').fill('немає такого тесту');assert.equal(await page.locator('#shared-test').inputValue(),'t1999');await page.locator('#shared-test-matches').filter({hasText:'не знайдено'}).waitFor();
   assert.ok(await page.locator('#shared-test option').count()<=52);
   await page.locator('[data-action=reset-filters]').click();await page.waitForFunction(()=>document.querySelector('#shared-test')?.value==='');assert.equal(await page.locator('#shared-test-search').inputValue(),'');
-  report.checks.push('A bounded shared selector finds the last test, preserves the selected filter across pages and search misses, and resets both values');
+  report.checks.push('A bounded section selector finds the last test, survives search misses, and keeps Results separate from the Tests name search');
   for(const [name,action,query,lastId]of [['tests','preview','Тест 1999','t1999'],['cadets','delete-cadet','Курсант 1999','c1999'],['results',null,'Курсант 9999',null],['materials','material-open','Матеріал 1199','m1199']]){
    await page.evaluate(async n=>(await import('/app.js')).navigate(n),name);
+   await page.locator(name==='materials'?'#material-search':'#filter').fill('');
    assert.ok(await page.locator('#app *').count()<1500);
    await page.locator('[data-action=list-page][data-index="2"]').click();
    await page.locator('.list-pager').filter({hasText:'51–100'}).waitFor();

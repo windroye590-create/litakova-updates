@@ -1,11 +1,11 @@
 {
   "name": "litakova-komisiia-pc",
-  "version": "1.2.28",
+  "version": "1.2.29",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node tests/no-retakes.mjs && node tests/result-deletion.mjs && node tests/cadet-deletion.mjs && node tests/contract.mjs && node tests/flows.mjs && node tests/written.mjs && node tests/written-reliability.mjs && node tests/review-audit.mjs && node tests/session-transitions.mjs && node tests/json-import-safety.mjs && node tests/pc-only.mjs && node tests/auth-recovery.mjs && node tests/login-capacity.mjs && node tests/results.mjs && node tests/large-tests.mjs && node tests/recent-results.mjs && node tests/review-presence.mjs && node tests/test-access-intake.mjs && node tests/public-table-sync.mjs && npm run test:storage-recovery && npm run test:private-storage && npm run test:audit && npm run test:reliability",
-    "test:ui": "node tests/ui.mjs && node tests/materials-ui.mjs && node tests/written-ui.mjs && node tests/results-ui.mjs && node tests/office.mjs && node tests/responsive-ui.mjs && node tests/updates-ui.mjs && node tests/instructors-ui.mjs && node tests/performance-ui.mjs && node tests/large-tests-ui.mjs && node tests/review-presence-ui.mjs && node tests/test-access-intake-ui.mjs && node tests/public-table-sync-ui.mjs",
+    "test:ui": "node tests/ui.mjs && node tests/section-filters-ui.mjs && node tests/materials-ui.mjs && node tests/written-ui.mjs && node tests/results-ui.mjs && node tests/office.mjs && node tests/responsive-ui.mjs && node tests/updates-ui.mjs && node tests/instructors-ui.mjs && node tests/performance-ui.mjs && node tests/large-tests-ui.mjs && node tests/review-presence-ui.mjs && node tests/test-access-intake-ui.mjs && node tests/public-table-sync-ui.mjs",
     "build": "python3 build_windows.py",
     "test:office": "node tests/office.mjs",
     "test:materials": "node tests/materials-server.mjs",
@@ -38,5 +38,5 @@
     "playwright": "1.62.1"
   },
   "executableName": "Litakova-Komisiia-PC.exe",
-  "versionCode": 152
+  "versionCode": 153
 }

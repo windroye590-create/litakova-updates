@@ -275,10 +275,11 @@ try{
   await page.locator(`#modal input[name=assignGroup][value="${toolsGroup.id}"]`).check();await page.locator('#modal input[name=assignmentReviewed]').check();await page.locator('#modal button.primary').click();await page.locator('#modal').waitFor({state:'hidden'});
   for(const t of toolsTests)assert.deepEqual(Array.from(context.assignedGroups_(context.getTestById_(t.id).description)),[toolsGroup.name]);
  });
- await mark('Shared filters survive navigation and restart without title ambiguity',async()=>{
-  await page.locator('#shared-group').selectOption(String(toolsGroup.id));await page.locator('#shared-test').selectOption(String(toolsTests[1].id));await page.waitForFunction(()=>document.querySelectorAll('.test-card').length===1);
-  assert.ok((await page.locator('.test-card').textContent()).includes(toolsTests[1].title));await page.locator('.nav button[data-page=results]').click();assert.equal(await page.locator('#shared-group').inputValue(),String(toolsGroup.id));
-  await page.reload();await page.getByRole('heading',{name:'Кабінет інструктора',exact:true}).waitFor();assert.equal(await page.locator('#shared-test').inputValue(),String(toolsTests[1].id));await click('reset-filters');
+ await mark('Section filters survive restart without leaking to Home or other lists',async()=>{
+  await page.locator('#shared-group').selectOption(String(toolsGroup.id));assert.equal(await page.locator('#shared-test').count(),0);await page.locator('#filter').fill(toolsTests[1].title);
+  await page.locator('.nav button[data-page=results]').click();assert.equal(await page.locator('#shared-group').inputValue(),'');await page.locator('#shared-group').selectOption(String(toolsGroup.id));await page.locator('#shared-test').selectOption(String(toolsTests[1].id));
+  await page.reload();await page.getByRole('heading',{name:'Кабінет інструктора',exact:true}).waitFor();assert.equal(await page.locator('#shared-group,#shared-test').count(),0);
+  await page.locator('.nav button[data-page=results]').click();assert.equal(await page.locator('#shared-test').inputValue(),String(toolsTests[1].id));await click('reset-filters');
  });
  await mark('PC editor saves a two-answer question to the bank and restores both keys',async()=>{
   await page.locator('.nav button[data-page=tests]').click();await click('new-test');await click('discard-draft');await page.locator('#modal button.primary').click();await page.locator('#modal').waitFor({state:'hidden'});await click('new-test');
