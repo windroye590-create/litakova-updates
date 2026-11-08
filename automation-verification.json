@@ -1,5 +1,5 @@
 {
-  "status": "ready-for-owner-authorization",
+  "status": "configured-and-verified",
   "pythonReleaseTests": 30,
   "applicationNpmTest": "passed",
   "applicationPassChecks": 358,
@@ -11,19 +11,15 @@
   "originalSigningCertificateValidated": true,
   "productionServerHealth": "pc-1.2.26-audit-reliability / API26 / online",
   "productionAPIWrites": 0,
-  "realGoogleDeploymentCredentialsVerified": false,
-  "signingSecretsConfigured": false,
+  "realGoogleDeploymentCredentialsVerified": true,
+  "signingSecretsConfigured": true,
   "codeVerification": "passed",
-  "codeVerificationCommit": "527012a605fdc2161a68c4e6d7c54a22469b00bf",
-  "codeVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42471841153",
+  "codeVerificationCommit": "4843cd11d09c7d878e059d06f16ac7f68fb51fb7",
+  "codeVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42475756181",
   "windowsPowerShell51SetupVerified": true,
   "powerShell7SetupVerified": true,
-  "setupVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42471992980",
-  "missingSecrets": [
-    "GAS_CREDENTIALS",
-    "LK_SIGNING_PKCS12_BASE64",
-    "LK_SIGNING_PASSWORD"
-  ],
+  "setupVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42475756181",
+  "missingSecrets": [],
   "portableBootstrapWithoutWinget": "passed",
   "portableBootstrapWindowsPowerShell51": true,
   "portableBootstrapPowerShell7Parsing": true,
@@ -35,5 +31,7 @@
   "rawBootstrapWindowsVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42474040074/job/128711244217",
   "gitlessSetupProcessVerified": true,
   "gitlessSetupVerificationURL": "https://github.com/windroye590-create/litakova-updates/actions/runs/42475355448/job/128715337957",
-  "existingGitHubAuthorizationRecoveryObserved": true
+  "existingGitHubAuthorizationRecoveryObserved": true,
+  "deployedAppsScriptVersion": 36,
+  "googleAccessVerifiedAtUTC": "2026-11-08T11:27:01Z"
 }
