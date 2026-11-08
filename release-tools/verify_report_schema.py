@@ -29,6 +29,14 @@ def verify(settings,build,read=read_json,pause=time.sleep,attempts=5):
         if attempt+1<attempts:pause(10)
     raise RuntimeError('Spreadsheet layout is still pending. The new server retains the migration backup; rerun release to resume it.')
 
+def verify_deployment(settings,receipt,**options):
+    # appscript_deploy apply replaces its plan with the successful health
+    # receipt. Only that applied receipt may authorize the layout migration.
+    require(receipt.get('status')=='passed' and receipt.get('api')==settings['apiVersion'],'The server deployment has not passed verification')
+    build=receipt.get('serverBuild')
+    require(isinstance(build,str) and bool(build),'The applied server receipt has no build identifier')
+    return verify(settings,build,**options)
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--receipt',required=True,type=Path);args=parser.parse_args()
-    receipt=json.loads(args.receipt.read_text());print(json.dumps(verify(config(),receipt['targetBuild'])))
+    receipt=json.loads(args.receipt.read_text());print(json.dumps(verify_deployment(config(),receipt)))

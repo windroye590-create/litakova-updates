@@ -7,7 +7,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import verify_report_schema as schema
 
 class ReportMigrationTests(unittest.TestCase):
-    settings={'webAppUrl':'https://example.invalid/exec'}
+    settings={'webAppUrl':'https://example.invalid/exec','apiVersion':26}
     build='pc-api26-0123456789abcdef'
 
     def ready(self,value=False,**extra):
@@ -18,6 +18,21 @@ class ReportMigrationTests(unittest.TestCase):
         def read(request):calls.append(request);return self.ready(True)
         self.assertEqual(schema.verify(self.settings,self.build,read=read,pause=lambda _:None)['status'],'passed')
         self.assertEqual(len(calls),1);self.assertIsNone(calls[0].data)
+
+    def test_the_apply_health_receipt_uses_server_build_after_replacing_the_plan(self):
+        receipt={'status':'passed','api':26,'serverBuild':self.build,'deployed':True,'version':38,'previousVersion':37}
+        responses=[self.ready(),{'ok':True,'groups':[]},self.ready(True)]
+        result=schema.verify_deployment(self.settings,receipt,read=lambda _:responses.pop(0),pause=lambda _:None)
+        self.assertEqual(result['serverBuild'],receipt['serverBuild'])
+        self.assertEqual(result['status'],'passed')
+
+    def test_an_unapplied_plan_cannot_start_the_migration(self):
+        with self.assertRaisesRegex(ValueError,'has not passed'):
+            schema.verify_deployment(self.settings,{'targetBuild':self.build,'changed':True},read=lambda _:self.fail('Unexpected request'))
+
+    def test_an_incompatible_or_incomplete_receipt_cannot_start_the_migration(self):
+        for receipt in [{'status':'passed','api':27,'serverBuild':self.build},{'status':'passed','api':26}]:
+            with self.assertRaises(ValueError):schema.verify_deployment(self.settings,receipt,read=lambda _:self.fail('Unexpected request'))
 
     def test_initializer_is_the_normal_groups_request_and_never_starts_cleanup(self):
         responses=[self.ready(),{'ok':True,'groups':[]},self.ready(True)];calls=[]
