@@ -1,0 +1,16 @@
+{
+  "status": "ready-for-owner-authorization",
+  "pythonReleaseTests": 30,
+  "applicationNpmTest": "passed",
+  "applicationPassChecks": 358,
+  "resultsUIChecks": 16,
+  "responsiveUIChecks": 308,
+  "packagedStartupChecks": 10,
+  "packedAssets": 229,
+  "reproducibleExeSHA256": "e05dfb9ea18ddac56b90d04133fe93c578417b14e06ac8874b29628564111265",
+  "originalSigningCertificateValidated": true,
+  "productionServerHealth": "pc-1.2.26-audit-reliability / API26 / online",
+  "productionAPIWrites": 0,
+  "realGoogleDeploymentCredentialsVerified": false,
+  "signingSecretsConfigured": "not yet observable with current integration"
+}

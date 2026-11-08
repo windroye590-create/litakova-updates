@@ -235,6 +235,7 @@ def main():
     parser.add_argument("directory")
     parser.add_argument("--public-key", default=str(Path(__file__).with_name("update-public.pem")))
     parser.add_argument("--notes", default="release-notes.md")
+    parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA", "main"))
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
     bundle = read_bundle(args.directory, args.public_key)
@@ -245,7 +246,7 @@ def main():
                     os.environ.get("GITHUB_TOKEN"))
     published = publish_bundle(client, bundle, args.public_key,
                                Path(args.notes).read_text(encoding="utf-8"),
-                               os.environ.get("GITHUB_SHA", "main"))
+                               args.commit)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as stream:

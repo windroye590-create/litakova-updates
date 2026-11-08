@@ -7,3 +7,8 @@ __pycache__/
 *.key
 storepass.txt
 keypass.txt
+.clasprc.json
+.clasp.json
+.env
+.env.*
+/automation-private/

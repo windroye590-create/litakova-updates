@@ -1,18 +1,10 @@
-name: Publish signed Windows release
+name: Перевірити підписаний канал (публікація в release.yml)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'channel/**'
-      - 'release-tools/github_release.py'
-      - 'release-tools/update-public.pem'
-      - 'release-notes.md'
-      - '.github/workflows/publish-signed-release.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: signed-windows-release
@@ -30,7 +22,3 @@ jobs:
         run: python3 release-tools/github_release.py channel --verify-only
       - name: Verify publication safeguards
         run: python3 -m unittest discover -s release-tools/tests -p 'test_*.py'
-      - name: Upload, verify, then publish latest
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: python3 release-tools/github_release.py channel

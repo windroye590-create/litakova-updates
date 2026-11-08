@@ -1,0 +1,9 @@
+{
+  "scriptId": "1IeUxTygw89IDekw0K1vr-XYVFwNGTYE1nU1jM7wWjsfu8CEmo6pFW4RY",
+  "deploymentId": "AKfycbxthXT1noK9KVJGiqgLOu8L5HgUI8olKC4cySBYM8Yaj4Um8Usm0OgqzZeC1pt5csh7VQ",
+  "webAppUrl": "https://script.google.com/macros/s/AKfycbxthXT1noK9KVJGiqgLOu8L5HgUI8olKC4cySBYM8Yaj4Um8Usm0OgqzZeC1pt5csh7VQ/exec",
+  "spreadsheetId": "1acfLVVoxCYs75ruUgTEIvwBLgb072QVz1MgEIW2b1sI",
+  "apiVersion": 26,
+  "requiredCapabilities": ["singleAttempt", "resultDeletion", "privateLocalStorage", "trainingResume", "examRecovery", "multipleChoice", "writtenTests"],
+  "claspVersion": "3.4.1"
+}
