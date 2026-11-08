@@ -1,0 +1,9 @@
+{
+  "version": "1.2.28",
+  "code": 152,
+  "sourceZipSHA256": "4a01b6aeaed3af124edada23377c4893e1b599afd7ec029267cc08bf86d339bb",
+  "exeSHA256": "43af9ce5034be8c421806e24e93ae34fd657f6c108dfdf8f3b1db1b1f3f9486b",
+  "serverWillChange": false,
+  "targetServerBuild": "pc-1.2.26-audit-reliability",
+  "initialCommit": "f0bee79ecc3dbc1b0c513a7b66297d019179e21b"
+}
