@@ -67,6 +67,9 @@ def prepare(version, current_code, current_name):
     package.update(version=version, versionCode=code)
     path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n')
     rewrite(SOURCE / 'web/core.js', r"^export const APP_VERSION='[^']+';", "export const APP_VERSION='" + version + "';")
+    core = SOURCE / 'web/core.js'
+    core.write_text(re.sub(r'^export const PREVIEW_BUILD=(?:true|false);',
+                          'export const PREVIEW_BUILD=false;', core.read_text(), flags=re.M), encoding='utf-8')
     rewrite(SOURCE / 'native/update_protocol.h', r'^#define PC_VERSION_CODE \d+u', '#define PC_VERSION_CODE ' + str(code) + 'u')
     rewrite(SOURCE / 'native/update_protocol.h', r'^#define PC_VERSION_NAME "[^"]+"', '#define PC_VERSION_NAME "' + version + '"')
     rewrite(SOURCE / 'Code.gs', r'^const LATEST_APP_VERSION_CODE = \d+;', 'const LATEST_APP_VERSION_CODE = ' + str(code) + ';')
@@ -82,7 +85,21 @@ def published_version():
     assets = [a for a in latest['assets'] if a['name'] == 'updates.txt']
     require(len(assets) == 1, 'Published release has no unique catalog')
     fields = github.verify_catalog(client.download(assets[0]), ROOT / 'release-tools/update-public.pem')
-    return int(fields['windows.code']), fields['windows.name']
+    code = int(fields['windows.code'])
+    # A stable build must also update PCs that tried a signed preview.
+    for release in client.request('GET', '/releases?per_page=100'):
+        if release.get('draft') or not release.get('prerelease'):
+            continue
+        catalogs = [a for a in release['assets'] if a['name'] == 'updates.txt']
+        if len(catalogs) != 1:
+            continue
+        raw = client.download(catalogs[0])
+        try:
+            preview = github.verify_catalog(raw, ROOT / 'release-tools/update-public.pem')
+        except ValueError:
+            continue
+        code = max(code, int(preview['windows.code']))
+    return code, fields['windows.name']
 
 
 def sign(output):

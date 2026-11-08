@@ -77,6 +77,7 @@ const sandbox = {C, e:C.esc, id:C.id, S:{session:{token:instructorToken}}, accou
   head:(title,subtitle,actions)=>'<header><h1>'+title+'</h1><p>'+subtitle+'</p>'+actions+'</header>',
   empty:text=>text};
 sandbox.S.session.user=api('GET','/api/workspace',instructorToken).user;
+sandbox.instructor=()=>true;sandbox.resultsView=()=>account.resultsView||'compact';sandbox.filter='';sandbox.page='results';
 sandbox.reviewPresence=createReviewPresence({session:()=>sandbox.S.session,rpc:sandbox.rpc,clientId:'review-audit-window'});
 sandbox.reviewPresenceMarkup=reviewPresenceMarkup;
 vm.createContext(sandbox);

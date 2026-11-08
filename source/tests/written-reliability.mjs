@@ -53,6 +53,7 @@ const draft={revision:0,items:{[small.questions[0].id]:{points:'1',comment:'За
 const account={gradingDrafts:{[result.id]:draft},results:[]};
 const sandbox={C,crypto,grading:{...review,draft},working:false,S:{session:{token:instructorToken}},id:C.id,account:()=>account,persist:async()=>{},render:()=>{},restoreWorkPosition:()=>{},toast:()=>{},reviewQueue:[result],page:'grading',loadReviewQueue:async()=>{},rpc:async(method,path,body={},token=instructorToken)=>api(method,path,token,body)};
 sandbox.S.session.user=api('GET','/api/workspace',instructorToken).user;
+sandbox.instructor=()=>true;sandbox.resultsView=()=>account.resultsView||'compact';sandbox.filter='';
 sandbox.reviewPresence=createReviewPresence({session:()=>sandbox.S.session,rpc:sandbox.rpc,clientId:'written-reliability-window'});
 await sandbox.reviewPresence.open(result.id);
 vm.createContext(sandbox);vm.runInContext(source,sandbox);

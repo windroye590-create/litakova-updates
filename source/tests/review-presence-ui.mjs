@@ -50,7 +50,7 @@ const one=await pc('pc-one'),two=await pc('pc-two');
 const action=(p,name)=>p.locator(`[data-action="${name}"]`);
 const row=(p,w)=>p.locator('.review-queue-item').filter({hasText:w.test.title});
 const reviewButton=(p,w)=>p.locator(`[data-action="grade-result"][data-id="${w.result.id}"]`);
-async function queue(p){await p.locator('.nav [data-page="reviews"]').click();await p.getByRole('heading',{name:'Перевірка робіт',exact:true}).waitFor();await reviewButton(p,b).waitFor();}
+async function queue(p){await p.locator('.nav [data-page="results"]').click();await p.locator('[data-action="results-view"][data-view="pending"]').click();await p.getByRole('heading',{name:'Перевірка робіт',exact:true}).waitFor();await reviewButton(p,b).waitFor();}
 async function open(p,w){await reviewButton(p,w).click();await p.locator('#review-presence-status').waitFor();}
 async function check(name,fn){await fn();checks.push(name);console.log('PASS '+name);}
 try{

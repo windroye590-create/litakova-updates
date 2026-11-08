@@ -38,6 +38,14 @@ class VersionTests(unittest.TestCase):
     def test_remote_newer_code_is_never_replaced_with_local_old_counter(self):
         self.assertEqual(pipeline.prepare('1.2.30', 170, '1.2.29')['versionCode'], 171)
 
+    def test_stable_build_updates_an_installed_preview_and_clears_its_label(self):
+        core=self.source/'web/core.js'
+        if 'export const PREVIEW_BUILD=' not in core.read_text():
+            core.write_text(core.read_text()+'\nexport const PREVIEW_BUILD=true;\n')
+        result=pipeline.prepare('1.2.28',151,'1.2.27')
+        self.assertEqual(result['versionCode'],152)
+        self.assertIn('export const PREVIEW_BUILD=false;',core.read_text())
+
     def test_invalid_or_old_versions_do_not_modify_sources(self):
         before = (self.source / 'package.json').read_bytes()
         for version in ['1.2.27', '1.2.26', '1.2.28; command', '../1.2.28', 'v1.2.28']:
@@ -71,6 +79,33 @@ class SnapshotTests(unittest.TestCase):
             self.assertEqual((root / 'channel/Litakova-Komisiia-PC.exe').read_bytes(), (bundle / 'Litakova-Komisiia-PC.exe').read_bytes())
             self.assertIn('channel', paths)
             self.assertFalse((root / '.git').exists())
+
+
+class PublishedPreviewVersionTests(unittest.TestCase):
+    def test_signed_public_previews_reserve_their_build_codes(self):
+        stable={'id':1,'draft':False,'assets':[{'name':'updates.txt','code':150}]}
+        previews=[{'draft':False,'prerelease':True,'assets':[{'name':'updates.txt','code':151}]},
+                  {'draft':True,'prerelease':True,'assets':[{'name':'updates.txt','code':999}]},
+                  {'draft':False,'prerelease':True,'assets':[{'name':'updates.txt','code':888,'invalid':True}]}]
+        class Client:
+            def latest(self):return stable
+            def request(self,method,path):return previews
+            def download(self,asset):return asset
+        def verify(asset,key):
+            if asset.get('invalid'):raise ValueError('Invalid signature')
+            return {'windows.code':str(asset['code']),'windows.name':'1.2.27'}
+        with patch.object(pipeline.github,'GitHub',return_value=Client()),patch.object(pipeline.github,'verify_catalog',side_effect=verify):
+            self.assertEqual(pipeline.published_version(),(151,'1.2.27'))
+
+    def test_failure_to_read_a_preview_cannot_reuse_its_counter(self):
+        class Client:
+            def latest(self):return {'draft':False,'assets':[{'name':'updates.txt','stable':True}]}
+            def request(self,method,path):return [{'draft':False,'prerelease':True,'assets':[{'name':'updates.txt'}]}]
+            def download(self,asset):
+                if not asset.get('stable'):raise OSError('Network interrupted')
+                return {'windows.code':'150','windows.name':'1.2.27'}
+        with patch.object(pipeline.github,'GitHub',return_value=Client()),patch.object(pipeline.github,'verify_catalog',side_effect=lambda raw,key:raw):
+            with self.assertRaises(OSError):pipeline.published_version()
 
 
 if __name__ == '__main__':
