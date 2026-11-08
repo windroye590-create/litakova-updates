@@ -201,7 +201,7 @@ function expectCode(action, expected) {
 }
 
 assert.match(context.setupCommission(), /окрема таблиця результатів/i);
-assert.equal(spreadsheet.sheets.size, 20);
+assert.equal(spreadsheet.sheets.size, 21);
 assert.ok(spreadsheet.getSheetByName('_Частини_тестів'));
 assert.ok(spreadsheet.getSheetByName('_Видалені_результати'));
 assert.equal(api("GET", "/api/app-info").latestVersionName, releaseName);

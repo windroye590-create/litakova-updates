@@ -118,7 +118,7 @@ await check('The actual confirmation handler cleans the selected cadet and work 
  const test=regressionTest('Кеш робіт'),target=submit(a,test,'client-deletion'),kept=submit(b,test,'client-keep');
  const {user}=api('GET','/api/workspace',instructorToken);
  const account={cadets:[a.user,b.user],results:[target,kept],reviews:{[target.id]:[],[kept.id]:[]},
-  gradingDrafts:{[target.id]:{revision:0}},workspaceRevisions:{cadets:'old',results:'old'}};
+  gradingDrafts:{[target.id]:{revision:0}},workspaceRevisions:{cadets:'old',results:'old'},cadetCardCache:{cadet:a.user,notes:[]},cadetNoteDrafts:{[a.user.id]:{text:'Прибрати'},[b.user.id]:{text:'Залишити'}}};
  const app=fs.readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
  const start=app.indexOf(" else if(act==='delete-cadet')");
  const end=app.indexOf(" else if(act==='review-result')",start);
@@ -134,6 +134,9 @@ await check('The actual confirmation handler cleans the selected cadet and work 
  assert.deepEqual(Array.from(account.results,item=>item.id),[kept.id]);
  assert.equal(account.reviews[target.id],undefined);
  assert.equal(account.gradingDrafts[target.id],undefined);
+ assert.equal(account.cadetCardCache,undefined);
+ assert.equal(account.cadetNoteDrafts[a.user.id],undefined);
+ assert.equal(account.cadetNoteDrafts[b.user.id].text,'Залишити');
  assert.equal(state.examRecoveryQueue.length,0);
  assert.equal(context.findUserById_(a.user.id),null);
  assert.ok(!publicRows().some(row=>matchesId(row,target)));

@@ -16,8 +16,8 @@ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
 const PUBLIC_SYNC_DELAY_MS = 30000;
 const REVIEW_LEASE_MS = 120000;
 const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
-const LATEST_APP_VERSION_CODE = 153;
-const LATEST_APP_VERSION_NAME = '1.2.29';
+const LATEST_APP_VERSION_CODE = 154;
+const LATEST_APP_VERSION_NAME = '1.2.30';
 const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
 const ROLE_INSTRUCTOR = 'instructor';
 const ROLE_CADET = 'cadet';
@@ -55,6 +55,7 @@ const SHEETS = Object.freeze({
   materialFiles: '_Файли_матеріалів',
   materialChunks: '_Частини_матеріалів',
   materialProgress: '_Перегляди_матеріалів',
+  cadetNotes: '_Примітки_курсантів',
   pcState: '_Чернетки_ПК',
   examRecoveries: '_Відновлення_іспитів'
 });
@@ -69,6 +70,7 @@ const HEADERS = Object.freeze({
   materialFiles: ['ID','ID інструктора','ID матеріалу','Створено','Розмір','SHA256','Частин','Стан','Перший рядок'],
   materialChunks: ['ID файлу','Частина','Base64'],
   materialProgress: ['ID матеріалу','Ревізія','ID курсанта','Сторінка','Найбільша сторінка','Сторінок','Відкрито','Оновлено'],
+  cadetNotes: ['ID курсанта','ID запиту','ID інструктора','Примітка JSON','Створено'],
   users: ['ID', 'Логін', 'ПІБ', 'Група', 'Роль', 'Хеш пароля', 'Сіль пароля', 'Активний', 'Створено', 'Публікація таблиці'],
   groups: ['ID', 'Назва', 'Створив', 'Створено', 'Архівна', 'Ревізія'],
   tests: ['ID', 'Назва', 'Опис', 'Режим', 'Тривалість, хв', 'Прохідний бал, %', 'Опубліковано', 'Питання JSON', 'Створено', 'Кількість питань', 'Ключ створення JSON'],
@@ -131,6 +133,7 @@ function doGet() {
     materials: true,
     cadetDeletion: true,
     cadetTransfer: true,
+    cadetCard: true,
     recentResultsRead: true,
     status: 'online',
     price: 'Безкоштовно'
@@ -442,7 +445,7 @@ function continueIntake_(actor,body) {
     else if(phase==='testParts'){
       var existing=Object.create(null);listTests_(false).forEach(function(t){existing[String(t.id)]=true;});
       done=intakeDeleteRows_(sheet_('testParts'),function(row){return String(row[0])!==''&&!existing[String(row[0])];},true);
-    }else if(phase==='audit')done=intakeDeleteRows_(sheet_('audit'),function(row){return ['cadet','result'].indexOf(String(row[4]))>=0;});
+    }else if(phase==='audit')done=intakeDeleteRows_(sheet_('cadetNotes'),all)&&intakeDeleteRows_(sheet_('audit'),function(row){return ['cadet','result'].indexOf(String(row[4]))>=0;});
     else if(phase==='sync')done=intakeDeleteRows_(sheet_('sync'),function(row){return String(row[1]).indexOf('result:')===0;});
     else if(phase==='results')done=intakeDeleteRows_(sheet_('deletedResults'),all)&&intakeDeleteRows_(sheet_('results'),all);
     else if(phase==='users')done=intakeDeleteRows_(sheet_('users'),function(row){return row[4]===ROLE_CADET&&targets[String(row[0])];});
@@ -509,7 +512,7 @@ function workspaceRevisions_(user,all) {
 function conditionalWorkspace_(user,body) {
   var all=body.allResults===true,known=body.known||{},before=workspaceRevisions_(user,all),props=PropertiesService.getScriptProperties();
   var busy=props.getProperty('LK_WORKSPACE_WRITE'),changes={},out={workspaceProtocol:1,user:publicUser_(user),revisions:before,changes:changes,
-    capabilities:{singleAttempt:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
+    capabilities:{singleAttempt:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
   if(user.role===ROLE_INSTRUCTOR)out.intake=intakeStatus_();
   if(known.groups!==before.groups)changes.groups=listGroups_();
   if(known.tests!==before.tests)changes.tests=listTestsForUser_(user);
@@ -596,6 +599,13 @@ function routeApi_(request) {
   if (method === 'POST' && trainingStartMatch) return startTraining_(user, decodePart_(trainingStartMatch[1]), body, request.choiceProtocol);
 
   requireRole_(user, ROLE_INSTRUCTOR);
+
+  var cadetCardMatch=path.match(/^\/api\/instructor\/cadets\/([^/]+)(\/notes)?$/);
+  if(cadetCardMatch){
+    var cadetId=decodePart_(cadetCardMatch[1]);
+    if(method==='GET'&&!cadetCardMatch[2])return instructorCadetCard_(cadetId);
+    if(method==='POST'&&cadetCardMatch[2])return addCadetNote_(user,cadetId,body);
+  }
 
   if(method === 'GET' && path === '/api/instructor/intake')return intakePreview_(user);
   if(method === 'POST' && path === '/api/instructor/intake/start')return startIntake_(user,body);
@@ -732,7 +742,7 @@ function createInitialInstructorCode() {
 
 function ensureSchema_(lockHeld, force) {
   var cache = CacheService.getScriptCache();
-  if (!force && cache.get('LK_SCHEMA_READY_API25') === '1' && cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1') === '1') return;
+  if (!force && cache.get('LK_SCHEMA_READY_API25') === '1' && cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1') === '1' && cache.get('LK_SCHEMA_CADET_CARD_V1') === '1') return;
   var ownLock = null;
   if (!lockHeld) {
     ownLock = LockService.getScriptLock();
@@ -763,6 +773,7 @@ function ensureSchema_(lockHeld, force) {
     }
     cache.put('LK_SCHEMA_READY_API25', '1', 21600);
     cache.put('LK_SCHEMA_READY_PUBLIC_CADETS_V1', '1', 21600);
+    cache.put('LK_SCHEMA_CADET_CARD_V1','1',21600);
   } finally {
     if (ownLock) ownLock.releaseLock();
   }
@@ -2710,6 +2721,7 @@ function deleteCadet_(id, actor, body) {
     return Boolean(ownedKeys[String(row[0])] && !otherKeys[String(row[0])]);
   });
   planPrivate('materialProgress', function (row) { return String(row[2]) === id; });
+  planPrivate('cadetNotes', function (row) { return String(row[0]) === id; });
   var draftOwners = Object.create(null);
   planPrivate('pcState', function (row) {
     if (String(row[0]) === id) return true;
@@ -3083,6 +3095,41 @@ function routeMaterials_(method, path, body, user) {
   }
   return null;
 }
+function requireCardCadet_(id) {
+  requireCadetNotDeleting_(id);
+  var cadet=findUserById_(id);
+  if(!cadet||cadet.role!==ROLE_CADET)fail_('Курсанта не знайдено.','NOT_FOUND');
+  return cadet;
+}
+function cadetNoteFromRow_(row) {
+  var data=JSON.parse(String(row[3]||'{}'));
+  return {id:String(row[1]),cadetId:String(row[0]),authorId:String(row[2]),authorName:String(data.authorName||''),text:String(data.text||''),createdAt:iso_(row[4])};
+}
+function instructorCadetCard_(id) {
+  var cadet=requireCardCadet_(id),uid=String(cadet.id),groups=listGroups_(),progress=Object.create(null),visited=Object.create(null);
+  dataRows_('materialProgress').forEach(function(row){
+    if(String(row[2])!==uid)return;
+    visited[String(row[0])]=true;var key=String(row[0])+':'+String(row[1]);
+    progress[key]={revision:Number(row[1]),lastPage:Number(row[3]),maxPage:Number(row[4]),pageCount:Number(row[5]),openedAt:iso_(row[6]),updatedAt:iso_(row[7])};
+  });
+  var materials=materialRows_().filter(function(item){return canReadMaterial_(item,cadet,groups)||visited[item.id];}).map(function(item){
+    return {material:publicMaterial_(item),assigned:canReadMaterial_(item,cadet,groups),progress:progress[item.id+':'+item.revision]||null};
+  });
+  return {cadetCardProtocol:1,cadet:publicUser_(cadet),results:listResults_(uid),tests:listTestsForUser_(cadet),materials:materials,
+    recoveries:listExamRecoveries_(cadet,true),notes:dataRows_('cadetNotes').filter(function(row){return String(row[0])===uid;}).map(cadetNoteFromRow_).reverse(),updatedAt:new Date().toISOString()};
+}
+function addCadetNote_(actor,id,body) {
+  requireRole_(actor,ROLE_INSTRUCTOR);
+  var cadet=requireCardCadet_(id),text=typeof body.text==='string'?body.text.trim():'',requestId=String(body.requestId||'');
+  if(!text||text.length>2000||!/^[A-Za-z0-9_-]{8,80}$/.test(requestId))fail_('Примітка має містити від 1 до 2000 символів.','INVALID_NOTE');
+  var old=dataRows_('cadetNotes').filter(function(row){return String(row[1])===requestId&&String(row[2])===String(actor.id);})[0];
+  if(old){var saved=cadetNoteFromRow_(old);if(saved.cadetId!==String(id)||saved.text!==text)fail_('Цей ключ уже використано для іншої примітки.','NOTE_CONFLICT');return {saved:true,cadetId:String(id),note:saved};}
+  var row=[String(id),requestId,String(actor.id),JSON.stringify({text:text,authorName:String(actor.fullName||actor.username)}),new Date().toISOString()];
+  sheet_('cadetNotes').appendRow(row);
+  logAudit_(actor,'CADET_NOTE_ADD','cadet',String(id),cadet.fullName,'Додано примітку інструктора.');
+  return {saved:true,cadetId:String(id),note:cadetNoteFromRow_(row)};
+}
+
 function materialRows_() {
   return dataRows_('materials').map(function(r,i) {
     return {id:String(r[0]),title:String(r[1]),description:String(r[2]||''),topic:String(r[3]||''),groupIds:JSON.parse(r[4]||'[]'),testId:String(r[5]||''),fileId:String(r[6]),revision:Number(r[7]),size:Number(r[8]),sha256:String(r[9]),pageCount:Number(r[10]),createdBy:String(r[11]),createdAt:iso_(r[12]),updatedAt:iso_(r[13]),active:asBoolean_(r[14],true),row:i+2};
