@@ -14,9 +14,7 @@
 На своєму Windows ПК відкрийте PowerShell і виконайте:
 
 ```powershell
-$setup = Join-Path $env:TEMP 'litakova-setup-automation.ps1'
-Invoke-WebRequest 'https://raw.githubusercontent.com/windroye590-create/litakova-updates/main/release-tools/setup-automation.ps1' -OutFile $setup
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File $setup
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/windroye590-create/litakova-updates/main/release-tools/setup-automation.ps1?portable=1' -OutFile "$env:TEMP\litakova-setup-automation.ps1" -ErrorAction Stop; if ($?) { powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$env:TEMP\litakova-setup-automation.ps1" }
 ```
 
 [Переглянути скрипт перед запуском](../release-tools/setup-automation.ps1).
@@ -24,7 +22,10 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File $setup
 
 Скрипт:
 
-1. За потреби встановлює GitHub CLI та Node.js через Windows Package Manager.
+1. За потреби завантажує закріплені portable-версії GitHub CLI та Node.js
+   з офіційних сайтів, перевіряє SHA-256 та розпаковує в
+   `%LOCALAPPDATA%\LitakovaReleaseTools`. `winget` і права адміністратора
+   не потрібні. PATH змінюється лише всередині процесу налаштування.
 2. Відкриває вхід GitHub, якщо він ще не налаштований, і перевіряє право
    керувати секретами саме `windroye590-create/litakova-updates`.
 3. Пропонує вибрати оригінальний `Litakova-Komisiia-v1.4.1-source-and-signing.zip`.

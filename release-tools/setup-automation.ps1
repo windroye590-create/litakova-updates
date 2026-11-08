@@ -1,28 +1,106 @@
-param([string]$SigningArchive = '', [switch]$CheckOnly)
+param([string]$SigningArchive = '', [switch]$CheckOnly, [switch]$CheckBootstrap)
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 $OutputEncoding = [Text.UTF8Encoding]::new($false)
 $repo = 'windroye590-create/litakova-updates'
 $claspVersion = '3.4.1'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 function Assert-NativeSuccess([string]$Operation) {
     if ($LASTEXITCODE -ne 0) { throw "$Operation failed (exit $LASTEXITCODE)." }
 }
 
-function Refresh-ToolPath {
-    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+function Get-PortableDefinition([string]$Command) {
+    $architecture = $env:PROCESSOR_ARCHITEW6432
+    if (-not $architecture) { $architecture = $env:PROCESSOR_ARCHITECTURE }
+    $arm = $architecture -eq 'ARM64'
+    if (-not $arm -and $architecture -ne 'AMD64') { throw 'This setup supports Windows x64 and ARM64.' }
+    if ($Command -eq 'gh') {
+        $arch = 'amd64'
+        $hash = '98d0cfa794721665d7973dd728c78aff7bd836d58f10f6d7a03568eccb0a22e0'
+        if ($arm) { $arch = 'arm64'; $hash = '197211c98687d7770ac331fe8a3b6c198c389108c1536cdbedf659fe4703e484' }
+        return @{ Version = '2.103.3'; Arch = $arch; Exe = 'gh.exe'; SHA256 = $hash; Url = "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_$arch.zip" }
+    }
+    if ($Command -eq 'node') {
+        $arch = 'x64'
+        $hash = 'dcc60d59a0746999f99064a01c020445d54d84228c691cdbf25b49ac3b59150a'
+        if ($arm) { $arch = 'arm64'; $hash = 'a9427139595156ef484e1fb08957676e09d4232368dd1743a2a9f93f3d241b14' }
+        return @{ Version = '26.13.0'; Arch = $arch; Exe = 'node.exe'; SHA256 = $hash; Url = "https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-$arch.zip" }
+    }
+    throw "Unknown setup tool: $Command"
 }
 
-function Ensure-Tool([string]$Command, [string]$Package) {
-    if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
-        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-            throw "Install $Package, then run this script again. Windows Package Manager (winget) is unavailable."
+function Install-PortableTool([string]$Command, [string]$ToolsRoot) {
+    $definition = Get-PortableDefinition $Command
+    $install = Join-Path $ToolsRoot "$Command-$($definition.Version)-$($definition.Arch)"
+    $marker = Join-Path $install '.verified-sha256'
+    if (-not (Test-Path -LiteralPath $marker) -or (Get-Content -Raw -LiteralPath $marker).Trim() -ne $definition.SHA256) {
+        $stage = Join-Path ([IO.Path]::GetTempPath()) ('litakova-tool-' + [Guid]::NewGuid().ToString('N'))
+        [void](New-Item -ItemType Directory -Path $stage -Force)
+        try {
+            $download = Join-Path $stage 'package.zip'
+            Write-Host "Downloading official $Command $($definition.Version)..."
+            Invoke-WebRequest -UseBasicParsing -Uri $definition.Url -OutFile $download
+            if ((Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash -ne $definition.SHA256) {
+                throw "The downloaded $Command archive failed SHA-256 verification."
+            }
+            $expanded = Join-Path $stage 'expanded'
+            Expand-Archive -LiteralPath $download -DestinationPath $expanded
+            $executables = @(Get-ChildItem -LiteralPath $expanded -Recurse -File -Filter $definition.Exe)
+            if ($executables.Count -ne 1) { throw "Unexpected official $Command archive layout." }
+            [void](New-Item -ItemType Directory -Path $ToolsRoot -Force)
+            if (Test-Path -LiteralPath $install) { Remove-Item -LiteralPath $install -Recurse -Force }
+            Move-Item -LiteralPath $expanded -Destination $install
+            [IO.File]::WriteAllText($marker, $definition.SHA256)
+        } finally {
+            if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
         }
-        & winget install --id $Package --exact --source winget --accept-source-agreements --accept-package-agreements
-        Assert-NativeSuccess "Installing $Package"
-        Refresh-ToolPath
-        if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
-            throw "Restart PowerShell, then run this script again to use $Command."
+    }
+    $executables = @(Get-ChildItem -LiteralPath $install -Recurse -File -Filter $definition.Exe)
+    if ($executables.Count -ne 1) { throw "Portable $Command is incomplete; remove $install and retry." }
+    $env:Path = $executables[0].DirectoryName + [IO.Path]::PathSeparator + $env:Path
+    return $executables[0].FullName
+}
+
+function Ensure-Tool([string]$Command) {
+    $found = Get-Command $Command -ErrorAction SilentlyContinue
+    $usable = $null -ne $found
+    if ($usable -and $Command -eq 'node') {
+        $major = [int]((& node --version).TrimStart('v').Split('.')[0])
+        $usable = $major -ge 22 -and $null -ne (Get-Command npx.cmd -ErrorAction SilentlyContinue)
+    }
+    if (-not $usable) {
+        $toolsRoot = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'LitakovaReleaseTools'
+        [void](Install-PortableTool $Command $toolsRoot)
+    }
+}
+
+function Test-GitHubLogin {
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & gh auth status --hostname github.com 1>$null 2>$null
+        return $LASTEXITCODE -eq 0
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
+function Test-PortableBootstrap {
+    $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('litakova-bootstrap-test-' + [Guid]::NewGuid().ToString('N'))
+    try {
+        foreach ($command in @('gh', 'node')) {
+            $executable = Install-PortableTool $command $testRoot
+            & $executable --version
+            Assert-NativeSuccess "Running portable $command"
         }
+        & npx.cmd --version
+        Assert-NativeSuccess 'Running portable npm/npx'
+        $signedIn = Test-GitHubLogin
+        if ($signedIn -isnot [bool]) { throw 'GitHub login detection failed.' }
+        Write-Host 'Portable GitHub CLI and Node.js verified without winget or administrator access.'
+    } finally {
+        if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
     }
 }
 
@@ -82,18 +160,18 @@ if ($CheckOnly) {
         $data = Read-SigningArchive $testZip
         if ($data.Key -ne 'YWJj' -or $data.Password -ne ('fixture-' + [char]0x0443)) { throw 'Signing ZIP read failed.' }
     } finally { if (Test-Path $testZip) { Remove-Item -LiteralPath $testZip } }
-    Write-Host 'Windows setup verified: selected Google account and signing ZIP parsing; no network calls.'
+    if ($CheckBootstrap) { Test-PortableBootstrap }
+    Write-Host 'Windows setup verified: selected Google account and signing ZIP parsing.'
     exit 0
 }
 
 Write-Host 'Litakova release automation setup. No application or database will be deployed.'
-Ensure-Tool 'gh' 'GitHub.cli'
-Ensure-Tool 'node' 'OpenJS.NodeJS.LTS'
+Ensure-Tool 'gh'
+Ensure-Tool 'node'
 $nodeMajor = [int]((& node --version).TrimStart('v').Split('.')[0])
 if ($nodeMajor -lt 22) { throw 'Install Node.js 22 or newer, then run this script again.' }
 
-& gh auth status --hostname github.com 2>$null
-if ($LASTEXITCODE -ne 0) {
+if (-not (Test-GitHubLogin)) {
     & gh auth login --hostname github.com --git-protocol https --web --skip-ssh-key
     Assert-NativeSuccess 'GitHub sign-in'
 }

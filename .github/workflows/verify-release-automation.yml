@@ -23,14 +23,14 @@ concurrency:
 jobs:
   windows-setup:
     runs-on: windows-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Validate setup in Windows PowerShell 5.1
+      - name: Validate setup and install portable tools without winget in Windows PowerShell 5.1
         shell: powershell
-        run: ./release-tools/setup-automation.ps1 -CheckOnly
+        run: ./release-tools/setup-automation.ps1 -CheckOnly -CheckBootstrap
       - name: Validate setup in PowerShell 7 without installing tools or signing in
         shell: pwsh
         run: ./release-tools/setup-automation.ps1 -CheckOnly
