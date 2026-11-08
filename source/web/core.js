@@ -1,4 +1,4 @@
-export const APP_VERSION='1.2.31';
+export const APP_VERSION='1.2.32';
 export const PREVIEW_BUILD=false;
 export const CLOUD_URL='https://script.google.com/macros/s/AKfycbxthXT1noK9KVJGiqgLOu8L5HgUI8olKC4cySBYM8Yaj4Um8Usm0OgqzZeC1pt5csh7VQ/exec';
 export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
