@@ -1,0 +1,9 @@
+{
+  "version": "1.2.29",
+  "code": 153,
+  "sourceZipSHA256": "8cbf6575da0531d7e164572df745f146bf417f1bce4d644a7aeca9a0fce34877",
+  "exeSHA256": "0e065374a9c0d52a4424badbba559fc46dd49f0302c3985fa19dde6681a79634",
+  "serverWillChange": false,
+  "targetServerBuild": "pc-1.2.26-audit-reliability",
+  "initialCommit": "edc4e3eb94133b4ea0bcf172f802b8186bfee8d4"
+}
