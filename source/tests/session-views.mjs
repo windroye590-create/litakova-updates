@@ -15,4 +15,10 @@ assert.equal(box.pdfReset,true);assert.equal(box.modalClosed,true);assert.equal(
 assert.equal(box.S.accounts.owner,privateAccount);assert.equal(privateAccount.draft.title,'Keep the persisted work');assert.equal(privateAccount.pending[0].answer,'Keep this answer');
 console.log('PASS Locking a session clears every transient private screen and cancels stale view requests');
 console.log('PASS Clearing session views preserves persisted drafts and unsent answers');
-fs.mkdirSync(new URL('../verification/',import.meta.url),{recursive:true});fs.writeFileSync(new URL('../verification/session-views.json',import.meta.url),JSON.stringify({status:'passed',passed:2,actualApplicationFunction:true,productionRequests:0},null,2));
+const rpcStart=app.indexOf('async function rpc('),rpcEnd=app.indexOf('\nasync function ',rpcStart+1);assert.ok(rpcStart>=0&&rpcEnd>rpcStart);
+Object.assign(box,{updateApplying:false,rpcFlights:0,C:{payload:()=>({})},local:async()=>({ok:false,code:'SESSION_EXPIRED',error:'Expired session'}),persist:async()=>{throw Error('Disk write failure');},secureStorage:{enabled:true,lock:async()=>{box.vaultClosed=true;}},render:()=>{box.loginRendered=box.S.session===null;},checkpoint:{answer:'Old journal'},S:{session:{token:'expired-token',user:{id:'owner'}},accounts:{owner:privateAccount}}});
+vm.runInContext(app.slice(rpcStart,rpcEnd),box);
+await assert.rejects(box.rpc('GET','/api/workspace'),error=>error.code==='SESSION_EXPIRED'&&error.message.includes('Disk write failure'));
+assert.equal(box.vaultClosed,true);assert.equal(box.loginRendered,true);assert.equal(box.S.session,null);assert.equal(Object.keys(box.S.accounts).length,0);assert.equal(box.checkpoint,null);assert.equal(privateAccount.draft.title,'Keep the persisted work');
+console.log('PASS An expired session always locks the vault and renders login even when saving fails');
+fs.mkdirSync(new URL('../verification/',import.meta.url),{recursive:true});fs.writeFileSync(new URL('../verification/session-views.json',import.meta.url),JSON.stringify({status:'passed',passed:3,actualApplicationFunction:true,productionRequests:0},null,2));

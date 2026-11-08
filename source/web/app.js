@@ -218,7 +218,19 @@ async function rpc(method,path,body={},token=S.session?.token||''){
  if(updateApplying)throw Error('Застосунок оновлюється.');
  rpcFlights++;let r;try{r=await local('/rpc',C.payload(method,path,token,body));}catch(x){x.code??='NETWORK';throw x;}finally{rpcFlights--;}
  if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});
- if(!r.ok){const x=Object.assign(Error(r.error||'Сервер відхилив запит.'),{code:r.code||'API_ERROR'});if(x.code==='SESSION_EXPIRED'&&token===S.session?.token){S.session=null;resetSessionViews();await persist();if(typeof secureStorage!=='undefined'&&secureStorage.enabled){try{await secureStorage.lock();}catch(error){await secureStorage.lock({forget:false}).catch(()=>{});x.message+=' '+error.message;}S.accounts={};checkpoint=null;}lastError=x.message;render();}throw x;}
+ if(!r.ok){
+  const x=Object.assign(Error(r.error||'Сервер відхилив запит.'),{code:r.code||'API_ERROR'});
+  if(x.code==='SESSION_EXPIRED'&&token===S.session?.token){
+   S.session=null;resetSessionViews();
+   try{await persist();}catch(saveError){x.message+=' '+saveError.message;}
+   if(typeof secureStorage!=='undefined'&&secureStorage.enabled){
+    try{await secureStorage.lock();}catch(error){await secureStorage.lock({forget:false}).catch(()=>{});x.message+=' '+error.message;}
+    S.accounts={};checkpoint=null;
+   }
+   lastError=x.message;render();
+  }
+  throw x;
+ }
  if(token&&typeof publicTableSync!=='undefined')publicTableSync.observe(r,token);
  return r;
 }

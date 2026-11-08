@@ -2,6 +2,9 @@ name: Перевірити сховище справжнього Windows EXE
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ['Випустити EXE та Apps Script']
+    types: [completed]
   push:
     branches: [main]
     paths: ['channel/Litakova-Komisiia-PC.exe', 'source/tests/windows-private-storage.py', '.github/workflows/windows-native-audit.yml']
@@ -15,6 +18,7 @@ concurrency:
 
 jobs:
   private-storage:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
