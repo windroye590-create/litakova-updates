@@ -36,6 +36,7 @@ const server=http.createServer(async(req,res)=>{
    let raw='';for await(const c of req)raw+=c;const p=JSON.parse(raw);let b={ok:true};
    if(offline){res.end('{"ok":false,"code":"NETWORK","error":"Тестова мережа недоступна"}');return;}
    if(p.path==='/api/groups')b.groups=groups;
+   else if(p.method==='GET'&&/^\/api\/instructor\/users\/[^/]+\/deletion-review$/.test(p.path))Object.assign(b,{cadetDeletionReviewProtocol:1,userId:decodeURIComponent(p.path.split('/')[4]),rows:[{token:'synthetic-layout-review',source:'public',rowNumber:2,name:cadets[0].fullName,testTitle:title,groupName:groups[0].name,correct:45,incorrect:15,duration:'28 хв 52 с',score:75}]});
    else if(p.path==='/api/workspace')Object.assign(b,{workspaceProtocol:1,user:state.session.user,revisions:{groups:'g1',tests:'t1',cadets:'c1',results:'r1'},changes:{groups,tests,results,...(role==='instructor'?{cadets}:{})},resultTotal:results.length,snapshotStable:true,capabilities:{multipleChoice:true,writtenTests:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true}});
    else if(p.path==='/api/account-state')Object.assign(b,{accountSyncProtocol:1,userId:state.session.user.id,cursor:'responsive-fixture',documents:[],stable:true});
    else if(p.path==='/api/account-state/document')Object.assign(b,{accountSyncProtocol:1,userId:state.session.user.id,document:{key:p.body.key,revision:(p.body.expectedRevision||0)+1,value:p.body.value??null}});
