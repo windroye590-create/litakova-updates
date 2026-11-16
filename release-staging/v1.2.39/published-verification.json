@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "version": "1.2.39",
+  "code": 163,
+  "releaseUrl": "https://github.com/windroye590-create/litakova-updates/releases/tag/v1.2.39",
+  "sourceCommit": "a9b496c30d757fcdbd35c3679a4ad50303adf270",
+  "publicCatalogSignatureVerified": true,
+  "publicExecutableMatchesChannel": true,
+  "sha256": "475e715671e169c42e645a873d32dabbf81679ec8735a96cc84e841e87f463ad",
+  "size": 9857888,
+  "serverChanged": false,
+  "serverBuild": "pc-api26-c91487ba4213f441",
+  "desktopUI": 53,
+  "responsiveUI": 306,
+  "releaseWorkflow": "https://github.com/windroye590-create/litakova-updates/actions/runs/43935089314",
+  "verifiedAt": "2026-11-16T19:08:51.088604+00:00",
+  "publishedWindowsAudit": "https://github.com/windroye590-create/litakova-updates/actions/runs/43935945043",
+  "publishedWindowsAuditConclusion": "success",
+  "publishedWindowsStorage": 16,
+  "releaseWorkflowConclusion": "success"
+}
