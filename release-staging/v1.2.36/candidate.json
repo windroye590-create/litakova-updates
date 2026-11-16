@@ -1,9 +1,9 @@
 {
   "version": "1.2.36",
   "code": 160,
-  "sourceZipSHA256": "8a3ee291e91b5c4acd8862a99fab0f67a19c03f8800155956cce111f2a739b6a",
+  "sourceZipSHA256": "dd5acb0541bc534f2b3604318cb858313f3ec26750dc25b617f96d685fae0630",
   "exeSHA256": "63ead899dbe9ea83f670c69c54feaa952f9627b547ada12b51cc9fd707901639",
-  "serverWillChange": true,
+  "serverWillChange": false,
   "targetServerBuild": "pc-api26-c91487ba4213f441",
-  "initialCommit": "a8521e379be28ae71e2b135cfb5f081c4f7d2be6"
+  "initialCommit": "2431b9c8e8135fbd4eb53583e879391504a21d66"
 }
