@@ -107,8 +107,11 @@ function alive(){return !replaced&&localStorage.getItem(leaseKey)===windowId;}
 async function local(path,body,headers={}){
  if(!alive())throw Error('Програму відкрито в іншому вікні.');
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),path==='/rpc'||path.startsWith('/legacy/')?90000:15000);
- try{const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'X-LK-Key':key,'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});if(!r.ok)throw Error('Локальний модуль не відповідає. Закрийте вікно та запустіть EXE знову.');return await r.json();}catch(x){if(x.name==='AbortError'){const err=Error('Запит триває надто довго. Дані залишаються збереженими.');err.code='TIMEOUT';throw err;}throw x;}finally{clearTimeout(timeout);}
+ try{const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'X-LK-Key':key,'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});if(!r.ok)throw Error('Локальний модуль не відповідає. Закрийте вікно та запустіть EXE знову.');return await r.json();}catch(x){if(x.name==='AbortError'){const err=Error('Запит триває надто довго. Дані залишаються збереженими.');err.code='TIMEOUT';throw err;}if(x.name==='TypeError'){throw Object.assign(Error('Втрачено зв’язок із локальним модулем. Запустіть EXE знову й повторіть дію.'),{code:'LOCAL_HOST_UNAVAILABLE'});}throw x;}finally{clearTimeout(timeout);}
 }
+const hostWindow=C.createHostWindow({local,key,windowId,alive,updating:()=>updateApplying,beacon:(path,body)=>navigator.sendBeacon(path,body)});
+hostWindow.open().catch(()=>{});
+setInterval(()=>{if(hostWindow.needsOpen&&alive()&&!updateApplying)hostWindow.open().catch(()=>{});},10000);
 const secureStorage=createSecureStorage({local,keepalive:(path,value,headers)=>{
  const raw=JSON.stringify(value);if(new TextEncoder().encode(raw).length>=60000)return false;
  fetch(path,{method:'POST',headers:{'X-LK-Key':key,'Content-Type':'application/json',...headers},body:raw,keepalive:true}).catch(()=>{});return true;
@@ -980,6 +983,8 @@ window.addEventListener('blur',markAway);
 window.addEventListener('focus',()=>{if(!document.hidden)away=false;});
 window.addEventListener('beforeunload',event=>{if(!alive())return;if(scheduledSave||journalPending||diskWriter.status().pending||journalError||(user()?.role==='cadet'&&examSession.status().pending)){event.preventDefault();event.returnValue='';}});
 window.addEventListener('pagehide',()=>{if(diskStateLoaded&&alive()&&!updateApplying){clearTimeout(saveTimer);if(user()&&account().run)checkpoint=stamp(runCheckpoint(account().run.test.mode==='exam'));else if(checkpoint)checkpoint={serial:++S.journalSerial,...Object.fromEntries(Object.entries(checkpoint).filter(([k])=>k!=='serial'))};if(typeof secureStorage!=='undefined'&&secureStorage.enabled){if(checkpoint)secureStorage.beacon(checkpoint);}else{if(checkpoint)navigator.sendBeacon('/journal?key='+encodeURIComponent(key),JSON.stringify(checkpoint));const raw=JSON.stringify(S);if(new TextEncoder().encode(raw).length<60000)navigator.sendBeacon('/state?key='+encodeURIComponent(key),raw);}}});
+window.addEventListener('pagehide',()=>hostWindow.close());
+window.addEventListener('pageshow',event=>{if(event.persisted&&alive()&&!updateApplying)hostWindow.open().catch(()=>{});});
 const updater=createUpdater({local,
  canApply:()=>user()&&account().run?'Оновлення готове. Установимо його автоматично після завершення поточного тесту.':working||refreshing||syncing||updateData.flight||exportResultsXlsx.flight||downloadIntakeArchive.flights?.size||intakeRunning||rpcFlights||modal.open||materials.busy?'Оновлення готове. Чекаємо завершення поточної дії…':'',
  save:async release=>{clearTimeout(saveTimer);S.updateReturnPage='more';S.updateTargetCode=release.code;await journalSaving.catch(()=>{});if(checkpoint){const r=secureStorage.enabled?await secureStorage.saveJournal(checkpoint):await local('/journal',checkpoint);if(r.ok===false)throw Error(r.error||'Не вдалося зберегти дані на диску.');}await persist();},
