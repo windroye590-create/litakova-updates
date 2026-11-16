@@ -903,9 +903,17 @@ async function clickAction(button){
   if(!instructor())return;
   const session=S.session,cadetId=id(tid),u=a.cadets.find(cadet=>id(cadet.id)===cadetId);
   if(!u)throw Error('Курсанта не знайдено. Оновіть список.');
-  return confirmAction('Видалити курсанта повністю?',`<strong>${e(u.fullName)}</strong><br>Логін: ${e(u.username)}<br>Група: ${e(u.groupName)}<br><br>Акаунт, усі проходження й відповіді буде видалено із застосунка, а результати також зі спільної Google Таблиці. Цю дію неможливо скасувати.`,async()=>{
+  let review;
+  try{review=await rpc('GET','/api/instructor/users/'+encodeURIComponent(cadetId)+'/deletion-review',{},session.token);}
+  catch(x){if(x.code!=='NOT_FOUND')throw x;review={cadetDeletionReviewProtocol:1,userId:cadetId,rows:[]};}
+  if(S.session?.token!==session.token)return;
+  if(review.cadetDeletionReviewProtocol!==1||id(review.userId)!==cadetId||!Array.isArray(review.rows))throw Error('Сервер повернув некоректний перелік старих рядків. Оновіть дані.');
+  if(review.alreadyDeleted){await refresh(true);toast('Курсанта вже видалено. Дані оновлено.');return;}
+  const legacy=review.rows.map((row,index)=>`<fieldset class="panel"><legend>${e(row.source==='legacy'?'Стара таблиця':'Спільна таблиця')} · рядок ${e(row.rowNumber)}</legend><p><strong>${e(row.name)}</strong><br>Тест: ${e(row.testTitle||'Не вказано')}<br>Група: ${e(row.groupName||'Не вказано')}<br>Правильних: ${e(row.correct===''?'—':row.correct)} · Неправильних: ${e(row.incorrect===''?'—':row.incorrect)} · Оцінка: ${e(row.score===''?'—':row.score)}<br>Час: ${e(row.duration||'Не вказано')}${row.completedAt?'<br>Завершено: '+e(date(row.completedAt)):''}</p><label class="field">Кому належить цей запис?<select name="legacy-row-${index}" required><option value="">Оберіть дію</option><option value="remove">Цьому курсанту — видалити разом з акаунтом</option><option value="keep">Іншому курсанту або невідомо — залишити</option></select></label></fieldset>`).join('');
+  return dialog('Видалити курсанта повністю?',`<p><strong>${e(u.fullName)}</strong><br>Логін: ${e(u.username)}<br>Група: ${e(u.groupName)}</p>${legacy?'<p>У старих рядках немає однозначного ID. Для кожного запису вкажіть, чи належить він цьому курсанту. Позначені для збереження рядки залишаться в таблиці.</p>'+legacy:''}<p>Акаунт, його проходження й відповіді буде видалено із застосунка. Результати з підтвердженим ID та обрані старі рядки буде видалено зі спільної таблиці. Цю дію неможливо скасувати.</p>`,async d=>{
+   const legacyRows=review.rows.map((row,index)=>{const choice=d['legacy-row-'+index];if(!['remove','keep'].includes(choice))throw Error('Оберіть дію для кожного старого рядка.');return {token:row.token,remove:choice==='remove'};});
    let r;
-   try{r=await rpc('DELETE','/api/instructor/users/'+encodeURIComponent(cadetId),{confirmUserId:cadetId},session.token);}
+   try{r=await rpc('DELETE','/api/instructor/users/'+encodeURIComponent(cadetId),{confirmUserId:cadetId,legacyRows},session.token);}
    catch(x){if(S.session?.token!==session.token)return;if(x.code==='NOT_FOUND')x.message='Оновіть серверний Code.gs, щоб увімкнути повне видалення.';await refresh(true);throw x;}
    if(S.session?.token!==session.token)return;
    if(r.deleted!==true||id(r.userId)!==cadetId)throw Error('Сервер не підтвердив видалення цього курсанта. Оновіть дані й перевірте обліковий запис.');
@@ -916,7 +924,7 @@ async function clickAction(button){
    delete a.workspaceRevisions?.results;
    delete a.fullResultsRevision;
    delete S.accounts[cadetId];
-   await persist();render();toast('Акаунт курсанта й результати видалено, спільну Google Таблицю очищено.');await refresh(true);
+   await persist();render();toast(legacyRows.some(row=>!row.remove)?'Акаунт і його результати видалено. Обрані старі рядки залишено.':'Акаунт курсанта й результати видалено, спільну Google Таблицю очищено.');await refresh(true);
   },'Видалити повністю');
  }
 

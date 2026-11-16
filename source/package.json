@@ -1,6 +1,6 @@
 {
   "name": "litakova-komisiia-pc",
-  "version": "1.2.35",
+  "version": "1.2.36",
   "private": true,
   "type": "module",
   "scripts": {
@@ -40,5 +40,5 @@
     "playwright": "1.62.1"
   },
   "executableName": "Litakova-Komisiia-PC.exe",
-  "versionCode": 159
+  "versionCode": 160
 }

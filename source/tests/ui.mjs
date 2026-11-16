@@ -138,6 +138,36 @@ try{
   try{await deleteButton(c).click();await page.locator('#modal button.primary').click();await page.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('Сервер не підтвердив'));assert.equal(await deleteButton(c).count(),1);assert.ok(context.findUserById_(c.user.id));assert.ok(state.accounts[String(state.session.user.id)].cadets.some(u=>String(u.id)===String(c.user.id)));await page.locator('#modal button[data-action=cancel-modal]').click();}
   finally{foreignDeleteAck=false;}
  });
+ const reviewCadet=api('POST','/api/register','',{fullName:'Петренко Перевірка UI',username:'ui_legacy_petrenko',groupId:otherGroup.id,...deletionPassword});
+ const reviewNamesake=api('POST','/api/register','',{fullName:reviewCadet.user.fullName,username:'ui_legacy_namesake',groupId:otherGroup.id,...deletionPassword});
+ const reviewSheet=context.publicResultsSheet_();
+ context.appendPublicRow_(reviewSheet,[reviewCadet.user.fullName,3,1,'15 хв 0 с',75,'Старий рядок для видалення','','']);
+ context.appendPublicRow_(reviewSheet,[reviewCadet.user.fullName,2,2,'12 хв 0 с',50,'<img src=x onerror=alert(1)>','','']);
+ await page.locator('.nav button[data-page=cadets]').click();await click('refresh');await deleteButton(reviewCadet).waitFor();
+ await mark('Historical row review requires an explicit choice and Cancel does not erase the account',async()=>{
+  const before=rpcCalls.filter(p=>p.method==='DELETE').length;
+  await deleteButton(reviewCadet).click();await page.locator('#modal select[name=legacy-row-0]').waitFor();
+  assert.equal(await page.locator('#modal select[name^=legacy-row-]').count(),2);
+  assert.equal(await page.locator('#modal img[src=x]').count(),0);
+  assert.deepEqual(await page.locator('#modal select[name^=legacy-row-]').evaluateAll(els=>els.map(el=>el.value)),['','']);
+  await page.locator('#modal button.primary').click();assert.equal(rpcCalls.filter(p=>p.method==='DELETE').length,before);
+  await page.locator('#modal [data-action=cancel-modal]').click();assert.ok(context.findUserById_(reviewCadet.user.id));
+ });
+ await mark('Changing a historical row after preview blocks deletion before any account is erased',async()=>{
+  await deleteButton(reviewCadet).click();await page.locator('#modal select[name=legacy-row-0]').selectOption('remove');await page.locator('#modal select[name=legacy-row-1]').selectOption('keep');
+  const title=reviewSheet.rows[0].indexOf('Тест'),score=reviewSheet.rows[0].indexOf('Підсумковий бал, %');
+  reviewSheet.rows.find(row=>row[title]==='Старий рядок для видалення')[score]=0.70;
+  await page.locator('#modal button.primary').click();await page.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('Старі рядки змінилися'));
+  assert.ok(context.findUserById_(reviewCadet.user.id));await page.locator('#modal [data-action=cancel-modal]').click();
+ });
+ await mark('The reviewed deletion removes selected history and preserves the namesake and kept row',async()=>{
+  await deleteButton(reviewCadet).click();await page.locator('#modal select[name=legacy-row-0]').selectOption('remove');await page.locator('#modal select[name=legacy-row-1]').selectOption('keep');
+  await page.setViewportSize({width:390,height:850});assert.equal(await page.locator('#modal').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+  await page.locator('#modal button.primary').click();await page.locator('#modal').waitFor({state:'hidden'});
+  assert.equal(context.findUserById_(reviewCadet.user.id),null);assert.ok(context.findUserById_(reviewNamesake.user.id));
+  const rows=context.publicRowsFromSheet_(reviewSheet);assert.ok(!rows.some(row=>row[5]==='Старий рядок для видалення'));assert.ok(rows.some(row=>row[5]==='<img src=x onerror=alert(1)>'));
+  await page.setViewportSize({width:1440,height:1000});
+ });
  await mark('Deletion by another instructor disappears from cached results after refresh',async()=>{
   const c=deletionCadets[2];await page.locator('.nav button[data-page=results]').click();await page.getByRole('heading',{name:'Результати та перевірка'}).waitFor();await page.locator('#filter').fill(c.user.fullName);await page.locator('#results-table').getByText(c.user.fullName,{exact:true}).waitFor();
   api('DELETE','/api/instructor/users/'+c.user.id,instructorToken,{confirmUserId:String(c.user.id)});await click('refresh');await page.getByRole('heading',{name:'Результатів не знайдено'}).waitFor();assert.equal(state.accounts[String(state.session.user.id)].results.some(r=>String(r.userId)===String(c.user.id)),false);assert.ok(context.findUserById_(state.session.user.id));
