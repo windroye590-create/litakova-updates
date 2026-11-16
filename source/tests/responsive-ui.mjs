@@ -1,3 +1,4 @@
+import {handleHostWindow} from './fixtures/host-window.mjs';
 // Exercise the real UI at desktop, narrow, and short window sizes. The local
 // service supplies synthetic records only; no live accounts are used or changed.
 import assert from 'node:assert/strict';
@@ -22,6 +23,8 @@ const materials=Array.from({length:54},(_,i)=>({id:'m'+i,title,description:'Оп
 const checks=[],failures=[],pageErrors=[];let state={},journal={},offline=false,role='instructor';
 function seed(next){role=next;state={version:1,theme:'light',groups,session:next==='auth'?null:{token:'responsive-fixture',user:{id:next==='cadet'?'c':'i',username:'WindRoy',fullName:'Шевченко-Петренко Олександр Володимирович '+word,role:next,title:'Інструктор',groupName:groups[0].name}},accounts:{}};if(next!=='auth')state.accounts[next==='cadet'?'c':'i']={tests,results,cadets,materials,materialProgress:{},materialSaved:{},fullTests:{t0:fullTest},pending:[],reviews:{r0:[{questionId:'q0',questionText:questions[0].text,selectedAnswerId:'no0',correctAnswerId:'yes0',selectedAnswerText:questions[0].answers[1].text,correctAnswerText:questions[0].answers[0].text,explanation:word}]},run:null,draft:null,capabilities:{multipleChoice:true,writtenTests:true},updatedAt:Date.now()};journal={};offline=false;}
 const server=http.createServer(async(req,res)=>{
+ if(handleHostWindow(req,res))return;
+
  try{
   const route=new URL(req.url,'http://local').pathname;res.setHeader('Cache-Control','no-store');
   if(route==='/state'||route==='/journal'){
