@@ -1,8 +1,9 @@
 const copy=x=>JSON.parse(JSON.stringify(x));
 const checkpoint=r=>({answers:copy(r.answers||{}),index:r.index||0,exitCount:r.exitCount||0});
 const encode=x=>JSON.stringify(x);
-export function createExamSession({session,account,deviceId,rpc,persist,now,changed=()=>{},completed=async()=>{},uuid=()=>crypto.randomUUID()}){
+export function createExamSession({session,account,deviceId,rpc,persist,now,changed=()=>{},completed=async()=>{},uuid=()=>crypto.randomUUID(),random=Math.random}){
  let flight=Promise.resolve(),busy=false,error='',anchor=null,readyToken='',generation=0;
+ let backgroundFlight=null,nextSyncAt=0,failures=0;
  const requestTimes=new WeakMap();
  const current=s=>s&&session()?.token===s.token&&String(session()?.user.id)===String(s.user.id);
  function validate(reply,s){
@@ -31,7 +32,14 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
    if(old?.submissionId===v?.submissionId||!old){a.run=null;delete a.examRequest;await completed(reply.completion,s,a);}
    a.examAvailable=null;anchor=null;await persist();return true;
   }
-  if(!v){a.examAvailable=null;return true;}
+  if(!v){
+   a.examAvailable=null;
+   if(reply.attemptDeleted===true&&old?.examProtocol===1&&String(old.test.id)===String(reply.deletedTestId)){
+    a.examBackups??=[];a.examBackups.unshift({submissionId:old.submissionId,testId:old.test.id,...checkpoint(old)});a.examBackups=a.examBackups.slice(0,5);
+    a.run=null;delete a.examRequest;await persist();changed();
+   }
+   return true;
+  }
   a.examAvailable={...copy(v),revision:reply.document.revision};
   const received=now(),sent=requestTimes.get(reply)??received;
   // The send time gives a conservative bound when the response is delayed.
@@ -58,12 +66,15 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
    busy=true;error='';changed();
    try{return await work();}catch(x){if(!current(owner))return false;error=x.code==='NOT_FOUND'?'Для продовження іспиту потрібен оновлений сервер.':x.message;
     const r=account().run;if(['EXAM_TAKEN','EXAM_REPLACED'].includes(x.code)&&r?.examProtocol===1)r.locked=true;
+    if(x.code==='RESULT_DELETED'&&r?.examProtocol===1){
+     const a=account();a.examBackups??=[];a.examBackups.unshift({submissionId:r.submissionId,testId:r.test.id,...checkpoint(r)});a.examBackups=a.examBackups.slice(0,5);a.run=null;delete a.examRequest;a.examAvailable=null;await persist();
+    }
     changed();throw x;
    }finally{if(epoch===generation){busy=false;changed();}}
   });flight=task;return task;
  }
  async function discoverWork(){
-  const s=session(),a=account(),reply=await request('/api/exam-session',{},s);
+  const s=session(),a=account(),r=a.run,reply=await request('/api/exam-session',r?.examProtocol===1?{knownTestId:String(r.test.id),knownSubmissionId:r.submissionId}:{},s);
   if(!current(s))return false;
   return accept(reply,s,a);
  }
@@ -99,7 +110,7 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   let pending=a.examRequest;
   if(pending&&(pending.submissionId!==r.submissionId||pending.fence!==r.fence)){delete a.examRequest;pending=null;}
   if(!pending){pending={action,submissionId:r.submissionId,deviceId:deviceId(),fence:r.fence,expectedRevision:r.revision,requestId:uuid(),checkpoint:value};a.examRequest=pending;await persist();}
-  const reply=await request('/api/exam-session/'+pending.action,pending,s);
+  const reply=await request('/api/exam-session/'+pending.action,{...pending,testId:String(r.test.id)},s);
   if(!current(s))return false;
   if(reply.completion){delete a.examRequest;return accept(reply,s,a);}
   if(account().run!==r)return false;
@@ -109,9 +120,23 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   return true;
  }
  const sync=()=>serial(async()=>{const r=account().run;if(r?.examProtocol===1&&owned(r))return writeWork();return discoverWork();});
+ async function background(){
+  const r=account().run;
+  // Flush recent answers promptly near the fixed server deadline.
+  const urgent=r?.examProtocol===1&&status().pending&&!failures&&(r.deadline-r.startedAt)-elapsed(r)*1000<=30000;
+  if(busy||backgroundFlight||now()<nextSyncAt&&!urgent)return false;
+  const epoch=generation;
+  const interval=r?.examProtocol===1?(r.finishRequested||r.releaseRequested?5000:status().pending?15000:30000):60000;
+  nextSyncAt=now()+interval*(1+random()*.3);
+  const task=sync().then(value=>{if(epoch===generation)failures=0;return value;}).catch(x=>{
+   if(epoch===generation){failures++;nextSyncAt=now()+Math.min(5000*2**Math.min(failures,3),30000)*(.5+random()*.5);}
+   throw x;
+  }).finally(()=>{if(backgroundFlight===task)backgroundFlight=null;});
+  backgroundFlight=task;return task;
+ }
  function finish(){return serial(async()=>{
   const r=account().run;if(!owned(r))throw Object.assign(Error('Спочатку продовжіть іспит на цьому ПК.'),{code:'EXAM_TAKEN'});
-  r.finishRequested=true;await persist();return writeWork('finish');
+  r.finishRequested=true;nextSyncAt=0;await persist();return writeWork('finish');
  });}
  function release(){
   const s=session(),r=s&&account().run;
@@ -119,6 +144,6 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   if(r?.examProtocol===1){r.releaseRequested=true;changed();}
   return serial(()=>writeWork('release')).catch(x=>{if(current(s)&&account().run===r&&account().examRequest?.action!=='release'){delete r.releaseRequested;changed();}throw x;});
  }
- function reset(){generation++;flight=Promise.resolve();busy=false;readyToken='';anchor=null;error='';}
- return {status,owned,editable,elapsed,expired,start,claim,discover,sync,finish,release,reset};
+ function reset(){generation++;flight=Promise.resolve();busy=false;readyToken='';anchor=null;error='';backgroundFlight=null;nextSyncAt=0;failures=0;}
+ return {status,owned,editable,elapsed,expired,start,claim,discover,sync,background,finish,release,reset};
 }

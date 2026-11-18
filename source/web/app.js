@@ -149,13 +149,14 @@ function updateData(){
  return flight.promise;
 }
 function updateStorageNotice(){const b=$('#account-sync-button'),n=$('#durability-status');if(n)n.outerHTML=storageNotice(Boolean(b));if(b)b.outerHTML=syncAccountButton();}
-function publicTableSyncNotice(){const pending=account().publicTableSync?.state==='pending';return `<div id="public-table-sync-status" ${pending?'class="notice warn" role="status"':'hidden'}>${pending?'Результати збережено в застосунку. Спільна Google Таблиця очікує синхронізації; повторимо автоматично після відновлення зв’язку.':''}</div>`;}
+function publicTableSyncNotice(){const pending=account().publicTableSync?.state==='pending';return `<div id="public-table-sync-status" ${pending?'class="notice warn" role="status"':'hidden'}>${pending?'Результати збережено в застосунку. Спільна Google Таблиця оновиться автоматично у фоні.':''}</div>`;}
 function updatePublicTableSyncUI(){const n=$('#public-table-sync-status');if(n)n.outerHTML=publicTableSyncNotice();}
 const diskWriter=createDurableWriter(async()=>{if(!alive())throw Error('Програму відкрито в іншому вікні.');if(!diskStateLoaded)throw Object.assign(Error('Спочатку потрібно прочитати збережені дані. Повторіть запуск.'),{code:'STORAGE_READ'});const r=typeof secureStorage!=='undefined'?await secureStorage.save(S):await local('/state',S);if(r.ok===false)throw Object.assign(Error(r.error||'Не вдалося зберегти дані на диску.'),{code:r.code});},updateStorageNotice);
 const accountSync=createAccountSync({session:()=>S.session,account,snapshot:accountDocuments,apply:applyAccountDocument,rpc,
+ delay:10000,pollInterval:30000,canSync:()=>!working&&!refreshing&&!rpcFlights&&!syncing&&!account().pending.some(p=>!p.permanent)&&!account().run?.finishRequested&&!account().run?.releaseRequested,
  persist:()=>diskWriter.save(),changed:()=>{updateStorageNotice();if(cloudRenderNeeded&&!accountSync.status().busy){cloudRenderNeeded=false;if(!modal.open&&page!=='runner'&&page!=='result')render();}}});
 const examSession=createExamSession({session:()=>S.session,account,deviceId:()=>S.deviceId??=(crypto.randomUUID()),rpc,now:uptime,persist:()=>diskWriter.save(),
- changed:()=>{updateStorageNotice();if(user()&&page==='runner'&&account().run?.examProtocol===1){const block=$('#exam-state');if(block)block.outerHTML=examNotice();const r=account().run,disabled=!examSession.editable(r),fields=$('.run-answers');if(fields)fields.disabled=disabled;for(const action of ['finish','handoff-exam']){const b=$(`[data-action="${action}"]`);if(b)b.disabled=disabled;}document.querySelectorAll('[data-action="question"],[data-action="prev"],[data-action="next"],[data-action="unanswered"]').forEach(b=>{b.disabled=disabled||(b.dataset.action==='prev'&&(r.index||0)===0)||(b.dataset.action==='next'&&(r.index||0)===r.test.questions.length-1);});}},
+ changed:()=>{updateStorageNotice();if(user()&&page==='runner'&&!account().run){page='tests';render();return;}if(user()&&page==='runner'&&account().run?.examProtocol===1){const block=$('#exam-state');if(block)block.outerHTML=examNotice();const r=account().run,disabled=!examSession.editable(r),fields=$('.run-answers');if(fields)fields.disabled=disabled;for(const action of ['finish','handoff-exam']){const b=$(`[data-action="${action}"]`);if(b)b.disabled=disabled;}document.querySelectorAll('[data-action="question"],[data-action="prev"],[data-action="next"],[data-action="unanswered"]').forEach(b=>{b.disabled=disabled||(b.dataset.action==='prev'&&(r.index||0)===0)||(b.dataset.action==='next'&&(r.index||0)===r.test.questions.length-1);});}},
  completed:async(reply,session,a)=>{C.validateResult(reply.result,session.user.id,reply.result.testId);a.results=C.mergeResults(a.results,[reply.result]);a.resultWriteVersion=(a.resultWriteVersion||0)+1;const review=C.enrichReview(reply.review,a.fullTests[id(reply.result.testId)]);a.reviews[id(reply.result.id)]=review;if(page==='runner'||page==='result'){lastResult={...reply,review,testId:id(reply.result.testId)};page='result';render();document.exitFullscreen?.().catch(()=>{});}}
 });
 function examNotice(){const r=account().run,v=examSession.status();if(r?.examProtocol!==1)return '';const message=r.releaseRequested?'Зберігаємо відповіді й передаємо іспит на інший ПК. Дочекайтеся підтвердження.':r.locked?'Іспит відкрито на іншому ПК. Щоб продовжити тут, поверніть редагування.':r.finishRequested?'Завершуємо іспит. Очікуємо підтвердження сервера.':v.error?v.error+' Незбережені відповіді залишилися на цьому ПК.':v.busy?'Зберігаємо спробу в акаунті…':v.pending?'Є нові відповіді. Очікуємо збереження в акаунті.':'Спробу збережено в акаунті. Можна продовжити з іншого ПК.';return `<div id="exam-state" class="sync-status ${r.locked||v.error?'warn':''}" role="status"><span>${e(message)}</span><button data-action="${r.locked?'resume':'sync-exam'}" ${v.busy?'disabled':''}>${r.locked?'Продовжити тут':'Зберегти зараз'}</button></div>`;}
@@ -211,7 +212,7 @@ async function applyAccountDocument(key,value,a,options={}){
  }
 }
 let examSaveTimer;
-function persist(){scheduledSave=false;saving=diskWriter.save().catch(x=>{x.localSave=true;throw x;});saving.then(()=>{if(user()){accountSync.changed();if(!instructor()&&account().run?.examProtocol===1){clearTimeout(examSaveTimer);examSaveTimer=setTimeout(()=>examSession.sync().catch(()=>{}),1500);}}},x=>toast(x.message));return saving;}
+function persist(){scheduledSave=false;saving=diskWriter.save().catch(x=>{x.localSave=true;throw x;});saving.then(()=>{if(user()){accountSync.changed();if(!instructor()&&account().run?.examProtocol===1){clearTimeout(examSaveTimer);examSaveTimer=setTimeout(()=>{if(!working&&!rpcFlights)examSession.background().catch(()=>{});},1500);}}},x=>toast(x.message));return saving;}
 async function retrySave(){if(checkpoint){const r=typeof secureStorage!=='undefined'&&secureStorage.enabled?await secureStorage.saveJournal(checkpoint):await local('/journal',checkpoint);if(r.ok===false)throw Error(r.error||'Не вдалося зберегти журнал.');journalError='';}await persist();updateStorageNotice();}
 
 function scheduleSave(){scheduledSave=true;updateStorageNotice();clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist(),100);}
@@ -220,7 +221,10 @@ function journal(value){if(value.kind==='draft'){const d=account().draft;if(!d||
 function runCheckpoint(interrupted=false){const r=account().run;if(!r)return;const value={kind:'run',userId:id(user().id),submissionId:r.submissionId,revision:(r.localRevision||0)+1,answers:r.answers,index:r.index||0,lastElapsed:Math.floor(r.examProtocol===1?examSession.elapsed(r):Math.max(0,(uptime()-r.startedUptime)/1000)),exitCount:r.exitCount||0,interrupted};r.localRevision=value.revision;r.lastElapsed=value.lastElapsed;if(interrupted)r.interrupted=true;return value;}
 async function rpc(method,path,body={},token=S.session?.token||''){
  if(updateApplying)throw Error('Застосунок оновлюється.');
- rpcFlights++;let r;try{r=await local('/rpc',C.payload(method,path,token,body));}catch(x){x.code??='NETWORK';throw x;}finally{rpcFlights--;}
+ const envelope=C.payload(method,path,token,body);
+ const send=()=>{if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});return local('/rpc',envelope);};
+ const critical=method==='POST'&&(/^\/api\/tests\/[^/]+\/start$/.test(path)||/^\/api\/exam-session\/(start|claim|finish|release)$/.test(path));
+ rpcFlights++;let r;try{r=await (critical?C.requestCapacity(send):send());}catch(x){x.code??='NETWORK';throw x;}finally{rpcFlights--;}
  if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});
  if(!r.ok){
   const x=Object.assign(Error(r.error||'Сервер відхилив запит.'),{code:r.code||'API_ERROR'});
@@ -412,10 +416,11 @@ async function refresh(force=false){
    if(Array.isArray(response.examRecoveries))a.examRecoveries=response.examRecoveries;
    if(response.resultTotal!==undefined&&resultSnapshotCurrent)a.resultTotal=response.resultTotal;
    if(response.resultsSheetUrl)a.resultsSheetUrl=response.resultsSheetUrl;
-   const intakeChanged=JSON.stringify(a.intake||null)!==JSON.stringify(response.intake||null),generationChanged=typeof response.intakeGeneration==='string'&&clearOldIntakeState(response.intakeGeneration);if(instructor())a.intake=response.intake||null;a.capabilities=response.capabilities||{};a.updatedAt=Date.now();lastError='';
+   const intakeChanged=JSON.stringify(a.intake||null)!==JSON.stringify(response.intake||null),generationChanged=typeof response.intakeGeneration==='string'&&clearOldIntakeState(response.intakeGeneration);if(instructor())a.intake=response.intake||null;a.capabilities=response.capabilities||{};a.updatedAt=Date.now();lastError='';if(a.capabilities.deletedAttemptRetakes&&!instructor())a.deletedTestIds=[];
    if(response.deletedResults&&resultSnapshotCurrent){
     for(const item of response.deletedResults)forgetResultDetails(a,item.id);
-    if(!instructor())a.deletedTestIds=[...new Set(response.deletedResults.map(item=>item.testId))];
+    if(!instructor()&&a.capabilities.deletedAttemptRetakes&&C.resetDeletedTraining(a,response.deletedResults)&&page==='runner')page='tests';
+    if(!instructor())a.deletedTestIds=a.capabilities.deletedAttemptRetakes?[]:[...new Set(response.deletedResults.map(item=>item.testId))];
     if(grading&&response.deletedResults.some(item=>item.id===id(grading.result.id))){
      void reviewPresence.stop(grading.result.id);
      grading=null;
@@ -537,7 +542,7 @@ function confirmResultDeletion(resultId){
  if(!instructor()||!account().capabilities?.resultDeletion)return;
  const session=S.session,a=account(),result=a.results.find(item=>id(item.id)===resultId);
  if(!result)throw Error('Результат не знайдено. Оновіть список.');
- const details=`<strong>${e(result.userName)}</strong><br>${e(result.groupName)} · ${e(result.testTitle)}<br><br>Роботу та її оцінку буде видалено зі списку результатів і спільної Google Таблиці. Спробу тесту залишено використаною.`;
+ const details=`<strong>${e(result.userName)}</strong><br>${e(result.groupName)} · ${e(result.testTitle)}<br><br>Роботу та її оцінку буде видалено зі списку результатів і спільної Google Таблиці. ${account().capabilities?.deletedAttemptRetakes?'Курсант зможе почати цей тест заново.':'Спробу тесту залишено використаною.'}`;
  return confirmAction('Видалити результат?',details,async()=>{
   const reply=await rpc('DELETE','/api/instructor/results/'+encodeURIComponent(resultId),{confirmResultId:resultId},session.token);
   if(S.session?.token!==session.token)return;
@@ -689,13 +694,13 @@ async function start(testId){
   const submissionId='pc-'+crypto.randomUUID();let confirmed=test,startPermit;if(a.capabilities?.testAccess||test.access?.protocol===1){let reply;try{reply=await rpc('POST','/api/tests/'+encodeURIComponent(test.id)+'/start',{submissionId},session.token);}catch(x){if(x.code==='NETWORK')x.message='Для початку тесту підключіться до інтернету та дочекайтеся відкриття інструктором.';throw x;}if(reply.submissionId!==submissionId||id(reply.test?.id)!==id(test.id)||typeof reply.startPermit!=='string'||!reply.startPermit.includes('.'))throw Error('Сервер не підтвердив початок цієї спроби.');confirmed=reply.test;startPermit=reply.startPermit;}const now=await getClock();if(S.session?.token!==session.token)return;a.run={test:C.shuffled(confirmed),...(startPermit?{startPermit}:{}),answers:{},index:0,startedUptime:now.uptime,launchId:now.launchId,submissionId,exitCount:0,userId:id(user().id)};await persist();page='runner';render();if(test.mode==='exam')document.documentElement.requestFullscreen?.().catch(()=>{});
  },'Почати');
 }
-function tick(){if(!alive()||!user()||page!=='runner')return;const r=account().run;if(!r)return;const elapsed=Math.floor(r.examProtocol===1?examSession.elapsed(r):Math.max(0,(uptime()-r.startedUptime)/1000)),remaining=Math.max(0,(r.examProtocol===1?(r.deadline-r.startedAt)/1000:r.test.durationMinutes*60)-elapsed);if($('#timer')){$('#timer').textContent=time(r.test.mode==='exam'?remaining:elapsed);$('#timer').classList.toggle('bad',r.test.mode==='exam'&&remaining<60);}r.lastElapsed=elapsed;if(r.test.mode==='exam'&&remaining===0&&(!r.examProtocol||examSession.owned(r))&&!examSession.status().busy){if(r.examProtocol===1&&!examSession.expired(r)){if($('#timer'))$('#timer').textContent='Уточнюємо час…';examSession.sync().catch(x=>toast(x.message));}else finishRun(false).catch(x=>toast(x.message));}}
+function tick(){if(!alive()||!user()||page!=='runner')return;const r=account().run;if(!r)return;const elapsed=Math.floor(r.examProtocol===1?examSession.elapsed(r):Math.max(0,(uptime()-r.startedUptime)/1000)),remaining=Math.max(0,(r.examProtocol===1?(r.deadline-r.startedAt)/1000:r.test.durationMinutes*60)-elapsed);if($('#timer')){$('#timer').textContent=time(r.test.mode==='exam'?remaining:elapsed);$('#timer').classList.toggle('bad',r.test.mode==='exam'&&remaining<60);}r.lastElapsed=elapsed;if(r.test.mode==='exam'&&remaining===0&&!r.finishRequested&&!r.releaseRequested&&(!r.examProtocol||examSession.owned(r))&&!examSession.status().busy){if(r.examProtocol===1&&!examSession.expired(r)){if($('#timer'))$('#timer').textContent='Уточнюємо час…';examSession.background().catch(()=>{});}else finishRun(false).catch(x=>toast(x.message));}}
 async function recoverRun(offline=false){const session=S.session,a=account(),r=a.run,native=await getClock();if(S.session?.token!==session.token)return;try{if(r?.test.mode==='exam'){if(r.examProtocol===1){if(!offline)await examSession.discover();}else{r.startedUptime=native.uptime-Math.max(0,r.lastElapsed||0)*1000;r.launchId=native.launchId;r.legacyRecovery=true;await persist();}}else if(r?.test.mode==='training'&&r.launchId!==clock.launchId){r.startedUptime=native.uptime-Math.max(0,r.lastElapsed||0)*1000;r.launchId=native.launchId;await persist();}else if(!instructor()&&!offline)await examSession.discover();}catch(x){if(S.session?.token===session.token)lastError=x.message;}}
 async function finishRun(ask=true,forcedUptime=null){
  const session=S.session,a=account(),r=a.run;if(!r||working)return;
- if(ask){const missing=r.test.questions.filter(q=>!C.answered(q,r.answers)).length;confirmAction('Завершити тест?',missing?`Без відповіді залишилося ${missing} пит. Після завершення повторне проходження буде заблоковане.`:'Усі питання отримали відповіді. Результат буде надіслано на спільний сервер.',()=>{if(S.session?.token===session.token&&account().run===r)return finishRun(false);},'Завершити');return;}
+ if(ask){const missing=r.test.questions.filter(q=>!C.answered(q,r.answers)).length;confirmAction('Завершити тест?',missing?`Без відповіді залишилося ${missing} пит. Після завершення результат буде надіслано викладачу.`:'Усі питання отримали відповіді. Результат буде надіслано на спільний сервер.',()=>{if(S.session?.token===session.token&&account().run===r)return finishRun(false);},'Завершити');return;}
  working=true;
- try{if(r.examProtocol===1){await examSession.finish();return;}const now=forcedUptime??(await getClock()).uptime;if(S.session?.token!==session.token||a.run!==r)return;const body=C.submission(r,now);const pending={body,testTitle:r.test.title,userId:id(session.user.id),attempts:0,nextAt:0,createdAt:Date.now()};a.pending.push(pending);a.run=null;try{await persist();}catch(x){a.run=r;a.pending=a.pending.filter(p=>p!==pending);throw x;}if(S.session?.token!==session.token)return;lastResult={testTitle:r.test.title,testId:id(r.test.id),submissionId:r.submissionId};page='result';render();if(document.fullscreenElement)document.exitFullscreen?.().catch(()=>{});await syncQueue(true);}
+ try{if(r.examProtocol===1){try{await examSession.finish();}catch(x){if(!x.localSave&&C.retryable(x.code))toast('Сервер зайнятий. Відповіді збережено на цьому ПК. Повторимо завершення автоматично.');else throw x;}return;}const now=forcedUptime??(await getClock()).uptime;if(S.session?.token!==session.token||a.run!==r)return;const body=C.submission(r,now);const pending={body,testTitle:r.test.title,userId:id(session.user.id),attempts:0,nextAt:0,createdAt:Date.now()};a.pending.push(pending);a.run=null;try{await persist();}catch(x){a.run=r;a.pending=a.pending.filter(p=>p!==pending);throw x;}if(S.session?.token!==session.token)return;lastResult={testTitle:r.test.title,testId:id(r.test.id),submissionId:r.submissionId};page='result';render();if(document.fullscreenElement)document.exitFullscreen?.().catch(()=>{});await syncQueue(true);}
  finally{working=false;if(!user())render();}
 }
 async function syncQueue(force=false){
@@ -718,7 +723,7 @@ async function syncQueue(force=false){
     if(S.session?.token!==session.token)break;p.attempts++;p.failure=x.message;p.failureCode=x.code;
     if(x.code==='RESULT_DELETED'){
      const testId=id(p.body.testId);
-     a.deletedTestIds=[...new Set([...(a.deletedTestIds||[]),testId])];
+     a.deletedTestIds=a.capabilities?.deletedAttemptRetakes?(a.deletedTestIds||[]).filter(t=>id(t)!==testId):[...new Set([...(a.deletedTestIds||[]),testId])];
      for(const item of a.results)if(id(item.testId)===testId)forgetResultDetails(a,id(item.id));
      a.results=a.results.filter(item=>id(item.testId)!==testId);
      a.pending=a.pending.filter(item=>item.body.submissionId!==p.body.submissionId);
@@ -737,6 +742,28 @@ async function syncQueue(force=false){
    }
   }
  }finally{resolve();if(syncQueue.completion===completion)syncQueue.completion=null;if(syncing===session.token){syncing=false;if(S.session?.token===session.token&&page!=='runner'&&page!=='editor')render();}}
+}
+let backgroundSyncing=false;
+async function backgroundTick(){
+ if(updateApplying||!alive())return;
+ if(diskWriter.status().error||journalError)await retrySave().catch(()=>{});
+ if(!user()||working||refreshing||rpcFlights||syncing||backgroundSyncing||updateData.flight?.token===S.session.token)return;
+ backgroundSyncing=true;
+ const token=S.session.token;
+ const idle=()=>S.session?.token===token&&!working&&!refreshing&&!rpcFlights&&!updateApplying;
+ try{
+  // Deliver completed work before account copies, report copies, or polling.
+  if(!instructor()&&account().pending.some(p=>!p.permanent)){await syncQueue();return;}
+  if(!instructor()){
+   await examSession.background().catch(()=>{});
+   if(!idle())return;
+   if(page==='home')render();
+   if(account().run?.examProtocol===1)return;
+  }
+  await accountSync.sync();if(!idle())return;
+  await materials.syncProgress();if(!idle())return;
+  await publicTableSync.tick();
+ }finally{backgroundSyncing=false;}
 }
 function download(content,name,type){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 function officeReview(d){
@@ -1011,8 +1038,8 @@ async function init(){
  timerInterval=setInterval(()=>{if(updateApplying)return;reviewPresence.expire();tick();if(user()?.role==='cadet'&&account().run&&uptime()-lastTimerSaved>=10000){lastTimerSaved=uptime();scheduleSave();}},1000);
  setInterval(()=>{if(alive()&&!updateApplying)getClock().then(()=>tick()).catch(()=>{});},10000);
  setInterval(()=>{if(updateApplying||!alive()||!instructor())return;if(page==='grading')reviewPresence.tick();else if(pendingReviewsPage()&&!document.hidden)pollReviewPresence();},25000);
- setInterval(()=>{if(!updateApplying&&!document.hidden&&alive()){if(user()&&updateData.flight?.token!==S.session.token){syncQueue();if(page!=='runner'&&page!=='editor')refresh();}}},45000+Math.floor(Math.random()*15000));
- setInterval(()=>{if(!updateApplying&&alive()){if(diskWriter.status().error||journalError)retrySave().catch(()=>{});if(user()){if(updateData.flight?.token!==S.session.token){syncQueue();publicTableSync.tick();materials.syncProgress();accountSync.sync();}if(!instructor())examSession.sync().then(()=>{if(page==='home')render();}).catch(()=>{});}}},10000);
+ setInterval(()=>{if(!updateApplying&&!document.hidden&&alive()&&!working&&!rpcFlights&&!syncing&&!backgroundSyncing){if(user()&&updateData.flight?.token!==S.session.token&&!account().pending.some(p=>!p.permanent)){if(page!=='runner'&&page!=='editor')refresh();}}},45000+Math.floor(Math.random()*15000));
+ setInterval(()=>{backgroundTick().catch(()=>{});},10000+Math.floor(Math.random()*5000));
  }catch(x){diskStateLoaded=false;window.dispatchEvent(new Event('lk:startup-failed'));if(!document.querySelector('[data-startup-error]'))app.innerHTML=`<div class="boot">Не вдалося відкрити програму<small>${e(x.message)}</small></div>`;}
 }
 init();
