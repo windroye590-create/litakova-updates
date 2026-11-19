@@ -16,8 +16,8 @@ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
 const PUBLIC_SYNC_DELAY_MS = 30000;
 const REVIEW_LEASE_MS = 120000;
 const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
-const LATEST_APP_VERSION_CODE = 165;
-const LATEST_APP_VERSION_NAME = '1.2.41';
+const LATEST_APP_VERSION_CODE = 166;
+const LATEST_APP_VERSION_NAME = '1.2.42';
 const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
 const ROLE_INSTRUCTOR = 'instructor';
 const ROLE_CADET = 'cadet';
@@ -88,7 +88,7 @@ const HEADERS = Object.freeze({
 const PUBLIC_RESULTS_CANONICAL_HEADERS = Object.freeze([
   'ПІБ курсанта', 'Правильних', 'Неправильних', 'Час проходження', 'Правильних, %',
   'Тест', '_ID курсанта', '_ID результату', 'Стан перевірки', 'Набрано балів', 'Максимум балів', 'Підсумковий бал, %',
-  'Група', 'Дата завершення', 'Результат'
+  'Група', 'Дата завершення', 'Результат', '_Ключ тесту'
 ]);
 const PUBLIC_RESULTS_HEADERS = Object.freeze([
   'ПІБ курсанта', 'Група', 'Тест', 'Дата завершення', 'Результат', 'Підсумковий бал, %',
@@ -107,6 +107,7 @@ var spreadsheetCache_ = null;
 var publicResultsSpreadsheetCache_ = null;
 var publicResultsSheetCache_ = null;
 var publicLayouts_ = [];
+var resultSeriesCache_ = null;
 var testAccessCache_ = null;
 var testAccessGroupsCache_ = null;
 var publicSyncActor_ = null;
@@ -191,6 +192,7 @@ function setAppDownloadUrl(url, versionCode, versionName) {
 }
 
 function doPost(e) {
+  resultSeriesCache_ = null;
   workspaceMutation_ = null; workspaceWriteRequest_ = false;
   deferPublicSync_ = false;
   deletedRetakeRequest_ = false; deletedRetakeEpochs_ = null;
@@ -530,7 +532,7 @@ function finishWorkspaceChange_() {
   recoverWorkspaceChange_(true);workspaceMutation_=null;
 }
 function workspaceRevisions_(user,all) {
-  var p=PropertiesService.getScriptProperties(),out={},finger=String(user.id)+':'+user.role+':'+String(user.groupName||'')+':written1:deleted-retakes1';
+  var p=PropertiesService.getScriptProperties(),out={},finger=String(user.id)+':'+user.role+':'+String(user.groupName||'')+':written1:deleted-retakes1:result-series1';
   ['groups','tests','cadets','results','materials','progress'].forEach(function(k){out[k]=(p.getProperty('LK_REV_'+k)||'0')+':'+finger;});
   out.results+=':'+(user.role===ROLE_INSTRUCTOR?(all?'all':'recent'):'own');return out;
 }
@@ -775,7 +777,7 @@ function createInitialInstructorCode() {
 function ensureSchema_(lockHeld, force) {
   var cache = CacheService.getScriptCache();
   var schemaReady=cache.get('LK_SCHEMA_READY_API25')==='1'&&cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1')==='1'&&cache.get('LK_SCHEMA_CADET_CARD_V1')==='1';
-  if(!force&&schemaReady&&cache.get('LK_SCHEMA_EXCEL_V1')==='1')return;
+  if(!force&&schemaReady&&cache.get('LK_SCHEMA_EXCEL_V1')==='1'&&publicReportLayoutReady_())return;
   var ownLock = null;
   if (!lockHeld) {
     ownLock = LockService.getScriptLock();
@@ -899,7 +901,7 @@ function publicResultsSpreadsheet_(createIfMissing) {
   return created;
 }
 
-function publicReportLayoutReady_(){var p=PropertiesService.getScriptProperties(),id=p.getProperty(PUBLIC_RESULTS_PROPERTY);return p.getProperty('LK_EXCEL_LAYOUT_ARMED_V1')==='1'&&(!id||p.getProperty('LK_PUBLIC_LAYOUT_READY_V4_'+id)==='1');}
+function publicReportLayoutReady_(){var p=PropertiesService.getScriptProperties(),id=p.getProperty(PUBLIC_RESULTS_PROPERTY);return p.getProperty('LK_EXCEL_LAYOUT_ARMED_V1')==='1'&&(!id||p.getProperty('LK_PUBLIC_LAYOUT_READY_V4_'+id)==='1'&&p.getProperty('LK_PUBLIC_TEST_KEYS_V1_'+id)==='1');}
 function migratePublicReports_(){
  var props=PropertiesService.getScriptProperties(),id=props.getProperty(PUBLIC_RESULTS_PROPERTY);if(props.getProperty('LK_EXCEL_LAYOUT_ARMED_V1')!=='1'||!id||publicReportLayoutReady_()||Date.now()<Number(props.getProperty('LK_PUBLIC_FORMAT_RETRY_V4')||0))return;
  try{ensurePublicResultsSheet_(SpreadsheetApp.openById(id));props.deleteProperty('LK_PUBLIC_FORMAT_ERROR_V4');props.deleteProperty('LK_PUBLIC_FORMAT_RETRY_V4');}
@@ -943,7 +945,21 @@ function writePublicRows_(sheet,first,rows) {
   if(grew&&layout.modern)formatPublicResults_(sheet);
 }
 function appendPublicRow_(sheet,row){var layout=publicLayout_(sheet),columns=layout.columns,width=Math.max.apply(null,columns)+1,values=Array(width).fill(''),grew=sheet.getLastRow()+1>sheet.getMaxRows();if(grew)sheet.insertRowsAfter(sheet.getMaxRows(),250);columns.forEach(function(column,index){if(column>=0)values[column]=publicPhysicalValue_(index,row[index],layout.modern);});sheet.appendRow(values);if(grew&&layout.modern)formatPublicResults_(sheet);}
-function publicPlaceholder_(user){return [safeCellText_(user.fullName),'','','','','',String(user.id),'','','','','',safeCellText_(user.groupName),'','Не проходив'];}
+function publicPlaceholder_(user){return [safeCellText_(user.fullName),'','','','','',String(user.id),'','','','','',safeCellText_(user.groupName),'','Не проходив',''];}
+// Add one hidden identity column without moving existing data or replaying an
+// old migration backup. Re-running only fills it from authoritative result IDs.
+function ensurePublicTestKeys_(sheet,bookId) {
+  var props=PropertiesService.getScriptProperties(),key='LK_PUBLIC_TEST_KEYS_V1_'+bookId;
+  var headers=sheet.getRange(1,1,1,sheet.getMaxColumns()).getValues()[0].map(String),column=headers.indexOf('_Ключ тесту')+1;
+  if(column&&props.getProperty(key)==='1')return;
+  if(!column){column=sheet.getMaxColumns()+1;sheet.insertColumnsAfter(column-1,1);sheet.getRange(1,column).setValue('_Ключ тесту');}
+  publicLayouts_=publicLayouts_.filter(function(entry){return entry.sheet!==sheet;});
+  var layout=publicLayout_(sheet),count=Math.max(0,sheet.getLastRow()-1),ids=count?sheet.getRange(2,layout.columns[7]+1,count,1).getValues():[],byId=Object.create(null);
+  listResults_(null).forEach(function(result){byId[String(result.id)]=result.canonicalTestId;});
+  if(count){var previous=sheet.getRange(2,column,count,1).getValues();sheet.getRange(2,column,count,1).setValues(ids.map(function(row,index){return [byId[String(row[0])]||previous[index][0]||''];}));}
+  sheet.getRange(1,column,sheet.getMaxRows(),1).setNumberFormat('@');sheet.hideColumns(column,1);
+  props.setProperty(key,'1');
+}
 function ensurePublicResultsSheet_(spreadsheet) {
   var sheet=spreadsheet.getSheetByName(PUBLIC_RESULTS_SHEET);
   if(!sheet){var sheets=spreadsheet.getSheets?spreadsheet.getSheets():[];sheet=sheets.length===1&&sheetIsEmpty_(sheets[0])?sheets[0]:spreadsheet.insertSheet(PUBLIC_RESULTS_SHEET);if(sheet.getName()!==PUBLIC_RESULTS_SHEET)sheet.setName(PUBLIC_RESULTS_SHEET);}
@@ -972,7 +988,7 @@ function ensurePublicResultsSheet_(spreadsheet) {
     var rows=publicRowsFromSheet_(backup||sheet,true).map(function(row){var result=results[String(row[7])];if(result)return publicResultValues_(result);if(!row[7]&&users[String(row[6])]&&row.slice(1,5).every(function(v){return v==='';}))return publicPlaceholder_(users[String(row[6])]);return row;});
     writePublicRows_(sheet,2,rows);
   }
-  formatPublicResults_(sheet);props.setProperty(readyKey,'1');
+  ensurePublicTestKeys_(sheet,spreadsheet.getId());formatPublicResults_(sheet);props.setProperty(readyKey,'1');
   return sheet;
 }
 function ensurePublicFilter_(sheet) {
@@ -1167,7 +1183,7 @@ function publicResultValues_(result) {
   var count=result.choiceTotal == null ? result.total : result.choiceTotal;
   return [safeCellText_(result.userName),result.correct,Math.max(0,count-result.correct),
     formatDuration_(result.durationSeconds),count ? Math.round(result.correct*100/count) : '',safeCellText_(result.testTitle),String(result.userId),String(result.id),
-    result.gradingStatus==='pending_review'?'Очікує перевірки':'Перевірено',result.earnedPoints==null?result.correct:result.earnedPoints,result.maxPoints==null?result.total:result.maxPoints,result.score==null?'':result.score,safeCellText_(result.groupName),result.completedAt||'',result.gradingStatus==='pending_review'?'Очікує перевірки':result.passed?'Складено':'Не складено'];
+    result.gradingStatus==='pending_review'?'Очікує перевірки':'Перевірено',result.earnedPoints==null?result.correct:result.earnedPoints,result.maxPoints==null?result.total:result.maxPoints,result.score==null?'':result.score,safeCellText_(result.groupName),result.completedAt||'',result.gradingStatus==='pending_review'?'Очікує перевірки':result.passed?'Складено':'Не складено',result.canonicalTestId||canonicalResultTestId_(result.testId)];
 }
 
 function publicRowMatchesStoredResult_(row, result) {
@@ -1721,12 +1737,14 @@ function listTests_(includeQuestions) {
     rows = sheet.getRange(2, 1, count, HEADERS.tests.length).getValues();
   } else {
     var first = sheet.getRange(2, 1, count, 7).getValues();
-    var tail = sheet.getRange(2, 9, count, 2).getValues();
+    var tail = sheet.getRange(2, 9, count, 3).getValues();
     rows = first.map(function (row, index) { return row.concat([''], tail[index]); });
   }
-  return rows.map(function (row, index) {
+  var tests=rows.map(function (row, index) {
     return testFromRow_(row, index, includeQuestions);
-  }).filter(function (test) { return test.id !== ''; }).sort(function (first, second) {
+  }).filter(function (test) { return test.id !== ''; });
+  var resolve=LKReport_.testSeriesResolver(tests);tests.forEach(function(test){test.canonicalTestId=resolve(test.id);});
+  return tests.sort(function (first, second) {
     return dateMillis_(second.createdAt) - dateMillis_(first.createdAt);
   });
 }
@@ -1747,6 +1765,7 @@ function testFromRow_(row, index, includeQuestions) {
     createdAt: iso_(row[8]),
     rowNumber: index == null ? null : index + 2
   };
+  if(row[10])try{var receipt=JSON.parse(String(row[10]));if(receipt&&receipt.v===1&&typeof receipt.replaces==='string'&&receipt.replaces)test.replacesId=receipt.replaces;}catch(ignored){}
   if (includeQuestions) test.questions = questions;
   return test;
 }
@@ -1836,6 +1855,7 @@ function createTest_(user, body, skipAudit, replacementReceipt) {
     id, safeCellText_(title), safeCellText_(description), mode, duration, passing,
     published, questionStorage, createdAt, questions.length,receipt?JSON.stringify(receipt):''
   ]);
+  resultSeriesCache_=null;
   if (skipAudit !== true) {
     logAudit_(user, 'TEST_CREATE', 'test', id, title,
       questions.length + ' пит.; ' + (published ? 'опубліковано' : 'чернетка') + '.');
@@ -1849,6 +1869,8 @@ function createTest_(user, body, skipAudit, replacementReceipt) {
 
 function replaceTest_(id, user, body) {
   var receipt=testCreationRequest_(user,body,id),replacement=receipt?testCreationReplay_(receipt):null;
+  var replayable=!!receipt;
+  if(!receipt)receipt={v:1,owner:String(user.id),request:'legacy-'+Utilities.getUuid(),digest:sha256Hex_(JSON.stringify(body)),replaces:String(id)};
   var original = getTestById_(id);
   // A receipt remains replayable after the original has already been archived.
   if (!replacement && (!original || isArchivedTest_(original))) fail_('Тест не знайдено.', 'TEST_NOT_FOUND');
@@ -1860,7 +1882,7 @@ function replaceTest_(id, user, body) {
   } catch (error) {
     // Receipt-bearing replacements survive both a lost append acknowledgement
     // and a partial archive write; retry completes the same pair of versions.
-    if(!receipt){
+    if(!replayable){
       try { sheet_('tests').getRange(original.rowNumber, 3).setValue(original.description); } catch (ignored) {}
       try { deleteTestRowOnly_(replacement.id); } catch (ignored) {}
     }
@@ -2386,10 +2408,18 @@ function deleteResult_(actor,id,body) {
   return {deleted:true,resultId:id,alreadyDeleted:false};
 }
 
+function canonicalResultTestId_(id) {
+  if(!resultSeriesCache_){
+    var tests=listTests_(false);
+    listRetries_().forEach(function(retry){if(retry.retryTestId&&retry.sourceTestId)tests.push({id:retry.retryTestId,replacesId:String(retry.sourceTestId)});});
+    resultSeriesCache_=LKReport_.testSeriesResolver(tests);
+  }
+  return resultSeriesCache_(id);
+}
 function resultFromRow_(row) {
   return {
     id: row[0], userId: row[1], userName: String(row[2] || ''), groupName: String(row[3] || ''),
-    testId: row[4], testTitle: String(row[5] || ''), score: row[16] === 'pending_review' ? null : Number(row[6] || 0),
+    testId: row[4], canonicalTestId:canonicalResultTestId_(row[4]), testTitle: String(row[5] || ''), score: row[16] === 'pending_review' ? null : Number(row[6] || 0),
     correct: Number(row[7] || 0), total: Number(row[8] || 0), durationSeconds: Number(row[9] || 0),
     completedAt: iso_(row[10]), passed: row[16] === 'pending_review' ? null : asBoolean_(row[11], false),
     examExitCount: Number(row[14] || 0), examPinned: asBoolean_(row[15], false),
@@ -4015,7 +4045,7 @@ function instructorReportData_(actor,body,options) {
   requireRole_(actor,ROLE_INSTRUCTOR);body=body||{};options=options||{};
   if(!options.allowIntake&&PropertiesService.getScriptProperties().getProperty('LK_INTAKE_ACTIVE'))fail_('Триває підготовка набору. Завантажте збережений архів або дочекайтеся завершення.','INTAKE_IN_PROGRESS');
   var revision=JSON.stringify(workspaceRevisions_(actor,true)),groups=listGroups_(),results=listResults_(null),cadets=listUsers_().filter(function(u){return u.role===ROLE_CADET&&!cadetDeletionPending_(u.id);}).map(publicUser_);
-  var tests=listTests_(false).filter(function(t){return !isArchivedTest_(t)&&!isRetakeTest_(t);}).map(function(t){var assigned=assignedGroups_(t.description);return {id:String(t.id),title:t.title,published:t.published&&assigned!==null,assignedGroups:assigned||[]};});
+  var tests=listTests_(false).filter(function(t){return !isArchivedTest_(t)&&!isRetakeTest_(t);}).map(function(t){var assigned=assignedGroups_(t.description);return {id:String(t.id),canonicalTestId:t.canonicalTestId,title:t.title,published:t.published&&assigned!==null,assignedGroups:assigned||[]};});
   var groupId=cleanText_(body.groupId,100),testId=cleanText_(body.testId,100),query=normalize_(cleanText_(body.query,180)),scope=[];
   if(groupId){var group=groups.filter(function(g){return String(g.id)===groupId;})[0];if(!group)fail_('Групу більше не знайдено. Оновіть фільтри.','GROUP_NOT_FOUND');results=results.filter(function(r){return r.groupName===group.name;});cadets=cadets.filter(function(u){return u.groupName===group.name;});tests=tests.filter(function(t){return !t.assignedGroups.length||t.assignedGroups.indexOf(group.name)>=0||results.some(function(r){return String(r.testId)===t.id;});});scope.push(group.name);}
   if(testId){var test=tests.filter(function(t){return t.id===testId;})[0],historical=results.filter(function(r){return String(r.testId)===testId;})[0];if(!test&&!historical)fail_('Тест більше не знайдено. Оновіть фільтри.','TEST_NOT_FOUND');results=results.filter(function(r){return String(r.testId)===testId;});tests=test?[test]:[{id:testId,title:historical.testTitle,historical:true}];scope.push((test||historical).title||historical.testTitle);}
@@ -4090,6 +4120,39 @@ function intakeArchiveContent_(body) {
 
 // BEGIN GENERATED EXCEL REPORT
 var LKReport_=(function(){
+// A replacement is another version of the same test. A separately created
+// test keeps its own identity, even when its title happens to be identical.
+const identity=value=>String(value??'');
+function testSeriesResolver(tests=[]) {
+ const parents=new Map();
+ for(const test of tests)if(identity(test.id))parents.set(identity(test.id),identity(test.canonicalTestId||test.replacesId||test.id));
+ return value=>{
+  let current=identity(value);const seen=new Set();
+  while(parents.has(current)&&parents.get(current)!==current){
+   if(seen.has(current))return identity(value); // Never merge corrupt cycles.
+   seen.add(current);current=parents.get(current);
+  }
+  return current;
+ };
+}
+function resultTestKey(result,resolve=value=>identity(value)) {
+ return resolve(result.canonicalTestId||result.testId);
+}
+function compareAttempts(a,b) {
+ return (Date.parse(a.completedAt)||0)-(Date.parse(b.completedAt)||0)
+  ||identity(a.id).localeCompare(identity(b.id),'en',{numeric:true});
+}
+function latestResults(results,tests=[],{byGroup=true}={}) {
+ const resolve=testSeriesResolver(tests),latest=new Map();
+ for(const result of results){
+  if(!result||!identity(result.userId)||!identity(result.testId))continue;
+  const key=JSON.stringify([identity(result.userId),byGroup?String(result.groupName||''):'',resultTestKey(result,resolve)]);
+  const previous=latest.get(key);
+  if(!previous||compareAttempts(result,previous)>0)latest.set(key,result);
+ }
+ return [...latest.values()].sort((a,b)=>compareAttempts(b,a));
+}
+
 // The same report model and XML run in the browser and in Apps Script.
 // Values are written as numbers or explicit strings; cell text is never a formula.
 const rptMime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -4123,11 +4186,11 @@ function reportModel(data,options={}){
  const columns=[['ПІБ курсанта',34],['Група',20],['Тест',38],['Дата завершення',22],['Результат',24],['Підсумковий бал',20],['Набрано балів',17],['Максимум балів',18],['Час проходження',18],['Правильних',16,true],['Неправильних',17,true],['Правильних, %',19,true],['ID курсанта',18,true],['ID результату',18,true],['Підтвердження збереженої роботи',38]];
  const ordered=results.slice().sort((a,b)=>(Date.parse(b.completedAt)||0)-(Date.parse(a.completedAt)||0)||rptSort(a.userName,b.userName));
  const resultRows=ordered.map(r=>{const state=rptPending(r)?7:r.passed?5:6,choice=rptChoice(r);return [r.userName,r.groupName,r.testTitle,rptCell(rptDate(r.completedAt,offset),4),rptCell(rptStatus(r),state),rptPercent(rptScore(r),state===7?2:r.passed?12:13),rptNumber(r.earnedPoints)??r.correct,rptNumber(r.maxPoints)??r.total,rptCell(rptTime(r.durationSeconds),3),choice?r.correct:'',choice?Math.max(0,choice-r.correct):'',rptPercent(choice?(Number(r.correct)||0)/choice:null),rptId(r.userId),rptId(r.id),r.examRecovered?'Підтвердив: '+(r.recoveredBy||'інструктор')+'; час зі збереженої роботи':''];});
- const byTest=new Map(),members=new Map(),latest=new Map();
- for(const t of tests)if(t&&rptId(t.id))byTest.set(rptId(t.id),t);
+ const resolve=testSeriesResolver(tests),current=latestResults(results,tests),byTest=new Map(),members=new Map(),latest=new Map();
+ for(const t of tests)if(t&&rptId(t.id))byTest.set(resolve(t.id),{...t,id:resolve(t.id)});
  for(const u of cadets){if(u.role&&u.role!=='cadet')continue;const group=String(u.groupName||'');members.set(JSON.stringify([rptId(u.id),group]),{id:rptId(u.id),name:u.fullName||u.username||'',username:u.username||'',group});}
- for(const r of ordered){
-  const tid=rptId(r.testId),person=JSON.stringify([rptId(r.userId),String(r.groupName||'')]);
+ for(const r of current){
+  const tid=resultTestKey(r,resolve),person=JSON.stringify([rptId(r.userId),String(r.groupName||'')]);
   if(!byTest.has(tid))byTest.set(tid,{id:tid,title:r.testTitle,historical:true});
   if(!members.has(person))members.set(person,{id:rptId(r.userId),name:r.userName,group:String(r.groupName||''),historical:true});
   const key=JSON.stringify([person,tid]);if(!latest.has(key))latest.set(key,r);
@@ -4207,6 +4270,6 @@ function zipReportParts(parts){
 }
 const XLSX_MIME=rptMime;
 
-return {reportModel:reportModel,xlsxParts:xlsxParts,reportFilename:reportFilename};
+return {reportModel:reportModel,xlsxParts:xlsxParts,reportFilename:reportFilename,testSeriesResolver:testSeriesResolver};
 })();
 // END GENERATED EXCEL REPORT
