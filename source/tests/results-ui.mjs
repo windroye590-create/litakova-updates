@@ -254,6 +254,7 @@ try{
   state={version:1,theme:'light',session:{token:'cadet-retake-ui',user},groups,accounts:{[user.id]:{tests,results:results.filter(r=>r.userId===user.id),cadets:[],fullTests:{},pending:[],reviews:{}}}};journal={};
   page=await browser.newPage({viewport:{width:1440,height:1000},locale:'uk-UA'});page.on('pageerror',x=>errors.push(x.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/?key=results-ui`);await page.locator('.layout').waitFor();await refreshed();
+  assert.equal(await page.locator('.stat').filter({has:page.getByText('Результати',{exact:true})}).locator('.value').innerText(),'2');
   await page.locator('.nav [data-page="results"]').click();await page.locator('.compact-results').waitFor();
   assert.equal(await page.locator('.compact-results tbody tr').count(),2);
   const retake=page.locator('[data-action="review-result"][data-id="meteo-retake"]');await retake.click();
