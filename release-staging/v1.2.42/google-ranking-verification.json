@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "preservedOriginalResults": 40,
+  "rankedCadets": 20,
+  "canonicalTests": 2,
+  "missingTestKeys": 0,
+  "formulaErrors": 0,
+  "independentlyRecomputed": true,
+  "liveFormulaRetakeProbe": "A later zero replaced 10; adding another test produced 3, not 13",
+  "googleVisualCheck": "An isolated browser required Google sign-in; cells, formula results and existing formatting were inspected through the connected Sheets API"
+}
