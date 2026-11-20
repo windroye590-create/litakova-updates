@@ -2,7 +2,7 @@
   "version": "1.2.43",
   "code": 167,
   "date": "2026-11-20",
-  "status": "local_checks_passed",
+  "status": "published_verified",
   "scope": [
     "one cloud call to start a catalogued test",
     "deferred recoverable auxiliary answer statistics"
@@ -37,5 +37,14 @@
   "packedResources": 232,
   "packagedStartupChecks": 10,
   "liveGoogleLoadMeasured": false,
-  "productionLearningRecordsUsed": false
+  "productionLearningRecordsUsed": false,
+  "releaseUrl": "https://github.com/windroye590-create/litakova-updates/releases/tag/v1.2.43",
+  "releaseWorkflow": "https://github.com/windroye590-create/litakova-updates/actions/runs/44708444052",
+  "sourceCommit": "f3935cbd9dbacab996f978dd4325de1f53ef0217",
+  "serverBuild": "pc-api26-827aea8c0f867adc",
+  "sha256": "4586de403713da31da4c187dc48506f8af40f6f849c70c04fc53199623843010",
+  "executableBytes": 9870210,
+  "nativeUpdateProtocolChecks": 28,
+  "windowsNativeAudit": "https://github.com/windroye590-create/litakova-updates/actions/runs/44709168210",
+  "windowsNativeAuditPassed": true
 }
