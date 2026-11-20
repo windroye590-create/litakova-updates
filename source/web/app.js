@@ -908,7 +908,7 @@ async function clickAction(button){
  if(act==='sync'){await syncQueue(true);toast(a.pending.length?'Результати залишаються у черзі.':'Чергу надіслано.');return;}
  if(act==='logout'){
   await persist();await syncQueue(true);await accountSync.sync(true);
-  const leave=async()=>{void reviewPresence.stop();await persist();if(typeof secureStorage!=='undefined'&&secureStorage.enabled){await secureStorage.collect().catch(()=>{});try{await secureStorage.lock();}catch(error){if(!secureStorage.status().locked)throw error;toast(error.message);}S.accounts={};checkpoint=null;}S.session=null;resetSessionViews();accountSync.reset();examSession.reset();page='home';lastError='';try{await persist();}finally{render();}};
+  const leave=async()=>{void reviewPresence.stop();modal.close();await persist();if(typeof secureStorage!=='undefined'&&secureStorage.enabled){await secureStorage.collect().catch(()=>{});try{await secureStorage.lock();}catch(error){if(!secureStorage.status().locked)throw error;toast(error.message);}S.accounts={};checkpoint=null;}S.session=null;resetSessionViews();accountSync.reset();examSession.reset();page='home';lastError='';try{await persist();}finally{render();}};
   const cloud=accountSync.status();if(cloud.pending||cloud.conflicts.length||account().pending.length||(!instructor()&&examSession.status().pending))return confirmAction('Зміни ще не надіслані','На іншому ПК ці зміни з’являться після синхронізації. Локальна копія залишиться тут. Вийти зараз?',leave,'Вийти');await leave();return;
  }
  if(act==='new-test'){if(a.draft){page='editor';toast('Відкрито вашу незавершену чернетку.');}else{a.draft=C.newDraft();await persist();page='editor';}render();return;}
