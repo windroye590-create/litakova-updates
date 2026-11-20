@@ -632,7 +632,7 @@ function routeApi_(request) {
   var cadetCardMatch=path.match(/^\/api\/instructor\/cadets\/([^/]+)(\/notes)?$/);
   if(cadetCardMatch){
     var cadetId=decodePart_(cadetCardMatch[1]);
-    if(method==='GET'&&!cadetCardMatch[2])return instructorCadetCard_(cadetId);
+    if(method==='GET'&&!cadetCardMatch[2])return instructorCadetCard_(cadetId,body);
     if(method==='POST'&&cadetCardMatch[2])return addCadetNote_(user,cadetId,body);
   }
 
@@ -3353,16 +3353,19 @@ function cadetNoteFromRow_(row) {
   var data=JSON.parse(String(row[3]||'{}'));
   return {id:String(row[1]),cadetId:String(row[0]),authorId:String(row[2]),authorName:String(data.authorName||''),text:String(data.text||''),createdAt:iso_(row[4])};
 }
-function instructorCadetCard_(id) {
-  var cadet=requireCardCadet_(id),uid=String(cadet.id),groups=listGroups_(),progress=Object.create(null),visited=Object.create(null);
-  dataRows_('materialProgress').forEach(function(row){
-    if(String(row[2])!==uid)return;
-    visited[String(row[0])]=true;var key=String(row[0])+':'+String(row[1]);
-    progress[key]={revision:Number(row[1]),lastPage:Number(row[3]),maxPage:Number(row[4]),pageCount:Number(row[5]),openedAt:iso_(row[6]),updatedAt:iso_(row[7])};
-  });
-  var materials=materialRows_().filter(function(item){return canReadMaterial_(item,cadet,groups)||visited[item.id];}).map(function(item){
-    return {material:publicMaterial_(item),assigned:canReadMaterial_(item,cadet,groups),progress:progress[item.id+':'+item.revision]||null};
-  });
+function instructorCadetCard_(id,options) {
+  var cadet=requireCardCadet_(id),uid=String(cadet.id),materials=[];
+  if(!options||options.includeMaterials!==false){
+    var groups=listGroups_(),progress=Object.create(null),visited=Object.create(null);
+    dataRows_('materialProgress').forEach(function(row){
+      if(String(row[2])!==uid)return;
+      visited[String(row[0])]=true;var key=String(row[0])+':'+String(row[1]);
+      progress[key]={revision:Number(row[1]),lastPage:Number(row[3]),maxPage:Number(row[4]),pageCount:Number(row[5]),openedAt:iso_(row[6]),updatedAt:iso_(row[7])};
+    });
+    materials=materialRows_().filter(function(item){return canReadMaterial_(item,cadet,groups)||visited[item.id];}).map(function(item){
+      return {material:publicMaterial_(item),assigned:canReadMaterial_(item,cadet,groups),progress:progress[item.id+':'+item.revision]||null};
+    });
+  }
   return {cadetCardProtocol:1,cadet:publicUser_(cadet),results:listResults_(uid),tests:listTestsForUser_(cadet),materials:materials,
     recoveries:listExamRecoveries_(cadet,true),notes:dataRows_('cadetNotes').filter(function(row){return String(row[0])===uid;}).map(cadetNoteFromRow_).reverse(),updatedAt:new Date().toISOString()};
 }
