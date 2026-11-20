@@ -702,7 +702,7 @@ function startFastTest(catalog,session,a){
    if(a.run.examProtocol===1&&!examSession.owned(a.run))return resumeRun();
    page='runner';render();
    if(a.run.test.mode==='exam')document.documentElement.requestFullscreen?.().catch(()=>{});
-  })().finally(()=>{flight=null;});return flight;
+  })().catch(x=>{if(x.code==='NETWORK')x.message='Для початку тесту підключіться до інтернету та дочекайтеся відкриття інструктором.';throw x;}).finally(()=>{flight=null;});return flight;
  },'Почати');
 }
 async function start(testId){

@@ -75,6 +75,7 @@ jobs:
           node tests/review-presence-ui.mjs
           node tests/responsive-ui.mjs
           node tests/ui.mjs
+          node tests/test-access-intake-ui.mjs
           node tests/packaged-startup.mjs
       - name: Sign the four public update files
         env:
