@@ -1,0 +1,159 @@
+{
+  "auditedRelease": "1.2.44",
+  "fixTargetVersion": "1.2.45",
+  "baseCommit": "0d69d42",
+  "fixCommit": "3c3eeec7b5950151619428ef3c5ec5c40aef405f",
+  "findings": [
+    {
+      "severity": "low",
+      "kind": "application",
+      "file": "source/web/app.js",
+      "function": "startFastTest",
+      "problem": "The one-request start path showed a generic transport error offline instead of the actionable connection-and-access hint used by the legacy path. The test was not started and its answers were not lost.",
+      "fix": "Retain NETWORK and remap its displayed message for both fast training and exam starts.",
+      "verification": "The existing access/intake UI suite reproduced the issue before the fix and passed all 11 checks after the fix.",
+      "addressed": true
+    },
+    {
+      "severity": "low",
+      "kind": "test-harness",
+      "file": "source/tests/account-sync.mjs",
+      "problem": "The extracted real refresh function used the id helper, but its isolated VM omitted that helper. This produced an id-is-not-defined failure in the optional account-sync test; the application defines the helper.",
+      "fix": "Provide C.id in the VM and remove the unused paused-materials stub.",
+      "verification": "All 25 account synchronization checks passed.",
+      "addressed": true
+    },
+    {
+      "severity": "low",
+      "kind": "verification-coverage",
+      "file": "source/package.json and .github/workflows",
+      "problem": "The default verification omitted the standalone account-sync/workspace-reliability models and the access/intake browser suite.",
+      "fix": "Require both model suites in npm test and the access/intake browser suite in verification and release workflows.",
+      "addressed": true
+    },
+    {
+      "severity": "low",
+      "kind": "browser-test-reliability",
+      "file": "source/tests/responsive-ui.mjs",
+      "problem": "Headless Chromium on GitHub could lose the DevTools async evaluation promise while a large screen redraw was finishing, failing the responsive suite with Resulting promise was garbage collected. Keeping the returned promise globally was insufficient.",
+      "fix": "Start navigation without returning a promise to DevTools; poll an explicit done/error record, retaining navigation errors, a bounded wait, and all layout assertions.",
+      "verification": "All 271 responsive checks passed in pinned headless Chromium locally and on GitHub; all 11 access/intake browser checks and 11 packed-startup checks passed on GitHub as well.",
+      "addressed": true
+    }
+  ],
+  "syntax": {
+    "status": "passed",
+    "files": 147,
+    "counts": {
+      ".py": 35,
+      ".gs": 1,
+      ".mjs": 92,
+      ".js": 19
+    },
+    "errors": []
+  },
+  "nativeParserMalformedCases": 20000,
+  "rankingFuzz": {
+    "status": "passed",
+    "deterministicSeed": 987654321,
+    "rounds": 150,
+    "generatedRecords": 460748,
+    "totalsVerifiedAgainstIndependentOracle": 10648,
+    "sourceMutation": false,
+    "large": {
+      "cadets": 270,
+      "tests": 200,
+      "records": 50000,
+      "cells": 54000,
+      "buildMilliseconds": 101
+    },
+    "roundMaxMilliseconds": 70
+  },
+  "isolatedBrowserStress": {
+    "status": "passed",
+    "kind": "isolated_27_chromium_clients_real_app_and_real_Code_gs",
+    "version": "1.2.44",
+    "productionWrites": false,
+    "liveGoogleCapacityMeasured": false,
+    "windowsRuntimeVerified": false,
+    "clients": 27,
+    "committedResults": 54,
+    "choiceAnswersChecked": 5940,
+    "writtenAnswersChecked": 405,
+    "writtenChars": 1214595,
+    "checks": [
+      "27 separate Chromium sessions initialized with real server authentication",
+      "27 simultaneous 200-question submissions survive BUSY, 429, lost replies and restarts",
+      "All 27 large written submissions stay on disk during a total outage",
+      "Reopening all application windows preserves every offline answer",
+      "Restored connection commits 27 mixed works once, with pending manual grades",
+      "405 large written answers remain byte-for-byte identical in authoritative storage",
+      "Every saved queue is empty only after a server acknowledgement",
+      "No application exceptions, leaked cross-account requests or external traffic"
+    ],
+    "metrics": {
+      "requests": 307,
+      "peakActive": 24,
+      "busy": 9,
+      "quota": 9,
+      "lostReplies": 9,
+      "offlineReplies": 40,
+      "stateWrites": 407
+    },
+    "wallSeconds": 43,
+    "localFinishMilliseconds": {
+      "median": 3095,
+      "p95": 3364
+    }
+  },
+  "productionRecordsDeleted": false,
+  "liveGoogleCapacityMeasured": false,
+  "publicBundleBeforeFixVerified": true,
+  "localFullBrowserSuitePassed": true,
+  "targetedAccessIntakeBrowserChecks": 11,
+  "targetedPublicTableSyncBrowserChecks": 6,
+  "localFullModelSuitePassed": true,
+  "releaseToolsChecks": 46,
+  "accountSyncChecks": 25,
+  "verificationWorkflow": "https://github.com/windroye590-create/litakova-updates/actions/runs/44779757805",
+  "verificationWorkflowPassed": true,
+  "fixCommits": [
+    "3c3eeec7b5950151619428ef3c5ec5c40aef405f",
+    "cf7910940c711a63df27e7761d05e662a80d3f09"
+  ],
+  "status": "completed",
+  "allFindingsAddressed": true,
+  "finalVersion": "1.2.45",
+  "publishedVerification": {
+    "status": "passed",
+    "version": "1.2.45",
+    "code": 169,
+    "releaseUrl": "https://github.com/windroye590-create/litakova-updates/releases/tag/v1.2.45",
+    "latestStableReleaseVerified": true,
+    "allFourPublicFilesMatchChannel": true,
+    "publicCatalogSignatureVerified": true,
+    "offlineStartGuidanceInPublishedExe": true,
+    "materialsReaderAndMenuExcluded": true,
+    "pdfStatementExportAssetsRetained": true,
+    "packedAssetCount": 27,
+    "serverBuild": "pc-api26-cb963e76035cf743",
+    "api": 26,
+    "executableBytes": 3200156,
+    "sha256": "1a849cb0161db6d77a8d0310677a6468700b75cd1f0cffd20c3323c8dd8542de",
+    "sourceCommit": "19a9a348074d0ab43d8585abd06ea13bca8f1c4d",
+    "serverChanged": false,
+    "releaseToolsChecks": 46,
+    "accountSyncChecks": 25,
+    "responsiveBrowserChecks": 271,
+    "accessIntakeBrowserChecks": 11,
+    "packedStartupBrowserChecks": 11,
+    "nativeUpdateProtocolChecks": 28,
+    "windowsNativeStorageChecks": 16,
+    "windowsNativeAuditPassed": true,
+    "releaseWorkflow": "https://github.com/windroye590-create/litakova-updates/actions/runs/44779761932",
+    "verificationWorkflow": "https://github.com/windroye590-create/litakova-updates/actions/runs/44779757805",
+    "windowsNativeAudit": "https://github.com/windroye590-create/litakova-updates/actions/runs/44780618901",
+    "verifiedAt": "2026-11-20T17:11:37.073268+00:00"
+  },
+  "completedAt": "2026-11-20T17:11:37.073407+00:00"
+}
