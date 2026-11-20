@@ -12,7 +12,7 @@ import {createReviewPresence,reviewPresenceMarkup} from './review-presence.js';
 import {createPublicTableSync} from './public-table-sync.js';
 import {importOffice,importQuestionError,OFFICE_MAX_BYTES} from './office-import.js';
 import {statementTests,buildStatement,statementPdf} from './statement.js';
-import {compactResults,buildRanking,searchRanking,rankingTable,rankingCSV} from './results.js';
+import {compactResults,createRankingCache,searchRanking,rankingTable,rankingCSV} from './results.js';
 const $=s=>document.querySelector(s),app=$('#app'),modal=$('#modal');
 // Native browser prompts otherwise follow Windows/browser language, even with lang=uk.
 document.addEventListener('invalid',event=>{
@@ -52,17 +52,18 @@ const e=C.esc,id=C.id;
 const user=()=>S.session?.user;
 const instructor=()=>user()?.role==='instructor';
 const listPages=Object.create(null),cadetViews=new WeakMap(),sharedTestSearches=new WeakMap();
+const cachedRanking=createRankingCache();
 const instructorRequests=new Map();
 function resetPage(name){listPages[name]=1;}
 function paginate(name,items){const p=C.pageSlice(items,listPages[name]);listPages[name]=p.page;return {...p,controls:p.total>C.LIST_PAGE_SIZE?`<nav class="list-pager" aria-label="Сторінки списку"><span role="status">${p.start}–${p.end} із ${p.total}</span><div class="actions"><button data-action="list-page" data-list="${e(name)}" data-index="${p.page-1}" ${p.page===1?'disabled':''}>← Попередні</button><span>Сторінка ${p.page} із ${p.pages}</span><button data-action="list-page" data-list="${e(name)}" data-index="${p.page+1}" ${p.page===p.pages?'disabled':''}>Наступні →</button></div></nav>`:''};}
 const reviewPresence=createReviewPresence({session:()=>S.session,rpc,onChange:updateReviewPresenceUI,clientId:reviewClientId});
 const publicTableSync=createPublicTableSync({session:()=>S.session,account,rpc,changed:()=>{scheduleSave();updatePublicTableSyncUI();}});
-let reviewQueueFlight=null,reviewQueueError='',reviewQueueAt=0,reviewQueueRevision=null,reviewPollFlight=null,reviewPollUnavailableUntil=0,reviewQueueToken='',reviewQueueUpdatedAt=0;
+let reviewQueueFlight=null,reviewQueueError='',reviewQueueAt=0,reviewQueueRevision=null,reviewPollFlight=null,reviewPollUnavailableUntil=0,reviewQueueToken='',reviewQueueUpdatedAt=0,reviewQueueFullAt=0;
 const cadetCard=createCadetCard({account,session:()=>S.session,rpc,persist,render,toast,paginate,resetPage,scheduleSave,openGrading,isOpen:()=>page==='cadet-card'});
 function account(){const k=id(user()?.id),a=S.accounts[k]??= {tests:[],results:[],cadets:[],fullTests:{},pending:[],reviews:{},draft:null,run:null,updatedAt:0,resultTotal:0};a.reviews??={};a.examRecoveries??=[];for(const [rid,draft] of Object.entries(a.gradingDrafts||{})){if(draft?.items&&Object.keys(draft.items).length===0)delete a.gradingDrafts[rid];}{if(!cadetViews.has(a.tests)){const safe=C.cadetTests(a.tests);cadetViews.set(a.tests,safe);cadetViews.set(safe,safe);}a.tests=cadetViews.get(a.tests);}return a;}
 function resetSessionViews(){
  bank=[];audit=[];analytics=null;preview=null;lastResult=null;grading=null;filter='';menuOpen=false;
- reviewQueue=[];examRecoveryQueue=[];reviewQueueFlight=null;reviewQueueToken='';reviewQueueUpdatedAt=0;reviewQueueAt=0;reviewQueueRevision=null;reviewQueueError='';
+ reviewQueue=[];examRecoveryQueue=[];reviewQueueFlight=null;reviewQueueToken='';reviewQueueUpdatedAt=0;reviewQueueFullAt=0;reviewQueueAt=0;reviewQueueRevision=null;reviewQueueError='';
  loadAnalytics.flight=null;loadAnalytics.error='';exportResultsXlsx.flight=null;downloadIntakeArchive.flights?.clear();instructorRequests.clear();
  for(const name of Object.keys(listPages))delete listPages[name];
  modal.close();modal.innerHTML='';
@@ -324,7 +325,7 @@ function pendingReviewsActive(){return instructor()&&resultsView()==='pending';}
 function pendingReviewsPage(){return page==='results'&&pendingReviewsActive();}
 function matchesResultQuery(r){return matchesResult(r)&&[r.userName,r.groupName,r.testTitle].join(' ').toLocaleLowerCase('uk-UA').includes(filter.trim().toLocaleLowerCase('uk-UA'));}
 function filteredResults(){const a=account();return (instructor()?a.results:latestResults(a.results,a.tests,{byGroup:false})).filter(matchesResultQuery);}
-function groupRanking(){const group=selectedGroup();return group?searchRanking(buildRanking(account(),group.name),filter):null;}
+function groupRanking(){const group=selectedGroup();return group?searchRanking(cachedRanking(account(),group.name),filter):null;}
 function pendingReviewBadge(){const known=reviewQueueToken===S.session?.token,count=reviewQueue.filter(matchesResult).length+examRecoveryQueue.filter(matchesResult).length;return `<span id="pending-review-count" class="result-tab-count" title="Робіт у вибраній групі та тесті">${known?count:'…'}</span>`;}
 function resultsTabs(){const selected=resultsView();return `<div class="results-switch" role="tablist" aria-label="Результати та перевірка">${[['compact','Усі результати'],['pending','Очікують перевірки'],['ranking','Рейтинг']].map(([view,label])=>`<button id="results-tab-${view}" role="tab" type="button" data-action="results-view" data-view="${view}" aria-selected="${selected===view}" aria-controls="results-panel" tabindex="${selected===view?0:-1}" class="${selected===view?'selected':''}">${label}${view==='pending'?pendingReviewBadge():''}</button>`).join('')}</div>`;}
 function resultsTable(){
@@ -883,7 +884,7 @@ async function clickAction(button){
   const keepFocus=!!document.activeElement?.closest('.results-switch');a.resultsSearches??={};a.resultsSearches[resultsView()]=filter;
   a.resultsView=button.dataset.view;page='results';filter=a.resultsSearches[resultsView()]||'';await persist();render();
   if(keepFocus)$('#results-tab-'+resultsView())?.focus({preventScroll:true});
-  return pendingReviewsActive()?loadReviewQueue(false,false,true):refreshResults();
+  return pendingReviewsActive()?loadReviewQueue():refreshResults();
  }
  if(act==='review-recovery')return openExamRecovery(tid);
  if(act==='refresh'||act==='sync-account')return updateData();
@@ -1112,18 +1113,34 @@ async function openExamRecovery(recoveryId){
 async function loadReviewQueue(quiet=false,background=false,force=false){
  const token=S.session?.token;if(!token||!instructor()||(quiet&&!background&&!pendingReviewsPage()))return;
  if(background&&!force&&reviewQueueToken===token&&Date.now()-reviewQueueUpdatedAt<30000)return;
- if(reviewQueueFlight?.token===token)return reviewQueueFlight.promise;
- const flight={token,promise:null};reviewQueueFlight=flight;
+ if(reviewQueueFlight?.token===token){
+  const current=reviewQueueFlight;
+  if(force&&current.conditional)return current.forced??=(current.promise.catch(()=>{}).then(()=>{if(S.session?.token===token)return loadReviewQueue(quiet,background,true);}));
+  return current.promise;
+ }
+ const flight={token,promise:null,conditional:false};reviewQueueFlight=flight;
  const resultVersion=account().resultWriteVersion||0;
  flight.promise=(async()=>{const sentAt=performance.now();try{
-  const r=await rpc('GET','/api/instructor/reviews',{},token);if(S.session?.token!==token)return;
-  let extra;try{extra=await rpc('GET','/api/instructor/exam-recoveries',{},token);}catch(x){if(x.code!=='NOT_FOUND')throw x;extra={recoveries:[]};}
+  const known=!force&&reviewQueueToken===token&&Date.now()-reviewQueueFullAt<300000&&typeof reviewQueueRevision==='string'?reviewQueueRevision:null;
+  flight.conditional=known!==null;
+  const r=await rpc('GET','/api/instructor/reviews',{reviewQueueProtocol:2,includeRecoveries:true,...(known===null?{}:{knownResultsRevision:known})},token);if(S.session?.token!==token)return;
+  let extra;
+  if(r.reviewQueueProtocol===2){
+   if(r.unchanged===true){
+    if(known===null||r.resultsRevision!==known||!Array.isArray(r.sessions)||!Number.isFinite(r.serverNow))throw Error('Некоректний стан перевірок.');
+   }else if(!Array.isArray(r.results)||!Array.isArray(r.recoveries))throw Error('Некоректний список перевірок.');
+   extra={recoveries:r.recoveries};
+  }else{try{extra=await rpc('GET','/api/instructor/exam-recoveries',{},token);}catch(x){if(x.code!=='NOT_FOUND')throw x;extra={recoveries:[]};}}
   if(S.session?.token!==token)return;
   if((account().resultWriteVersion||0)!==resultVersion){
    setTimeout(()=>{if(S.session?.token===token)void loadReviewQueue(true,true,true);},0);
    return;
   }
-  reviewQueue=r.results||[];reviewQueueAt=sentAt;reviewQueueRevision=r.resultsRevision??null;reviewQueueError='';examRecoveryQueue=extra.recoveries||[];reviewQueueToken=token;reviewQueueUpdatedAt=Date.now();updateReviewCount();if(pendingReviewsPage())render();
+  if(r.reviewQueueProtocol===2&&r.unchanged===true){
+   const sessions=new Map(r.sessions.map(v=>[String(v.resultId),v]));
+   for(const row of reviewQueue)row.reviewPresence=sessions.get(String(row.id))||{state:'free',serverNow:r.serverNow};
+  }else{reviewQueue=r.results||[];examRecoveryQueue=extra.recoveries||[];reviewQueueFullAt=Date.now();}
+  reviewQueueAt=sentAt;reviewQueueRevision=r.resultsRevision??null;reviewQueueError='';reviewQueueToken=token;reviewQueueUpdatedAt=Date.now();updateReviewCount();if(pendingReviewsPage())render();
  }catch(x){if(S.session?.token!==token)return;reviewQueueError='Не вдалося оновити список. Поточний статус перевірок не підтверджено.';updateReviewCount();if(pendingReviewsPage())render();if(!quiet)throw x;
  }finally{if(reviewQueueFlight===flight)reviewQueueFlight=null;}})();return flight.promise;
 }

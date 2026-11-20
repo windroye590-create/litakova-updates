@@ -131,6 +131,7 @@ function doGet() {
     publicTableSync: true,
     fastTestStart: true,
     deferredResultStats: true,
+    conditionalReviewQueue: true,
     testAccess: true,
     newIntake: true,
     reviewPresence: true,
@@ -2280,6 +2281,18 @@ function listResults_(userId) {
   });
 }
 
+function listPendingReviewResults_() {
+  var sheet=sheet_('results'),count=Math.max(0,sheet.getLastRow()-1);
+  if(count<=DASHBOARD_RESULT_LIMIT)return listResults_(null).filter(function(r){return r.gradingStatus==='pending_review';});
+  // Old graded history is irrelevant to the review queue. Probe one narrow
+  // status column, then read one contiguous span covering pending work.
+  var states=sheet.getRange(2,17,count,1).getValues(),first=-1,last=-1;
+  states.forEach(function(row,i){if(row[0]==='pending_review'){if(first<0)first=i;last=i;}});
+  if(first<0)return [];
+  return readResultSummaries_(sheet,first+2,last-first+1).filter(function(row){return row[0]!==''&&row[16]==='pending_review';})
+    .map(resultFromRow_).sort(function(a,b){return dateMillis_(b.completedAt)-dateMillis_(a.completedAt);});
+}
+
 // List views never need the large answers JSON or the submission key.
 // Keep their column positions so the existing serializer remains compatible.
 function readResultSummaries_(sheet, startRow, count) {
@@ -3646,14 +3659,26 @@ function reviewQueueWithPresence_(user, body) {
   var now = Date.now(), properties = PropertiesService.getScriptProperties();
   var all = properties.getProperties();
   var lookup = {getProperty:function(key){return all[key] || null;}};
-  var results = listResults_(null).filter(function(r){return r.gradingStatus === 'pending_review' && (!body.groupName || r.groupName === body.groupName) && (!body.testId || String(r.testId) === String(body.testId));});
+  var optimized=body.reviewQueueProtocol===2,revision=String(all.LK_REV_results||'0');
+  if(optimized&&!body.groupName&&!body.testId&&typeof body.knownResultsRevision==='string'&&body.knownResultsRevision===revision&&!all.LK_WORKSPACE_WRITE){
+    var sessions=[];
+    Object.keys(all).forEach(function(key){if(key.indexOf(REVIEW_LEASE_PREFIX)===0){
+      var id=decodeURIComponent(key.slice(REVIEW_LEASE_PREFIX.length)),lease=readReviewLease_(id,now,lookup);
+      if(lease)sessions.push(publicReviewLease_(id,lease,user,'',now));
+    }});
+    if(!properties.getProperty('LK_WORKSPACE_WRITE')&&revision===String(properties.getProperty('LK_REV_results')||'0'))
+      return {reviewQueueProtocol:2,unchanged:true,sessions:sessions,serverNow:now,resultsRevision:revision};
+  }
+  var results = listPendingReviewResults_().filter(function(r){return (!body.groupName || r.groupName === body.groupName) && (!body.testId || String(r.testId) === String(body.testId));});
   results.forEach(function(result){
     var lease = readReviewLease_(result.id, now, lookup);
     // Queue readers never receive the private lease credential.
     result.reviewPresence = publicReviewLease_(result.id, lease, user, '', now);
   });
-  var stable = !all.LK_WORKSPACE_WRITE && !properties.getProperty('LK_WORKSPACE_WRITE') && String(all.LK_REV_results || '0') === String(properties.getProperty('LK_REV_results') || '0');
-  return {results:results, reviewPresence:true, serverNow:now, resultsRevision:stable ? String(all.LK_REV_results || '0') : null};
+  var out={results:results,reviewPresence:true,serverNow:now};
+  if(optimized){out.reviewQueueProtocol=2;out.unchanged=false;if(body.includeRecoveries===true)out.recoveries=listExamRecoveries_(user,true);}
+  var stable = !all.LK_WORKSPACE_WRITE && !properties.getProperty('LK_WORKSPACE_WRITE') && revision === String(properties.getProperty('LK_REV_results') || '0');
+  out.resultsRevision=stable?revision:null;return out;
 }
 function reviewPresenceSnapshot_(user) {
   var properties=PropertiesService.getScriptProperties(),all=properties.getProperties(),now=Date.now(),sessions=[];
@@ -4170,6 +4195,8 @@ var LKReport_=(function(){
 // A replacement is another version of the same test. A separately created
 // test keeps its own identity, even when its title happens to be identical.
 const identity=value=>String(value??'');
+// Some Apps Script runtimes omit Intl; the same module is embedded in Code.gs.
+const compareIds=typeof Intl==='object'&&typeof Intl.Collator==='function'?new Intl.Collator('en',{numeric:true}).compare:(a,b)=>a.localeCompare(b,'en',{numeric:true});
 function testSeriesResolver(tests=[]) {
  const parents=new Map();
  for(const test of tests)if(identity(test.id))parents.set(identity(test.id),identity(test.canonicalTestId||test.replacesId||test.id));
@@ -4187,7 +4214,7 @@ function resultTestKey(result,resolve=value=>identity(value)) {
 }
 function compareAttempts(a,b) {
  return (Date.parse(a.completedAt)||0)-(Date.parse(b.completedAt)||0)
-  ||identity(a.id).localeCompare(identity(b.id),'en',{numeric:true});
+  ||compareIds(identity(a.id),identity(b.id));
 }
 function latestResults(results,tests=[],{byGroup=true}={}) {
  const resolve=testSeriesResolver(tests),latest=new Map();
