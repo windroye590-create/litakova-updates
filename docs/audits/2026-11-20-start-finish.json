@@ -1,0 +1,41 @@
+{
+  "version": "1.2.43",
+  "code": 167,
+  "date": "2026-11-20",
+  "status": "local_checks_passed",
+  "scope": [
+    "one cloud call to start a catalogued test",
+    "deferred recoverable auxiliary answer statistics"
+  ],
+  "trainingStartCloudCalls": {
+    "legacyFallback": 3,
+    "fastPath": 1
+  },
+  "newOwnedExamStartCloudCalls": 1,
+  "serverAccessChecksPreserved": true,
+  "serverExamClockAndOwnershipPreserved": true,
+  "resultCommit": "Authoritative result, full normalized answers and pending flag append in one row",
+  "backgroundWork": "Bounded authenticated publication worker reconciles ledger and per-question rows before acknowledging the pending flag",
+  "recovery": [
+    "lost acknowledgement",
+    "partially written batch",
+    "duplicate derived rows",
+    "manual report repair",
+    "deletion before background work",
+    "archived test definitions",
+    "historical rows without snapshots"
+  ],
+  "compatibility": "API 26; old start flow retained when capability is absent; historical immediate-publication clients retain their behavior",
+  "modelChecks": 19,
+  "browserChecks": 5,
+  "syntheticCadets": 20,
+  "questionsPerTest": 50,
+  "derivedQuestionRows": 1000,
+  "criticalAuxiliaryWrites": 0,
+  "fullNpmTestPassed": true,
+  "releaseToolChecks": 46,
+  "packedResources": 232,
+  "packagedStartupChecks": 10,
+  "liveGoogleLoadMeasured": false,
+  "productionLearningRecordsUsed": false
+}

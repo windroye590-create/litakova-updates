@@ -687,8 +687,36 @@ async function openNewIntake(){
 }
 async function fetchTest(testId,force=false){const session=S.session,a=account();if(!force&&a.fullTests[id(testId)])return a.fullTests[id(testId)];const r=await rpc('GET','/api/tests/'+encodeURIComponent(testId),{},session.token);a.fullTests[id(testId)]=r.test;await persist();if(S.session?.token!==session.token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});return r.test;}
 async function downloadTest(testId){await fetchTest(testId,true);toast('Тест збережено для офлайну.');if(page==='tests')render();}
+function startFastTest(catalog,session,a){
+ const current=()=>S.session?.token===session.token&&account()===a;
+ const submissionId='pc-'+crypto.randomUUID();let flight=null;
+ confirmAction(catalog.mode==='exam'?'Почати іспит?':'Почати тренування?',`${e(catalog.title)}<br>${catalog.questionCount} питань${catalog.mode==='exam'?', '+catalog.durationMinutes+' хвилин. Переходи до інших вікон фіксуються. Відповіді зберігаються в акаунті. Можна продовжити на іншому ПК; таймер продовжує відлік.':'. Відповіді синхронізуються з акаунтом.'}`,()=>{
+  if(!current())return;if(flight)return flight;
+  flight=(async()=>{
+   if(catalog.mode==='exam')await examSession.start(catalog.id);
+   else{
+    const reply=await rpc('POST','/api/tests/'+encodeURIComponent(catalog.id)+'/start',{submissionId},session.token);
+    if(!current())return;
+    const test=reply.test;
+    if(reply.submissionId!==submissionId||id(test?.id)!==id(catalog.id)||test.mode!=='training'||C.isRetakeTest(test)||!Array.isArray(test.questions)||!test.questions.length||test.questions.length>200||test.questions.some(q=>!id(q?.id)||!Array.isArray(q.answers))||typeof reply.startPermit!=='string'||!reply.startPermit.includes('.'))throw Error('Сервер не підтвердив початок цієї спроби.');
+    const now=await getClock();if(!current())return;
+    a.fullTests[id(test.id)]=test;
+    a.run={test:C.shuffled(test),startPermit:reply.startPermit,answers:{},index:0,startedUptime:now.uptime,launchId:now.launchId,submissionId,exitCount:0,userId:id(session.user.id)};
+    await persist();
+   }
+   if(!current()||!a.run)return;
+   // An accepted new exam already has its owner, fence and server clock.
+   // Claiming it again would add discovery/save requests before question one.
+   if(a.run.examProtocol===1&&!examSession.owned(a.run))return resumeRun();
+   page='runner';render();
+   if(a.run.test.mode==='exam')document.documentElement.requestFullscreen?.().catch(()=>{});
+  })().finally(()=>{flight=null;});return flight;
+ },'Почати');
+}
 async function start(testId){
  const session=S.session,a=account();if(!session)return;if(C.isRetakeTest(a.tests.find(t=>id(t.id)===id(testId)))||C.isRetakeTest(a.fullTests[id(testId)]))throw Error('Повторне проходження тестів недоступне.');if(a.run)return resumeRun();if(C.completed(testId,a.results,a.pending,null,a.deletedTestIds)||a.examRecoveries?.some(x=>id(x.testId)===id(testId)))throw Error('Цей тест уже пройдено або робота очікує підтвердження.');
+ const quick=a.tests.find(t=>id(t.id)===id(testId));
+ if(a.capabilities?.fastTestStart===true&&a.capabilities?.multipleChoice&&quick&&['training','exam'].includes(quick.mode)&&Number.isInteger(quick.questionCount)&&quick.questionCount>0&&quick.questionCount<=200)return startFastTest(quick,session,a);
  await refresh();if(S.session?.token!==session.token)return;if(C.completed(testId,a.results,a.pending,null,a.deletedTestIds))throw Error('Цей тест уже пройдено на іншому пристрої.');
  const catalogTest=a.tests.find(t=>id(t.id)===id(testId));if(catalogTest?.access?.open===false)throw Error('Тест закрито. Дочекайтеся відкриття інструктором.');const test=await fetchTest(testId);if(S.session?.token!==session.token)return;if(C.isRetakeTest(test))throw Error('Повторне проходження тестів недоступне.');if(!test.questions?.length)throw Error('У тесті немає питань.');if(!a.capabilities?.multipleChoice)throw Error('Для вибору до двох відповідей оновіть серверний Code.gs до API 14.');
  confirmAction(test.mode==='exam'?'Почати іспит?':'Почати тренування?',`${e(test.title)}<br>${test.questions.length} питань${test.mode==='exam'?', '+test.durationMinutes+' хвилин. Переходи до інших вікон фіксуються. Відповіді зберігаються в акаунті. Можна продовжити на іншому ПК; таймер продовжує відлік.':'. Відповіді синхронізуються з акаунтом.'}`,async()=>{

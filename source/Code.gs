@@ -16,8 +16,8 @@ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
 const PUBLIC_SYNC_DELAY_MS = 30000;
 const REVIEW_LEASE_MS = 120000;
 const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
-const LATEST_APP_VERSION_CODE = 166;
-const LATEST_APP_VERSION_NAME = '1.2.42';
+const LATEST_APP_VERSION_CODE = 167;
+const LATEST_APP_VERSION_NAME = '1.2.43';
 const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
 const ROLE_INSTRUCTOR = 'instructor';
 const ROLE_CADET = 'cadet';
@@ -129,6 +129,8 @@ function doGet() {
     privateLocalStorage: true,
     trainingResume: true,
     publicTableSync: true,
+    fastTestStart: true,
+    deferredResultStats: true,
     testAccess: true,
     newIntake: true,
     reviewPresence: true,
@@ -210,7 +212,7 @@ function doPost(e) {
     // Older clients retain their original immediate-publication behavior.
     deferPublicSync_ = request && request.deliveryProtocol === 1 && request.action === 'api'
       && String(request.method).toUpperCase() === 'POST'
-      && (request.path === '/api/results' || /^\/api\/exam-session\//.test(String(request.path)));
+      && (request.path === '/api/results' || /^\/api\/exam-session\//.test(String(request.path)) || /^\/api\/tests\/[^/]+\/start$/.test(String(request.path)));
     var mutation = requiresWriteLock_(request);
     if (mutation) {
       lock = LockService.getScriptLock();
@@ -539,7 +541,7 @@ function workspaceRevisions_(user,all) {
 function conditionalWorkspace_(user,body) {
   var all=body.allResults===true,known=body.known||{},before=workspaceRevisions_(user,all),props=PropertiesService.getScriptProperties();
   var busy=props.getProperty('LK_WORKSPACE_WRITE'),changes={},out={workspaceProtocol:1,user:publicUser_(user),revisions:before,changes:changes,
-    capabilities:{singleAttempt:true,deletedAttemptRetakes:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true,formattedReports:true,intakeArchives:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
+    capabilities:{fastTestStart:true,deferredResultStats:true,singleAttempt:true,deletedAttemptRetakes:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true,formattedReports:true,intakeArchives:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
   if(user.role===ROLE_INSTRUCTOR)out.intake=intakeStatus_();
   if(known.groups!==before.groups)changes.groups=listGroups_();
   if(known.tests!==before.tests)changes.tests=listTestsForUser_(user);
@@ -1162,6 +1164,13 @@ function repairPublicResults_() {
   var info = resultsSheetInfo_();
   info.synced = true;
   info.resultCount = results.length;
+  // Manual publication must not erase a pending obligation to build statistics.
+  if(flags.some(function(flag){return flag[0]==='pending';})){
+    var pendingIds=resultSheet.getRange(2,1,resultRows,1).getValues();
+    flags.forEach(function(flag,index){var result=resultsById[String(pendingIds[index][0])];
+      if(flag[0]==='pending'&&result)ensureResultAuxiliaries_(result,resultSheet.getRange(index+2,1,1,HEADERS.results.length).getValues()[0]);
+    });
+  }
   if(resultRows)resultSheet.getRange(2,PUBLIC_SYNC_COLUMN,resultRows,1).setValues(flags.map(function(row){
     return row[0]===RESULT_DELETING?row:[''];
   }));
@@ -1254,14 +1263,17 @@ function publicSyncStatus_(user) {
   var retry=Number(PropertiesService.getScriptProperties().getProperty(PUBLIC_SYNC_RETRY)||0);
   return {protocol:1,state:count?'pending':'synced',pendingCount:count,retryAfterSeconds:count?Math.max(0,Math.ceil((retry-Date.now())/1000)):0};
 }
-function publishCommittedResult_(result,rowNumber) {
+function publishCommittedResult_(result,rowNumber,storedRow) {
   if(cadetDeletionPending_(result.userId))return false;
   var sheet=sheet_('results');
   if(sheet.getRange(rowNumber,PUBLIC_SYNC_COLUMN).getValue()!=='pending')return true;
   if(deferPublicSync_)return false;
   var properties=PropertiesService.getScriptProperties();
   if(Number(properties.getProperty(PUBLIC_SYNC_RETRY)||0)>Date.now())return false;
-  var synced=tryPublicWrite_(function(){publishVisibleResult_(result);});
+  var synced=tryPublicWrite_(function(){
+    if(storedRow!==false)ensureResultAuxiliaries_(result,storedRow||sheet.getRange(rowNumber,1,1,HEADERS.results.length).getValues()[0]);
+    publishVisibleResult_(result);
+  });
   if(synced) {
     try{sheet.getRange(rowNumber,PUBLIC_SYNC_COLUMN).setValue('');}catch(error){synced=false;}
   }
@@ -1303,7 +1315,7 @@ function drainPublicResults_(lockHeld,limit) {
       }
       var row=sheet.getRange(entry.row,1,1,HEADERS.results.length).getValues()[0];
       if(String(row[0])!==entry.id||row[PUBLIC_SYNC_COLUMN-1]!=='pending')continue;
-      if(!publishCommittedResult_(resultFromRow_(row),entry.row))break;
+      if(!publishCommittedResult_(resultFromRow_(row),entry.row,row))break;
     }
   }finally{if(ownLock)ownLock.releaseLock();}
 }
@@ -2133,17 +2145,10 @@ function submitResult_(user, body, examSource, recoveryApproval) {
   invalidatePublicSync_();
   // The result is committed. Failures in auxiliary sheets must not turn an
   // accepted attempt into an apparent failure or cause a duplicate submission.
-  tryAuxiliaryWrite_('Ключ синхронізації', function () {
+  if(!deferPublicSync_)tryAuxiliaryWrite_('Ключ синхронізації', function () {
     sheet_('sync').appendRow([safeCellText_(submissionId || ('result-' + result.id)), 'result:' + result.id, completedAt]);
   });
-  var detailRows = (test.questions || []).filter(function(q){return !isWritten_(q);}).map(function (question) {
-    var right = (question.answers || []).filter(function (answer) { return answer.isCorrect === true; })[0];
-    var selectedId = selected[String(question.id)] || '0';
-    return [
-      result.id, result.userId, result.testId, safeCellText_(result.testTitle), question.id,
-      safeCellText_(String(question.text || '')), choiceCorrect_(question,selectedId), completedAt
-    ];
-  });
+  var detailRows = deferPublicSync_?[]:resultDetailRows_(result,test,selected,completedAt);
   if (detailRows.length) {
     tryAuxiliaryWrite_('Деталі відповідей', function () {
       var detailSheet = sheet_('resultDetails');
@@ -2152,8 +2157,47 @@ function submitResult_(user, body, examSource, recoveryApproval) {
       detailSheet.getRange(startRow, 1, detailRows.length, HEADERS.resultDetails.length).setValues(detailRows);
     });
   }
-  var tableSynced = publishCommittedResult_(result,committedRow);
+  // Older clients already attempted the auxiliary writes above. Keep their
+  // original publication behavior; deferred clients leave the durable flag.
+  var tableSynced = publishCommittedResult_(result,committedRow,false);
   return {result: result, review: buildResultReview_(user, result, test, selected, {}), practice: mistakePractice_(result, test, selected, null), tableSynced: tableSynced};
+}
+
+function resultDetailRows_(result,test,selected,completedAt) {
+  return (test.questions||[]).filter(function(q){return !isWritten_(q);}).map(function(question){
+    return [result.id,result.userId,result.testId,safeCellText_(result.testTitle),question.id,
+      safeCellText_(String(question.text||'')),choiceCorrect_(question,selected[String(question.id)]||'0'),completedAt];
+  });
+}
+// The result row already contains the complete answers and the pending flag.
+// A bounded, authenticated publication worker can rebuild these derived rows
+// after a crash. All callers hold the same lock as deletion and intake cleanup.
+function ensureResultAuxiliaries_(result,row) {
+  if(String(row[0])!==String(result.id)||row[PUBLIC_SYNC_COLUMN-1]!== 'pending')return;
+  var key=String(row[12]||('result-'+result.id)),kind='result:'+String(result.id);
+  if(!dataRows_('sync').some(function(item){return String(item[0])===key&&String(item[1])===kind;}))
+    sheet_('sync').appendRow([safeCellText_(key),kind,new Date(result.completedAt)]);
+  // Historical imports can have a score and old details but no immutable
+  // answer snapshot. Never replace those details with invented empty answers.
+  if(row[13]===''||row[13]==null)return;
+  var selected;try{selected=JSON.parse(String(row[13]||'{}'));}catch(error){fail_('Не вдалося прочитати збережені відповіді для статистики.','RESULT_DATA_INCOMPLETE');}
+  if(!selected||Array.isArray(selected)||typeof selected!=='object')fail_('Некоректний знімок відповідей для статистики.','RESULT_DATA_INCOMPLETE');
+  if(!Object.keys(selected).length)return;
+  var test=getTestById_(result.testId);if(!test)fail_('Не знайдено питання для статистики збереженої роботи.','TEST_DATA_INCOMPLETE');
+  var expected=resultDetailRows_(result,test,selected,new Date(result.completedAt)),wanted=Object.create(null),seen=Object.create(null),remove=[];
+  expected.forEach(function(item){wanted[String(item[4])]=item;});
+  var detailSheet=sheet_('resultDetails');
+  dataRows_('resultDetails').forEach(function(item,index){
+    if(String(item[0])!==String(result.id))return;
+    var qid=String(item[4]),value=wanted[qid];
+    if(!value||seen[qid]){remove.push(index+2);return;}
+    seen[qid]=true;
+    var same=value.every(function(v,i){var old=item[i];return v instanceof Date&&old instanceof Date?v.getTime()===old.getTime():String(v)===String(old);});
+    if(!same)detailSheet.getRange(index+2,1,1,HEADERS.resultDetails.length).setValues([value]);
+  });
+  remove.sort(function(a,b){return b-a;}).forEach(function(number){detailSheet.deleteRow(number);});
+  var missing=expected.filter(function(item){return !seen[String(item[4])];});
+  if(missing.length){var first=detailSheet.getLastRow()+1;ensureRowCapacity_(detailSheet,first+missing.length-1);detailSheet.getRange(first,1,missing.length,HEADERS.resultDetails.length).setValues(missing);}
 }
 
 function examRecoveryFromRow_(row) {
