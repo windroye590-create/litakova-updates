@@ -78,11 +78,18 @@ async function audit(name){
 }
 async function allSizes(name){for(const size of sizes){await page.setViewportSize(size);await audit(name+` ${size.width}×${size.height}`);}}
 async function navigate(next){
- // DevTools can lose its weak reference while an unrooted async evaluation is
- // awaiting a save. Retain the real navigation promise until it settles; errors
- // still reject the check and every layout assertion below still runs.
- await page.evaluate(n=>globalThis.__responsiveNavigation=(async()=>(await import('/app.js')).navigate(n))(),next);
- await page.evaluate(()=>{delete globalThis.__responsiveNavigation;});
+ // Avoid DevTools awaiting a transient promise during a large screen redraw.
+ // Poll an explicit completion record instead, preserving navigation errors and
+ // keeping the timeout and every layout assertion below active.
+ await page.evaluate(n=>{
+  const state={done:false,error:''};globalThis.__responsiveNavigation=state;
+  state.promise=import('/app.js').then(app=>app.navigate(n)).then(
+   ()=>{state.done=true;},error=>{state.error=String(error?.stack||error);state.done=true;}
+  );
+ },next);
+ await page.waitForFunction(()=>globalThis.__responsiveNavigation?.done===true);
+ const error=await page.evaluate(()=>{const error=globalThis.__responsiveNavigation.error;delete globalThis.__responsiveNavigation;return error;});
+ assert.equal(error,'','Navigation to '+next+' must complete successfully');
 }
 const action=act=>page.locator(`button[data-action="${act}"]`).first().click();
 try{
