@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "date": "2026-11-20",
+  "scope": "Google ranking worksheet formulas only",
+  "applicationUpdateRequired": false,
+  "appRankingChanged": false,
+  "sourceResultRowsPreserved": 59,
+  "participants": 20,
+  "places": "1..20",
+  "sortOrder": [
+    "correct answers descending",
+    "completed tests descending",
+    "missing durations ascending",
+    "sum of latest-attempt durations ascending",
+    "stable user and group identity"
+  ],
+  "durationDisplay": "minutes:seconds; e.g. 17:23",
+  "latestRetakeOnly": true,
+  "missingTimeShownAsDash": true,
+  "independentCalculationMatches": true,
+  "syntheticUsers": 7,
+  "syntheticCases": [
+    "higher score first",
+    "equal score uses completed count",
+    "equal score and count uses lower elapsed time",
+    "latest lower retake replaces old work and duration",
+    "missing time does not count as a zero-speed advantage",
+    "fully tied records keep deterministic identity order"
+  ],
+  "formulaErrors": 0,
+  "sourceResultsUnchanged": true,
+  "originalColumnsStyleUnchanged": true,
+  "bandingExtendedToNewColumns": true,
+  "scratchCleared": true,
+  "visualVerification": "Google Sheets API: preserved existing typography and header colors; new columns copy their neighbor; elapsed times verified as readable text; isolated browser has no authenticated Google session"
+}
