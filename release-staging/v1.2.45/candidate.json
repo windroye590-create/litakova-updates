@@ -1,0 +1,9 @@
+{
+  "version": "1.2.45",
+  "code": 169,
+  "sourceZipSHA256": "c40ba08ac997fb320d4a1033a582f3a651c88fa673a2cd4dc59d45184c5bf467",
+  "exeSHA256": "1a849cb0161db6d77a8d0310677a6468700b75cd1f0cffd20c3323c8dd8542de",
+  "serverWillChange": false,
+  "targetServerBuild": "pc-api26-cb963e76035cf743",
+  "initialCommit": "cf7910940c711a63df27e7761d05e662a80d3f09"
+}
