@@ -77,7 +77,13 @@ async function audit(name){
  checks.push(name);
 }
 async function allSizes(name){for(const size of sizes){await page.setViewportSize(size);await audit(name+` ${size.width}×${size.height}`);}}
-async function navigate(next){await page.evaluate(async n=>(await import('/app.js')).navigate(n),next);}
+async function navigate(next){
+ // DevTools can lose its weak reference while an unrooted async evaluation is
+ // awaiting a save. Retain the real navigation promise until it settles; errors
+ // still reject the check and every layout assertion below still runs.
+ await page.evaluate(n=>globalThis.__responsiveNavigation=(async()=>(await import('/app.js')).navigate(n))(),next);
+ await page.evaluate(()=>{delete globalThis.__responsiveNavigation;});
+}
 const action=act=>page.locator(`button[data-action="${act}"]`).first().click();
 try{
  await open('instructor');
