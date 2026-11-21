@@ -1,0 +1,165 @@
+{
+  "server": {
+    "status": "passed",
+    "passed": 8,
+    "checks": [
+      "A large training start serializes outside the lock and exposes no answer key",
+      "A training result flushes and commits its cursor before unlocked review construction",
+      "A large exam copies its public snapshot after unlocking while preserving all question IDs",
+      "Exam completion keeps both durable writes locked and builds review and response after unlocking",
+      "Retrying an exam completion after a lost response returns exactly one saved result",
+      "A failed training flush cannot acknowledge a result or clear its recovery obligation",
+      "Response construction failure preserves the committed work for an idempotent retry",
+      "Legacy clients retain their complete response and original locked presentation path"
+    ],
+    "measurements": {
+      "trainingStart": {
+        "events": [
+          "lock",
+          "unlock",
+          "serialize"
+        ],
+        "flushes": 0,
+        "publicCopies": [],
+        "reviewLocks": [],
+        "serializations": [
+          false
+        ],
+        "postUnlockReads": 0
+      },
+      "trainingFinish": {
+        "events": [
+          "lock",
+          "flush",
+          "unlock",
+          "review",
+          "serialize"
+        ],
+        "flushes": 1,
+        "publicCopies": [],
+        "reviewLocks": [
+          false
+        ],
+        "serializations": [
+          false
+        ],
+        "postUnlockReads": 0
+      },
+      "examStart": {
+        "events": [
+          "lock",
+          "flush",
+          "unlock",
+          "public-copy",
+          "serialize"
+        ],
+        "flushes": 1,
+        "publicCopies": [
+          false
+        ],
+        "reviewLocks": [],
+        "serializations": [
+          false
+        ],
+        "postUnlockReads": 0
+      },
+      "syntheticWire": {
+        "plainBytes": 927383,
+        "gzipBytes": 11575
+      },
+      "examFinish": {
+        "events": [
+          "lock",
+          "flush",
+          "flush",
+          "unlock",
+          "review",
+          "public-copy",
+          "serialize"
+        ],
+        "flushes": 2,
+        "publicCopies": [
+          false
+        ],
+        "reviewLocks": [
+          false
+        ],
+        "serializations": [
+          false
+        ],
+        "postUnlockReads": 0
+      },
+      "failedTrainingFlush": {
+        "events": [
+          "lock",
+          "flush",
+          "serialize",
+          "unlock"
+        ],
+        "flushes": 1,
+        "publicCopies": [],
+        "reviewLocks": [],
+        "serializations": [
+          true
+        ],
+        "postUnlockReads": 0,
+        "failFlush": false
+      },
+      "legacyTrainingFinish": {
+        "events": [
+          "lock",
+          "review",
+          "serialize",
+          "unlock"
+        ],
+        "flushes": 0,
+        "publicCopies": [],
+        "reviewLocks": [
+          true
+        ],
+        "serializations": [
+          true
+        ],
+        "postUnlockReads": 0
+      }
+    },
+    "questions": 200,
+    "actualAppsScriptExecuted": true,
+    "liveGoogleLoadMeasured": false,
+    "productionRequests": 0
+  },
+  "native": {
+    "status": "passed",
+    "passed": 11,
+    "actualCommissionRequestExecuted": true,
+    "winHttpDecompressionOption": 118,
+    "gzipOnlyFlag": 1,
+    "decodedLimitBytes": 8388608,
+    "unsupportedOptionPlainFallback": true,
+    "requestBytesPreserved": true,
+    "addressSanitizer": true,
+    "undefinedBehaviorSanitizer": true,
+    "actualWindowsNetworkExecuted": false
+  },
+  "windowsHTTP": {
+    "status": "passed",
+    "passed": 5,
+    "checks": [
+      "Exact 200-question Unicode response: /plain",
+      "Exact 200-question Unicode response: /gzip",
+      "Exact 200-question Unicode response: /redirect",
+      "Rejected invalid or oversized decoded response: /broken",
+      "Rejected invalid or oversized decoded response: /expanded"
+    ],
+    "actualWindowsWinHTTPExecuted": true,
+    "gzipVerified": true,
+    "redirectVerified": true,
+    "postBytesUnchanged": true,
+    "decodedLimitBytes": 8388608,
+    "plainBytes": 1178614,
+    "syntheticGzipBytes": 6785,
+    "decodedSha256": "48cf5f8a582c06502d8d5c456d1f36624e7b4687fcafe5a7cd9e35e0b518b093",
+    "productionRPCRequests": 0,
+    "liveGoogleCompressionMeasured": false
+  }
+}
