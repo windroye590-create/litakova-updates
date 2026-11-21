@@ -30,7 +30,7 @@ static HINTERNET WinHttpOpen(const WCHAR*a,DWORD b,void*c,void*d,DWORD e){assert
 static BOOL WinHttpSetTimeouts(HINTERNET a,int b,int c,int d,int e){return 1;}
 static HINTERNET WinHttpConnect(HINTERNET a,const WCHAR*b,unsigned short c,DWORD d){assert(wcscmp(b,L"script.google.com")==0&&c==443);return (void*)2;}
 static HINTERNET WinHttpOpenRequest(HINTERNET a,const WCHAR*b,const WCHAR*c,void*d,void*e,void*f,DWORD g){assert(wcscmp(b,L"POST")==0&&g==0x00800000);assert(wcsstr(c,L"/macros/s/")==c);return mode==10?0:(void*)3;}
-static BOOL WinHttpSetOption(HINTERNET a,DWORD option,void*value,DWORD size){assert(a==(void*)3&&option==118&&size==4&&*(DWORD*)value==3);assert(sends==0);options++;return mode!=1;}
+static BOOL WinHttpSetOption(HINTERNET a,DWORD option,void*value,DWORD size){assert(a==(void*)3&&option==118&&size==4&&*(DWORD*)value==1);assert(sends==0);options++;return mode!=1;}
 static BOOL WinHttpSendRequest(HINTERNET a,const WCHAR*b,DWORD c,void*d,DWORD e,DWORD f,uint64_t g){assert(options==1);assert(!wcsstr(b,L"Accept-Encoding"));assert(e==f&&e==strlen(d)&&strcmp(d,"{\"submissionId\":\"synthetic-stable-id\"}")==0);sends++;return 1;}
 static BOOL WinHttpReceiveResponse(HINTERNET a,void*b){return mode!=6;}
 static BOOL WinHttpQueryHeaders(HINTERNET a,DWORD b,void*c,void*d,DWORD*e,void*f){*(DWORD*)d=mode==7?429:200;return 1;}
@@ -69,7 +69,7 @@ with tempfile.TemporaryDirectory(prefix='lk-native-http-') as directory:
     assert completed.returncode == 0, completed.stderr
     print(completed.stdout, end='')
 report = {'status': 'passed', 'passed': 11, 'actualCommissionRequestExecuted': True,
-          'winHttpDecompressionOption': 118, 'gzipAndDeflateFlags': 3,
+          'winHttpDecompressionOption': 118, 'gzipOnlyFlag': 1,
           'decodedLimitBytes': 8 * 1024 * 1024, 'unsupportedOptionPlainFallback': True,
           'requestBytesPreserved': True, 'addressSanitizer': True,
           'undefinedBehaviorSanitizer': True, 'actualWindowsNetworkExecuted': False}

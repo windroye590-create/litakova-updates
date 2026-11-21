@@ -92,7 +92,7 @@ def request(port, path, compressed=True):
         connection = ok(api.WinHttpConnect(session, '127.0.0.1', port, 0))
         handle = ok(api.WinHttpOpenRequest(connection, 'POST', path, None, None, None, 0))
         if compressed:
-            flags = W.DWORD(3)
+            flags = W.DWORD(1)
             ok(api.WinHttpSetOption(handle, 118, ctypes.byref(flags), ctypes.sizeof(flags)))
         body = ctypes.create_string_buffer(BODY)
         ok(api.WinHttpSendRequest(handle, 'Content-Type: application/json; charset=utf-8\r\nAccept: application/json\r\n', 0xffffffff, body, len(BODY), len(BODY), 0))
@@ -127,7 +127,7 @@ server.daemon_threads = True
 thread = threading.Thread(target=server.serve_forever, daemon=True)
 thread.start()
 try:
-    for name, compressed in [('/plain', False), ('/gzip', True), ('/deflate', True), ('/redirect', True)]:
+    for name, compressed in [('/plain', False), ('/gzip', True), ('/redirect', True)]:
         actual = request(server.server_port, name, compressed)
         assert actual == payload
         assert len(json.loads(actual)['test']['questions']) == 200
@@ -146,7 +146,7 @@ try:
             raise AssertionError('Invalid compressed data was accepted: ' + path)
     assert posts and all(value == BODY for value in posts)
     report = {'status': 'passed', 'passed': len(checks), 'checks': checks,
-              'actualWindowsWinHTTPExecuted': True, 'gzipAndDeflateVerified': True,
+              'actualWindowsWinHTTPExecuted': True, 'gzipVerified': True,
               'redirectVerified': True, 'postBytesUnchanged': True,
               'decodedLimitBytes': LIMIT, 'plainBytes': len(payload),
               'syntheticGzipBytes': len(packets['/gzip'][0]),
