@@ -108,6 +108,7 @@ var publicResultsSpreadsheetCache_ = null;
 var publicResultsSheetCache_ = null;
 var publicLayouts_ = [];
 var resultSeriesCache_ = null;
+var resultLookupCache_ = null;
 var testAccessCache_ = null;
 var testAccessGroupsCache_ = null;
 var publicSyncActor_ = null;
@@ -131,6 +132,7 @@ function doGet() {
     publicTableSync: true,
     fastTestStart: true,
     deferredResultStats: true,
+    cadetCriticalPath: true,
     conditionalReviewQueue: true,
     testAccess: true,
     newIntake: true,
@@ -196,6 +198,7 @@ function setAppDownloadUrl(url, versionCode, versionName) {
 
 function doPost(e) {
   resultSeriesCache_ = null;
+  resultLookupCache_ = null;
   workspaceMutation_ = null; workspaceWriteRequest_ = false;
   deferPublicSync_ = false;
   deletedRetakeRequest_ = false; deletedRetakeEpochs_ = null;
@@ -209,11 +212,13 @@ function doPost(e) {
     if (raw.length > MAX_API_REQUEST_JSON_LENGTH) fail_('Запит перевищує дозволений розмір.', 'PAYLOAD_TOO_LARGE');
     var request = JSON.parse(raw);
     deletedRetakeRequest_ = Boolean(request && request.retakeProtocol === 1);
-    // Acknowledging answers must not wait for the separately published report.
+    // Attempt traffic must not wait for the separately published report.
     // Older clients retain their original immediate-publication behavior.
     deferPublicSync_ = request && request.deliveryProtocol === 1 && request.action === 'api'
-      && String(request.method).toUpperCase() === 'POST'
-      && (request.path === '/api/results' || /^\/api\/exam-session\//.test(String(request.path)) || /^\/api\/tests\/[^/]+\/start$/.test(String(request.path)));
+      && (String(request.method).toUpperCase() === 'POST'
+        && (request.path === '/api/results' || /^\/api\/exam-session\//.test(String(request.path)) || /^\/api\/tests\/[^/]+\/start$/.test(String(request.path))
+          || request.path === '/api/account-state/document' && request.body && request.body.key === 'training')
+        || String(request.method).toUpperCase() === 'GET' && request.path === '/api/exam-session');
     var mutation = requiresWriteLock_(request);
     if (mutation) {
       lock = LockService.getScriptLock();
@@ -238,8 +243,16 @@ function doPost(e) {
       // A bounded worker runs only after authentication and a successful API
       // operation. It uses the same script lock as result/grade mutations.
       try {
-        if (!deferPublicSync_) drainPublicResults_(Boolean(lock), 2);
-        response.publicTableSync = publicSyncStatus_(publicSyncActor_);
+        if (!deferPublicSync_) {
+          drainPublicResults_(Boolean(lock), 2);
+          response.publicTableSync = publicSyncStatus_(publicSyncActor_);
+        } else {
+          // Starting/saving an attempt must not scan every result and account
+          // just to update a report badge. A committed result carries its own
+          // durable publication flag; the next authenticated poll counts it.
+          var publication = response.completion || response;
+          if (publication.tableSynced === false) response.tableSynced = false;
+        }
       } catch (syncError) {
         response.publicTableSync = {protocol:1,state:'pending',pendingCount:1,retryAfterSeconds:30};
         console.warn('Стан синхронізації таблиці: '+String(syncError.message||syncError));
@@ -542,7 +555,7 @@ function workspaceRevisions_(user,all) {
 function conditionalWorkspace_(user,body) {
   var all=body.allResults===true,known=body.known||{},before=workspaceRevisions_(user,all),props=PropertiesService.getScriptProperties();
   var busy=props.getProperty('LK_WORKSPACE_WRITE'),changes={},out={workspaceProtocol:1,user:publicUser_(user),revisions:before,changes:changes,
-    capabilities:{fastTestStart:true,deferredResultStats:true,singleAttempt:true,deletedAttemptRetakes:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true,formattedReports:true,intakeArchives:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
+    capabilities:{fastTestStart:true,deferredResultStats:true,cadetCriticalPath:true,singleAttempt:true,deletedAttemptRetakes:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true,formattedReports:true,intakeArchives:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
   if(user.role===ROLE_INSTRUCTOR)out.intake=intakeStatus_();
   if(known.groups!==before.groups)changes.groups=listGroups_();
   if(known.tests!==before.tests)changes.tests=listTestsForUser_(user);
@@ -2143,6 +2156,7 @@ function submitResult_(user, body, examSource, recoveryApproval) {
     JSON.stringify(selected), result.examExitCount, result.examPinned, result.gradingStatus, result.earnedPoints, result.maxPoints, result.choiceTotal, result.pendingWritten, 0, '{}', result.examRecovered, safeCellText_(result.recoveredBy), result.recoveredAt,'pending'
   ]);
   var committedRow=sheet_('results').getLastRow();
+  resultLookupCache_=null;
   invalidatePublicSync_();
   // The result is committed. Failures in auxiliary sheets must not turn an
   // accepted attempt into an apparent failure or cause a duplicate submission.
@@ -2494,13 +2508,41 @@ function findResult_(userId, testId) {
 }
 
 function findResultRecord_(userId, testId) {
+  // This memo is valid only while this request owns the mutation lock. In
+  // particular a negative lookup must never survive another PC's submission.
+  var memo=deferPublicSync_&&workspaceWriteRequest_,key=JSON.stringify([String(userId),String(testId)]);
+  if(memo&&resultLookupCache_&&Object.prototype.hasOwnProperty.call(resultLookupCache_,key))return resultLookupCache_[key];
+  var record=readResultRecord_(userId,testId);
+  if(memo){if(!resultLookupCache_)resultLookupCache_=Object.create(null);resultLookupCache_[key]=record;}
+  return record;
+}
+function readResultRecord_(userId, testId) {
   var sheet = sheet_('results');
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return null;
+  // Sheets searches the ID column on its server. A new cadet need not download
+  // everybody's names/groups and test IDs to prove they have no result yet.
+  if(lastRow>500){
+    var finder=sheet.getRange(2,2,lastRow-1,1).createTextFinder(String(userId));
+    var matches=finder.matchEntireCell(true).matchCase(true).useRegularExpression(false).findAll()
+      .map(function(range){return range.getRow();}).sort(function(a,b){return b-a;});
+    if(!matches.length)return null;
+    var tests=matches.length>1?sheet.getRange(matches[matches.length-1],5,matches[0]-matches[matches.length-1]+1,1).getValues():null;
+    for(var i=0;i<matches.length;i++){
+      if(tests&&String(tests[matches[i]-matches[matches.length-1]][0])!==String(testId))continue;
+      var matched=sheet.getRange(matches[i],1,1,HEADERS.results.length).getValues()[0];
+      // A concurrent read-only request can overlap row deletion. Refuse a
+      // shifted row instead of returning another cadet's work.
+      if(String(matched[1])!==String(userId))fail_('Результати зараз оновлюються. Повторіть запит.','BUSY');
+      if(String(matched[4])===String(testId))return {result:resultFromRow_(matched),row:matched,rowNumber:matches[i]};
+    }
+    return null;
+  }
   var keys = sheet.getRange(2, 2, lastRow - 1, 4).getValues();
   for (var index = keys.length - 1; index >= 0; index -= 1) {
     if (String(keys[index][0]) === String(userId) && String(keys[index][3]) === String(testId)) {
       var row = sheet.getRange(index + 2, 1, 1, HEADERS.results.length).getValues()[0];
+      if(String(row[1])!==String(userId)||String(row[4])!==String(testId))fail_('Результати зараз оновлюються. Повторіть запит.','BUSY');
       return {result: resultFromRow_(row), row: row,rowNumber:index+2};
     }
   }
@@ -3821,10 +3863,27 @@ function pcStateKey_(user, value) {
   if(user.role===ROLE_CADET&&key==='training')return key;
   fail_('Цей тип чернетки недоступний для облікового запису.','FORBIDDEN');
 }
-function pcStateHeaders_(user) {
+function pcStateMetadata_(user) {
   var sheet=sheet_('pcState'),count=sheet.getLastRow()-1;
   if(count<1)return [];
-  return sheet.getRange(2,1,count,9).getValues().map(function(row,i){return {row:row,number:i+2};})
+  if(user&&count>500){
+    var matches=sheet.getRange(2,1,count,1).createTextFinder(String(user.id))
+      .matchEntireCell(true).matchCase(true).useRegularExpression(false).findAll()
+      .map(function(range){return range.getRow();}).sort(function(a,b){return a-b;});
+    // Preserve physical row offsets, including gaps belonging to other users.
+    // The locked writer can append/trim this sparse snapshot without another
+    // full-table read. No payload from another account is needed.
+    var metadata=[];metadata.length=count;
+    if(matches.length){
+      var first=matches[0],last=matches[matches.length-1];
+      sheet.getRange(first,1,last-first+1,9).getValues().forEach(function(row,index){if(String(row[0])===String(user.id))metadata[first-2+index]=row;});
+    }
+    return metadata;
+  }
+  return sheet.getRange(2,1,count,9).getValues();
+}
+function pcStateHeaders_(user,metadata) {
+  return (metadata||pcStateMetadata_(user)).map(function(row,i){return {row:row,number:i+2};})
     .filter(function(x){return String(x.row[0])===String(user.id)&&Number(x.row[4])===-1;});
 }
 function pcStateLatest_(headers,key) {
@@ -3893,11 +3952,14 @@ function pcStatePut_(user,body) {
   pcStateValidate_(user,key,body.value);
   return pcStateWrite_(user,key,body);
 }
-function pcStateWrite_(user,key,body) {
+function pcStateWrite_(user,key,body,observed) {
   var expected=body.expectedRevision,request=body.requestId;
   var raw=JSON.stringify(body.value);
   if(raw.length>MAX_PC_STATE_JSON_LENGTH)fail_('Чернетка завелика для синхронізації. Скоротіть її або експортуйте в JSON. Дані на цьому ПК збережено.','STATE_TOO_LARGE');
-  var digest=sha256Hex_(raw),headers=pcStateHeaders_(user),old=pcStateLatest_(headers,key),props=PropertiesService.getScriptProperties();
+  // Exam reads and writes share this snapshot only within the same locked
+  // request. No authorization or revision data is cached across requests.
+  var metadata=observed&&observed.rows||pcStateMetadata_(user);
+  var digest=sha256Hex_(raw),headers=pcStateHeaders_(user,metadata),old=pcStateLatest_(headers,key),props=PropertiesService.getScriptProperties();
   if(old&&String(old.row[7])===request){
     if(String(old.row[8])!==digest)fail_('Ключ синхронізації вже використано для інших даних.','REQUEST_CONFLICT');
     props.setProperty('LK_PC_STATE_'+user.id,Utilities.getUuid());
@@ -3915,17 +3977,24 @@ function pcStateWrite_(user,key,body) {
   if(sheet.getMaxRows()<needed)sheet.insertRowsAfter(sheet.getMaxRows(),needed-sheet.getMaxRows());
   sheet.getRange(first,1,rows.length,10).setValues(rows);
   // Commit only after every payload part was written successfully.
-  sheet.appendRow([String(user.id),key,revision,generation,-1,parts.length,updated,request,digest,'']);
+  var committed=[String(user.id),key,revision,generation,-1,parts.length,updated,request,digest,''];
+  sheet.appendRow(committed);
   props.setProperty('LK_PC_STATE_'+user.id,Utilities.getUuid());
+  var nextMetadata=metadata.concat(rows.map(function(row){return row.slice(0,9);}),[committed.slice(0,9)]);
   try{
-    var keep=Object.create(null);pcStateHeaders_(user).filter(function(h){return String(h.row[1])===key;})
-      .sort(function(a,b){return Number(b.row[2])-Number(a.row[2]);}).slice(0,3)
+    var keep=Object.create(null);keep[generation]=true;
+    headers.filter(function(h){return String(h.row[1])===key;})
+      .sort(function(a,b){return Number(b.row[2])-Number(a.row[2]);}).slice(0,2)
       .forEach(function(h){keep[String(h.row[3])]=true;});
-    var count=sheet.getLastRow()-1,meta=sheet.getRange(2,1,count,9).getValues();
-    for(var i=meta.length-1;i>=0;i--)if(String(meta[i][0])===String(user.id)&&String(meta[i][1])===key&&!keep[String(meta[i][3])])sheet.deleteRow(i+2);
-  }catch(ignored){}
-  var current=pcStateLatest_(pcStateHeaders_(user),key);
-  return {accountSyncProtocol:1,userId:String(user.id),document:pcStateRead_(user,key,current)};
+    for(var i=metadata.length-1;i>=0;i--)if(metadata[i]&&String(metadata[i][0])===String(user.id)&&String(metadata[i][1])===key&&!keep[String(metadata[i][3])]){
+      sheet.deleteRow(i+2);nextMetadata.splice(i,1);
+    }
+  }catch(ignored){nextMetadata=null;}
+  if(observed)observed.rows=nextMetadata;
+  // Both parts and the commit marker have acknowledged their writes. Return
+  // their exact JSON snapshot without rereading the whole table and payload.
+  var document=pcStateDescriptor_({row:committed});document.value=JSON.parse(raw);
+  return {accountSyncProtocol:1,userId:String(user.id),document:document};
 }
 
 // Account-owned exam attempts. Only these endpoints can write the reserved document.
@@ -3981,7 +4050,9 @@ function examExpand_(doc) {
   return doc;
 }
 function examDocument_(user) {
-  return examExpand_(pcStateRead_(user,EXAM_STATE_KEY_,pcStateLatest_(pcStateHeaders_(user),EXAM_STATE_KEY_)));
+  var observed={rows:pcStateMetadata_(user)};
+  var doc=examExpand_(pcStateRead_(user,EXAM_STATE_KEY_,pcStateLatest_(pcStateHeaders_(user,observed.rows),EXAM_STATE_KEY_)));
+  doc.pcStateObserved=observed;return doc;
 }
 function examReply_(user,doc,completion) {
   var value=doc.value?JSON.parse(JSON.stringify(doc.value)):null;
@@ -3996,7 +4067,8 @@ function examIdentifier_(value) {
   return value;
 }
 function examWrite_(user,doc,value,request) {
-  return examExpand_(pcStateWrite_(user,EXAM_STATE_KEY_,{expectedRevision:doc.revision,requestId:request||Utilities.getUuid(),value:examPack_(value)}).document);
+  var next=examExpand_(pcStateWrite_(user,EXAM_STATE_KEY_,{expectedRevision:doc.revision,requestId:request||Utilities.getUuid(),value:examPack_(value)},doc.pcStateObserved).document);
+  next.pcStateObserved=doc.pcStateObserved;return next;
 }
 function examCheckpoint_(attempt,checkpoint) {
   if(!checkpoint||!checkpoint.answers||typeof checkpoint.answers!=='object'||Array.isArray(checkpoint.answers))fail_('Некоректні відповіді спроби.','BAD_REQUEST');
