@@ -110,6 +110,9 @@ var publicLayouts_ = [];
 var resultSeriesCache_ = null;
 var resultLookupCache_ = null;
 var testQuestionRequestCache_ = null;
+var responsePresentations_ = [];
+var requestWriteFlushed_ = false;
+var requestCommitFailed_ = false;
 var testAccessCache_ = null;
 var testAccessGroupsCache_ = null;
 var publicSyncActor_ = null;
@@ -199,6 +202,7 @@ function setAppDownloadUrl(url, versionCode, versionName) {
 }
 
 function doPost(e) {
+  responsePresentations_ = [];requestWriteFlushed_ = false;requestCommitFailed_ = false;
   resultSeriesCache_ = null;
   resultLookupCache_ = null;
   testQuestionRequestCache_ = null;
@@ -261,6 +265,15 @@ function doPost(e) {
         console.warn('Стан синхронізації таблиці: '+String(syncError.message||syncError));
       }
     }
+    if(lock&&deferPublicSync_){
+      // Durable attempt writes and revision cursors finish while protected.
+      // Large read-only response construction must not hold up another PC.
+      if(workspaceMutation_&&!requestWriteFlushed_)flushRequestWrites_();
+      finishRequestWrite_();
+      var committedLock=lock;lock=null;
+      try{committedLock.releaseLock();}catch(ignored){}
+    }
+    responsePresentations_.forEach(function(build){build();});responsePresentations_=[];
     if(String(request.method).toUpperCase()==='GET' && request.writtenProtocol!==1)response=legacyChoiceResponse_(response);
     if(request.choiceProtocol!==2)response=legacyMultiChoiceResponse_(response);
     response.ok = true;
@@ -274,14 +287,28 @@ function doPost(e) {
     });
   } finally {
     if (lock) {
-      try { finishWorkspaceChange_(); } catch (error) { console.warn('Не завершено ревізії кабінету: '+String(error.message||error)); }
-      // A fresh scan made while holding this write lock is still valid for
-      // the revision just committed. Keep dashboard reads bounded to 500 rows.
-      if(publicSyncScan_&&publicSyncScan_.entries!==null)try{cachePublicSyncSummary_(publicSyncScan_.summary);}catch(ignored){}
-      workspaceWriteRequest_ = false;
+      finishRequestWrite_();
       try { lock.releaseLock(); } catch (ignored) {}
     }
   }
+}
+
+// These callbacks only transform this request's in-memory snapshots. They
+// must never read Sheets, authorize a caller or write after releasing a lock.
+function presentResponse_(build) {
+  if(deferPublicSync_&&workspaceWriteRequest_)responsePresentations_.push(build);
+  else build();
+}
+function flushRequestWrites_() {
+  try{SpreadsheetApp.flush();requestWriteFlushed_=true;}
+  catch(error){requestCommitFailed_=true;throw error;}
+}
+function finishRequestWrite_() {
+  if(!requestCommitFailed_){
+    try{finishWorkspaceChange_();}catch(error){console.warn('Не завершено ревізії кабінету: '+String(error.message||error));}
+    if(publicSyncScan_&&publicSyncScan_.entries!==null)try{cachePublicSyncSummary_(publicSyncScan_.summary);}catch(ignored){}
+  }
+  workspaceWriteRequest_=false;
 }
 
 
@@ -2174,6 +2201,7 @@ function submitResult_(user, body, examSource, recoveryApproval) {
     choiceTotal: grading.choiceTotal, pendingWritten: grading.pendingWritten, gradingRevision: 0,
     examRecovered: Boolean(recoveryApproval), recoveredBy: recoveryApproval ? recoveryApproval.name : '', recoveredAt: recoveryApproval ? recoveryApproval.at : ''
   };
+  requestWriteFlushed_=false;
   sheet_('results').appendRow([
     result.id, result.userId, safeCellText_(result.userName), safeCellText_(result.groupName),
     result.testId, safeCellText_(result.testTitle), result.score == null ? '' : result.score, result.correct, result.total,
@@ -2200,7 +2228,9 @@ function submitResult_(user, body, examSource, recoveryApproval) {
   // Older clients already attempted the auxiliary writes above. Keep their
   // original publication behavior; deferred clients leave the durable flag.
   var tableSynced = publishCommittedResult_(result,committedRow,false);
-  return {result: result, review: buildResultReview_(user, result, test, selected, {}), practice: mistakePractice_(result, test, selected, null), tableSynced: tableSynced};
+  var response={result:result,tableSynced:tableSynced};
+  presentResponse_(function(){response.review=buildResultReview_(user,result,test,selected,{});response.practice=mistakePractice_(result,test,selected,null);});
+  return response;
 }
 
 function resultDetailRows_(result,test,selected,completedAt) {
@@ -4000,6 +4030,7 @@ function pcStateWrite_(user,key,body,observed) {
   var rows=parts.map(function(part,i){return [String(user.id),key,revision,generation,i,parts.length,updated,request,digest,'json:'+part];});
   var first=sheet.getLastRow()+1,needed=first+rows.length;
   if(sheet.getMaxRows()<needed)sheet.insertRowsAfter(sheet.getMaxRows(),needed-sheet.getMaxRows());
+  requestWriteFlushed_=false;
   sheet.getRange(first,1,rows.length,10).setValues(rows);
   // Commit only after every payload part was written successfully.
   var committed=[String(user.id),key,revision,generation,-1,parts.length,updated,request,digest,''];
@@ -4018,7 +4049,7 @@ function pcStateWrite_(user,key,body,observed) {
   if(observed)observed.rows=nextMetadata;
   // Apps Script buffers spreadsheet writes. Finish them while the request
   // still holds its script lock, before acknowledging the saved document.
-  SpreadsheetApp.flush();
+  flushRequestWrites_();
   // Both parts and the commit marker have acknowledged their writes. Return
   // their exact JSON snapshot without rereading the whole table and payload.
   var document=pcStateDescriptor_({row:committed});document.value=JSON.parse(raw);
@@ -4085,8 +4116,9 @@ function examDocument_(user) {
 function examReply_(user,doc,completion) {
   var visible=null;
   if(doc.value){visible={};Object.keys(doc.value).forEach(function(key){if(['sourceTest','sourceQuestions','questionOrder','answerOrder'].indexOf(key)<0)visible[key]=doc.value[key];});}
-  var value=visible?copyObject_(visible):null;
+  var value=visible;
   var out={examProtocol:1,userId:String(user.id),serverNow:Date.now(),document:{revision:doc.revision,value:value}};
+  presentResponse_(function(){out.document.value=visible?copyObject_(visible):null;});
   if(completion)out.completion=completion;
   else if(value){var record=findResultRecord_(user.id,value.test.id);if(record)out.completion={result:record.result,review:safeResultReview_(user,record),alreadyAccepted:true};}
   return out;

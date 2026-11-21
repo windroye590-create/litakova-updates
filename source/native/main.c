@@ -70,9 +70,13 @@ static void load_blob(SOCKET s,const WCHAR*path){
  else json(s,"{\"ok\":false,\"code\":\"STORAGE_READ\",\"error\":\"Не вдалося прочитати збережені дані Windows.\"}");
 }
 static BYTE*commission_request(char*body,DWORD length,DWORD*replyLength,DWORD*replyStatus){
- HINTERNET session=WinHttpOpen(L"Litakova-Komisiia-PC/1.0.15",4,0,0,0),conn=0,req=0;char*buf=0;DWORD used=0,status=0,statussize=4;BOOL ok=0;
+ HINTERNET session=WinHttpOpen(L"Litakova-Komisiia-PC/1.0.15 (gzip)",4,0,0,0),conn=0,req=0;char*buf=0;DWORD used=0,status=0,statussize=4;BOOL ok=0;
  if(session){WinHttpSetTimeouts(session,10000,10000,15000,45000);conn=WinHttpConnect(session,L"script.google.com",443,0);}
  if(conn)req=WinHttpOpenRequest(conn,L"POST",L"/macros/s/AKfycbxthXT1noK9KVJGiqgLOu8L5HgUI8olKC4cySBYM8Yaj4Um8Usm0OgqzZeC1pt5csh7VQ/exec",0,0,0,0x00800000);
+ // WinHTTP advertises and decodes gzip/deflate only when this option works.
+ // Older Windows keeps the original plain response path. MAX_BODY below
+ // bounds decoded bytes, including a small compressed reply that expands.
+ if(req){DWORD decompression=3u;WinHttpSetOption(req,118u,&decompression,sizeof(decompression));}
  if(req&&WinHttpSendRequest(req,L"Content-Type: application/json; charset=utf-8\r\nAccept: application/json\r\n",(DWORD)-1,body,length,length,0)&&WinHttpReceiveResponse(req,0)){
   WinHttpQueryHeaders(req,19|0x20000000u,0,&status,&statussize,0);
   if(status>=200&&status<300){buf=allocate(MAX_BODY+1);ok=buf!=0;while(ok){DWORD available=0,got=0;if(!WinHttpQueryDataAvailable(req,&available)){ok=0;break;}if(!available)break;if(available>MAX_BODY-used){ok=0;break;}if(!WinHttpReadData(req,buf+used,available,&got)||!got){ok=0;break;}used+=got;}if(ok){buf[used]=0;DWORD first=0;while(first<used&&(buf[first]==' '||buf[first]=='\r'||buf[first]=='\n'))first++;ok=first<used&&buf[first]=='{';}}

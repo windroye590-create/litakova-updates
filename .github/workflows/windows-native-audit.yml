@@ -7,7 +7,7 @@ on:
     types: [completed]
   push:
     branches: [main]
-    paths: ['channel/Litakova-Komisiia-PC.exe', 'source/tests/windows-private-storage.py', '.github/workflows/windows-native-audit.yml']
+    paths: ['channel/Litakova-Komisiia-PC.exe', 'source/tests/windows-private-storage.py', 'source/tests/windows-http-compression.py', '.github/workflows/windows-native-audit.yml']
 
 permissions:
   contents: read
@@ -45,9 +45,14 @@ jobs:
       - name: Exercise real CNG, DPAPI, backup recovery and saved login
         shell: pwsh
         run: python source/tests/windows-private-storage.py channel/Litakova-Komisiia-PC.exe windows-private-storage.json
+      - name: Verify real WinHTTP gzip, deflate, redirect and decoded byte limits
+        shell: pwsh
+        run: python source/tests/windows-http-compression.py windows-http-compression.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: windows-native-storage-audit
-          path: windows-private-storage.json
+          path: |
+            windows-private-storage.json
+            windows-http-compression.json
           if-no-files-found: warn
