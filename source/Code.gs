@@ -109,6 +109,7 @@ var publicResultsSheetCache_ = null;
 var publicLayouts_ = [];
 var resultSeriesCache_ = null;
 var resultLookupCache_ = null;
+var testQuestionRequestCache_ = null;
 var testAccessCache_ = null;
 var testAccessGroupsCache_ = null;
 var publicSyncActor_ = null;
@@ -133,6 +134,7 @@ function doGet() {
     fastTestStart: true,
     deferredResultStats: true,
     cadetCriticalPath: true,
+    cadetGoogleOptimization: true,
     conditionalReviewQueue: true,
     testAccess: true,
     newIntake: true,
@@ -199,6 +201,7 @@ function setAppDownloadUrl(url, versionCode, versionName) {
 function doPost(e) {
   resultSeriesCache_ = null;
   resultLookupCache_ = null;
+  testQuestionRequestCache_ = null;
   workspaceMutation_ = null; workspaceWriteRequest_ = false;
   deferPublicSync_ = false;
   deletedRetakeRequest_ = false; deletedRetakeEpochs_ = null;
@@ -1797,13 +1800,29 @@ function testFromRow_(row, index, includeQuestions) {
 }
 
 function getTestById_(id) {
+  var sheet=sheet_('tests'),revision=PropertiesService.getScriptProperties().getProperty('LK_REV_tests')||'0';
+  var key='LK_TEST_ROW_V1_'+sha256Hex_(String(id)),hint=null;
+  try{hint=JSON.parse(CacheService.getScriptCache().get(key)||'null');}catch(ignored){}
+  if(hint&&hint.revision===revision&&Number.isInteger(hint.row)&&hint.row>=2&&hint.row<=sheet.getLastRow()
+    &&typeof hint.canonical==='string'&&typeof hint.replaces==='string'){
+    var row=sheet.getRange(hint.row,1,1,HEADERS.tests.length).getValues()[0];
+    var current=testFromRow_(row,hint.row-2,false);
+    // The cache locates a row only. Current questions, publication, assignment
+    // and access checks always come from this request's live Sheets data.
+    if(String(current.id)===String(id)&&String(current.replacesId||'')===hint.replaces){
+      current.canonicalTestId=hint.canonical;current.questions=parseQuestions_(row[7],current.id);current.questionCount=current.questions.length;return current;
+    }
+  }
   var metadata = listTests_(false).filter(function (test) {
     return String(test.id) === String(id);
   })[0];
   if (!metadata) return null;
-  metadata.questions = parseQuestions_(sheet_('tests').getRange(metadata.rowNumber, 8).getValue(), metadata.id);
-  metadata.questionCount = metadata.questions.length;
-  return metadata;
+  var row=sheet.getRange(metadata.rowNumber,1,1,HEADERS.tests.length).getValues()[0];
+  var current=testFromRow_(row,metadata.rowNumber-2,false);
+  if(String(current.id)!==String(id)||String(current.replacesId||'')!==String(metadata.replacesId||''))fail_('Каталог тестів зараз оновлюється. Повторіть запит.','BUSY');
+  current.canonicalTestId=metadata.canonicalTestId;current.questions=parseQuestions_(row[7],current.id);current.questionCount=current.questions.length;
+  try{CacheService.getScriptCache().put(key,JSON.stringify({revision:revision,row:current.rowNumber,canonical:current.canonicalTestId,replaces:String(current.replacesId||'')}),21600);}catch(ignored){}
+  return current;
 }
 
 function isRetakeTest_(test) { return String(test && test.description || '').indexOf(RETRY_PREFIX) >= 0; }
@@ -1981,6 +2000,8 @@ function storeTestQuestions_(id, raw) {
 }
 
 function readTestQuestions_(value, id) {
+  var memo=deferPublicSync_&&workspaceWriteRequest_,cacheKey=memo?JSON.stringify([id==null?'':String(id),String(value)]):'';
+  if(memo&&testQuestionRequestCache_&&testQuestionRequestCache_.key===cacheKey)return JSON.parse(testQuestionRequestCache_.raw);
   var broken = function () { fail_('Не вдалося завантажити всі питання тесту. Оновіть дані або зверніться до інструктора.', 'TEST_DATA_INCOMPLETE'); };
   var marker;
   try { marker = JSON.parse(String(value).slice(TEST_PARTS_PREFIX.length)); } catch (error) { broken(); }
@@ -2013,6 +2034,9 @@ function readTestQuestions_(value, id) {
   var questions;
   try { questions = JSON.parse(raw); } catch (error) { broken(); }
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 200) broken();
+  // Immutable parts are verified once per locked request. Each caller gets a
+  // separate object; answer edits/shuffling cannot mutate the grading source.
+  if(memo)testQuestionRequestCache_={key:cacheKey,raw:raw};
   return questions;
 }
 
@@ -2027,7 +2051,8 @@ function parseQuestions_(value, id) {
 }
 
 function sanitizeTestForCadet_(test) {
-  var clean = copyObject_(test);
+  var metadata={};Object.keys(test).forEach(function(key){if(key!=='questions')metadata[key]=test[key];});
+  var clean = copyObject_(metadata);
   clean.questions = (test.questions || []).map(function (question) {
     return {
       id: question.id,
@@ -4058,8 +4083,9 @@ function examDocument_(user) {
   doc.pcStateObserved=observed;return doc;
 }
 function examReply_(user,doc,completion) {
-  var value=doc.value?JSON.parse(JSON.stringify(doc.value)):null;
-  if(value){delete value.sourceTest;delete value.sourceQuestions;delete value.questionOrder;delete value.answerOrder;}
+  var visible=null;
+  if(doc.value){visible={};Object.keys(doc.value).forEach(function(key){if(['sourceTest','sourceQuestions','questionOrder','answerOrder'].indexOf(key)<0)visible[key]=doc.value[key];});}
+  var value=visible?copyObject_(visible):null;
   var out={examProtocol:1,userId:String(user.id),serverNow:Date.now(),document:{revision:doc.revision,value:value}};
   if(completion)out.completion=completion;
   else if(value){var record=findResultRecord_(user.id,value.test.id);if(record)out.completion={result:record.result,review:safeResultReview_(user,record),alreadyAccepted:true};}
