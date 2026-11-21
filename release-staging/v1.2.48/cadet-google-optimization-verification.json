@@ -1,0 +1,129 @@
+{
+  "status": "passed",
+  "baselineVersion": "1.2.47",
+  "targetVersion": "1.2.48",
+  "questions": {
+    "training": 50,
+    "exam": 200
+  },
+  "measurements": {
+    "coldTrainingStart": {
+      "before": {
+        "rangeReads": 6,
+        "catalogReads": 3,
+        "questionPartReads": 0,
+        "returnedCells": 543,
+        "returnedJsonBytes": 24469
+      },
+      "after": {
+        "rangeReads": 6,
+        "catalogReads": 3,
+        "questionPartReads": 0,
+        "returnedCells": 553,
+        "returnedJsonBytes": 24562
+      }
+    },
+    "warmTrainingStart": {
+      "before": {
+        "rangeReads": 6,
+        "catalogReads": 3,
+        "questionPartReads": 0,
+        "returnedCells": 543,
+        "returnedJsonBytes": 24469
+      },
+      "after": {
+        "rangeReads": 4,
+        "catalogReads": 1,
+        "questionPartReads": 0,
+        "returnedCells": 263,
+        "returnedJsonBytes": 20321
+      }
+    },
+    "trainingFinish": {
+      "before": {
+        "rangeReads": 6,
+        "catalogReads": 3,
+        "questionPartReads": 0,
+        "returnedCells": 508,
+        "returnedJsonBytes": 24066
+      },
+      "after": {
+        "rangeReads": 4,
+        "catalogReads": 1,
+        "questionPartReads": 0,
+        "returnedCells": 228,
+        "returnedJsonBytes": 19918
+      }
+    },
+    "largeExamStart": {
+      "before": {
+        "rangeReads": 9,
+        "catalogReads": 4,
+        "questionPartReads": 2,
+        "returnedCells": 838,
+        "returnedJsonBytes": 4991975
+      },
+      "after": {
+        "rangeReads": 8,
+        "catalogReads": 4,
+        "questionPartReads": 1,
+        "returnedCells": 703,
+        "returnedJsonBytes": 2500712
+      }
+    },
+    "largeExamFinish": {
+      "before": {
+        "rangeReads": 8,
+        "catalogReads": 0,
+        "questionPartReads": 3,
+        "returnedCells": 684,
+        "returnedJsonBytes": 7502421
+      },
+      "after": {
+        "rangeReads": 6,
+        "catalogReads": 0,
+        "questionPartReads": 1,
+        "returnedCells": 394,
+        "returnedJsonBytes": 2519669
+      }
+    },
+    "privateExamStart": {
+      "before": {
+        "objectWrites": 8,
+        "objectWriteJsonBytes": 3325376,
+        "accountJsonCharacters": 1699349
+      },
+      "after": {
+        "objectWrites": 4,
+        "objectWriteJsonBytes": 1662765,
+        "accountJsonCharacters": 849734
+      }
+    }
+  },
+  "correctness": {
+    "trainingCorrect": 50,
+    "examCorrect": 200
+  },
+  "checks": {
+    "fullApplicationModels": "passed",
+    "releaseToolsUnits": "passed",
+    "googleOptimizationRegressions": 8,
+    "largeTests": 17,
+    "examResume": 22,
+    "finishDeliveryReliability": 14,
+    "startFinishActualChromium": 5,
+    "finishDeliveryActualChromium": 4,
+    "actualNativeWindows": 16
+  },
+  "measurementScope": "Actual Code.gs, exam controller and secure-storage modules, paired isolated Sheets and native-protocol fixtures. Returned JSON bytes are serialized cell-value bytes, not live network traffic. Read counts exclude property/cache/metadata calls. The row-location cache was explicitly cleared for cold starts and warmed before repeated starts. Encrypted object writes are counted in the isolated storage transport; real Windows storage is verified separately.",
+  "limitations": "No live Google timing or end-to-end speed ratio measured. Cold short-test lookup keeps its fallback reads. Catalog changes and cache eviction require lookup again.",
+  "productionTestRequests": 0,
+  "productionRecordsDeleted": 0,
+  "liveGoogleLoadMeasured": false,
+  "implementationCommit": "6678c103f1bf338b877bb5ecf9b98593a56f78da",
+  "releaseSourceCommit": "e6d887e68b465c0d5a1b6eb91448acc631bc29f0",
+  "deployedServerBuild": "pc-api26-12e7c860a8840232",
+  "releaseWorkflowRun": 44897668578,
+  "automationVerificationRun": 44897621279,
+  "baselineReleaseCommit": "8880d58ab85861b202a31665d0d6d78eb151d9ee"
+}

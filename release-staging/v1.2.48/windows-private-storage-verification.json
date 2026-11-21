@@ -1,0 +1,31 @@
+{
+  "status": "passed",
+  "passed": 16,
+  "checks": [
+    "Upgrade archives old data and refuses anonymous legacy or global journal access",
+    "Real AES-256-GCM and Windows DPAPI round-trip a private account object",
+    "Lost object acknowledgements retry idempotently without allowing overwrite",
+    "Changing a nonce, GCM tag or ciphertext is rejected even after valid DPAPI rewrapping",
+    "The GCM identity binds both the account owner and the immutable object identifier",
+    "The profile keeps three distinct backups and rejects conflicting commits",
+    "Corrupt profiles restore a verified backup while sharing violations remain visible errors",
+    "If every profile copy is damaged the host refuses an empty reset or overwrite",
+    "A large Unicode journal restores backups and never falsely acknowledges a rolled-back serial",
+    "Collection removes orphan objects and preserves every referenced object and account journal",
+    "Closing the native vault invalidates its capability and exposes backup recovery status",
+    "The remembered vault key is DPAPI-protected and contains no password or bearer token",
+    "A complete Windows host restart restores the saved key, private objects and last journal",
+    "A locked saved-login file reports an error and never falsely acknowledges logout",
+    "A corrupt saved-login cache cannot erase private data and can be repaired by a valid owner",
+    "Explicit logout remains forgotten after another complete Windows restart"
+  ],
+  "actualWindowsHostExecuted": true,
+  "realDPAPIVerified": true,
+  "realCNGGCMVerified": true,
+  "productionRPCRequests": 0,
+  "browserRendered": false,
+  "version": "1.2.48",
+  "workflowRun": 44898056038,
+  "artifactId": 14704965741,
+  "releaseSourceCommit": "e6d887e68b465c0d5a1b6eb91448acc631bc29f0"
+}
