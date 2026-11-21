@@ -3991,6 +3991,9 @@ function pcStateWrite_(user,key,body,observed) {
     }
   }catch(ignored){nextMetadata=null;}
   if(observed)observed.rows=nextMetadata;
+  // Apps Script buffers spreadsheet writes. Finish them while the request
+  // still holds its script lock, before acknowledging the saved document.
+  SpreadsheetApp.flush();
   // Both parts and the commit marker have acknowledged their writes. Return
   // their exact JSON snapshot without rereading the whole table and payload.
   var document=pcStateDescriptor_({row:committed});document.value=JSON.parse(raw);

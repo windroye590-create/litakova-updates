@@ -195,6 +195,7 @@ const context = vm.createContext({
   isNaN,
   decodeURIComponent,
   SpreadsheetApp: {
+    flush() {},
     newConditionalFormatRule:()=>{const r={whenFormulaSatisfied(v){r.formula=v;return r;},setBackground(){return r;},setFontColor(){return r;},setRanges(v){r.ranges=v;return r;},build(){return {getBooleanCondition:()=>({getCriteriaValues:()=>[r.formula]}),ranges:r.ranges};}};return r;},
     openById: (id) => {
       if (String(id) === BACKEND_SPREADSHEET_ID) return spreadsheet;

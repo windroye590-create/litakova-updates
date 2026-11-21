@@ -92,6 +92,21 @@ try{
    assert.equal(JSON.stringify(states.rows.filter(row=>String(row[0])!==String(other.user.id))),foreignBefore);
   }finally{states.deleteRow=remove;}
  });
+ await check('A failed write-cache flush cannot acknowledge completion and retries keep one result',()=>{
+  for(const failAt of [1,2]){
+  const third=person(),started=request('POST','/api/exam-session/start',{testId:exam.id,deviceId,requestId:crypto.randomUUID()},third),v=started.document.value;
+  const body={submissionId:v.submissionId,testId:exam.id,deviceId,requestId:crypto.randomUUID(),fence:v.fence,expectedRevision:started.document.revision,checkpoint:{answers:Object.fromEntries(exam.questions.map(q=>[String(q.id),q.answers[0].id])),index:49,exitCount:0}};
+  const flush=context.SpreadsheetApp.flush;let attempts=0,failed=false;
+  context.SpreadsheetApp.flush=()=>{if(++attempts===failAt){failed=true;throw Error('Injected write-cache failure');}return flush();};
+  try{
+   assert.throws(()=>request('POST','/api/exam-session/finish',body,third),e=>e.message==='Injected write-cache failure');assert.equal(failed,true);
+   assert.equal(results.rows.filter(r=>String(r[1])===String(third.user.id)).length,failAt-1);
+   const done=request('POST','/api/exam-session/finish',body,third);assert.equal(done.document.value.status,'completed');assert.equal(done.completion.result.correct,50);
+   assert.equal(request('POST','/api/exam-session/finish',body,third).completion.result.id,done.completion.result.id);
+   assert.equal(results.rows.filter(r=>String(r[1])===String(third.user.id)).length,1);
+  }finally{context.SpreadsheetApp.flush=flush;}
+  }
+ });
  await check('The public-table observer preserves a previous pending count until polling',async()=>{
   const {createPublicTableSync}=await import('../web/public-table-sync.js');const account={publicTableSync:{protocol:1,state:'pending',pendingCount:4}};
   const sync=createPublicTableSync({session:()=>cadet,account:()=>account,rpc:async()=>{}});sync.observe(examFinish,cadet.token);assert.equal(account.publicTableSync.pendingCount,4);
@@ -104,5 +119,5 @@ try{
  });
 }finally{
  proto.getValues=get;proto.createTextFinder=finder;proto.setValues=set;context.scanPublicSync_=scan;
- fs.writeFileSync(new URL('../verification/cadet-critical-path.json',import.meta.url),JSON.stringify({status:checks.length===11?'passed':'failed',passed:checks.length,checks,questionsPerTest:50,historicalResults:12000,otherAccountStateRows:6000,measurements,productionRequests:0,liveGoogleLoadMeasured:false},null,2)+'\n');
+ fs.writeFileSync(new URL('../verification/cadet-critical-path.json',import.meta.url),JSON.stringify({status:checks.length===12?'passed':'failed',passed:checks.length,checks,questionsPerTest:50,historicalResults:12000,otherAccountStateRows:6000,measurements,productionRequests:0,liveGoogleLoadMeasured:false},null,2)+'\n');
 }
