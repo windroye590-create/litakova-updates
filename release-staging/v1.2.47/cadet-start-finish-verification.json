@@ -1,0 +1,116 @@
+{
+  "status": "passed",
+  "baselineVersion": "1.2.46",
+  "targetVersion": "1.2.47",
+  "implementationCommit": "ed63e8300a487b158e629c595d9e3faeb085a364",
+  "fixture": {
+    "questions": 50,
+    "historicalResults": 12000,
+    "otherAccountStateRows": 6000
+  },
+  "measurements": {
+    "trainingStart": {
+      "before": {
+        "rangeReads": 8,
+        "textFinderSearches": 0,
+        "rangeReadsAndSearches": 8,
+        "returnedCells": 60576,
+        "returnedJsonBytes": 643978,
+        "rangeWrites": 0,
+        "explicitWriteCacheFlushes": 0
+      },
+      "after": {
+        "rangeReads": 5,
+        "textFinderSearches": 1,
+        "rangeReadsAndSearches": 6,
+        "returnedCells": 467,
+        "returnedJsonBytes": 23061,
+        "rangeWrites": 0,
+        "explicitWriteCacheFlushes": 0
+      }
+    },
+    "trainingFinish": {
+      "before": {
+        "rangeReads": 10,
+        "textFinderSearches": 0,
+        "rangeReadsAndSearches": 10,
+        "returnedCells": 138582,
+        "returnedJsonBytes": 1576364,
+        "rangeWrites": 0,
+        "explicitWriteCacheFlushes": 0
+      },
+      "after": {
+        "rangeReads": 5,
+        "textFinderSearches": 2,
+        "rangeReadsAndSearches": 7,
+        "returnedCells": 432,
+        "returnedJsonBytes": 22668,
+        "rangeWrites": 0,
+        "explicitWriteCacheFlushes": 0
+      }
+    },
+    "examStart": {
+      "before": {
+        "rangeReads": 16,
+        "textFinderSearches": 0,
+        "rangeReadsAndSearches": 16,
+        "returnedCells": 402765,
+        "returnedJsonBytes": 4178625,
+        "rangeWrites": 1,
+        "explicitWriteCacheFlushes": 0
+      },
+      "after": {
+        "rangeReads": 6,
+        "textFinderSearches": 2,
+        "rangeReadsAndSearches": 8,
+        "returnedCells": 494,
+        "returnedJsonBytes": 24534,
+        "rangeWrites": 1,
+        "explicitWriteCacheFlushes": 1
+      }
+    },
+    "examFinish": {
+      "before": {
+        "rangeReads": 18,
+        "textFinderSearches": 0,
+        "rangeReadsAndSearches": 18,
+        "returnedCells": 570670,
+        "returnedJsonBytes": 5670003,
+        "rangeWrites": 2,
+        "explicitWriteCacheFlushes": 0
+      },
+      "after": {
+        "rangeReads": 5,
+        "textFinderSearches": 2,
+        "rangeReadsAndSearches": 7,
+        "returnedCells": 196,
+        "returnedJsonBytes": 27997,
+        "rangeWrites": 2,
+        "explicitWriteCacheFlushes": 2
+      }
+    }
+  },
+  "metricsScope": "Actual Code.gs against the same isolated in-memory Sheets fixture; counts of getValues and TextFinder.findAll calls and returned values. These counts exclude metadata/property service calls and do not measure work inside Google TextFinder. Local model timings are deliberately omitted.",
+  "liveGoogleLoadMeasured": false,
+  "productionTestRecordsCreated": 0,
+  "productionRecordsDeleted": 0,
+  "checks": {
+    "fullNpmSuite": "passed",
+    "releaseToolsUnitSuite": "passed",
+    "cadetCriticalPath": 12,
+    "classroomDelivery": 9,
+    "examResume": 22,
+    "accountSync": 25,
+    "startFinishActualChromium": 5,
+    "finishDeliveryReliability": 14,
+    "finishDeliveryActualChromium": 4,
+    "privateStorageActualChromium": 17,
+    "actualWindowsHost": 16
+  },
+  "remainingLatency": "Google execution startup, network latency, lock contention and durable writes remain; no live seconds or overall speedup claimed.",
+  "writeAcknowledgement": "Parts, commit marker and cleanup writes are explicitly flushed while holding the script lock. A failure in either exam flush is retryable and cannot acknowledge an incomplete attempt. Isolated injection tests cover failure before and after the result row commit.",
+  "releaseWorkflowRun": 44894044812,
+  "automationVerificationRun": 44894029713,
+  "releaseSourceCommit": "8880d58ab85861b202a31665d0d6d78eb151d9ee",
+  "deployedServerBuild": "pc-api26-fa1931d3ba0e464e"
+}
