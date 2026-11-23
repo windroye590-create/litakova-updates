@@ -53,7 +53,7 @@ try{
  page=await browser.newPage({viewport:{width:1440,height:1000},locale:'ru-RU'});
  page.on('pageerror',x=>failures.push(x.message));page.on('dialog',d=>d.accept());
  await page.goto(origin+'/?key=local');await page.getByRole('heading',{name:'Вхід до кабінету'}).waitFor();
- await mark('Instructor registration explains where to obtain the code',async()=>{await click('auth-mode');await page.getByText('Отримати можливо у інших інструкторів',{exact:true}).waitFor();await click('auth-mode');});
+ await mark('Instructor registration explains where to obtain the code',async()=>{await click('auth-mode');await page.getByText('Код реєстрації надає розробник.',{exact:true}).waitFor();await click('auth-mode');});
  await mark('Registration validation stays Ukrainian in a Russian-language browser',async()=>{
   await click('auth-mode');await page.locator('#auth-form button.primary').click();
   for(const name of ['fullName','username','password','inviteCode'])assert.equal(await page.locator(`input[name=${name}]`).evaluate(el=>el.validationMessage),'Заповніть це поле.');
