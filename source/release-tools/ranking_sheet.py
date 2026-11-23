@@ -3,8 +3,9 @@
 The service key is the original test ID across explicit replacement versions.
 Titles are a temporary fallback until the owner-side identity migration finishes.
 Raw result rows remain an audit history; only the latest attempt contributes.
-Ties use completed tests, then their total duration. Missing durations never
-win as zero. Stable identity resolves a complete tie; places are sequential.
+Only the sum of correct answers determines a place. Equal totals share the
+same competition rank (1, 2, 2, 4). Stable identity orders tied rows without
+awarding different places; elapsed time and completion count are informational.
 """
 import json
 
@@ -23,14 +24,14 @@ def summary_formula():
             'totals,QUERY(latest,"select Col1,Col2,sum(Col5),sum(Col8),count(Col3),sum(Col9) '
             'group by Col1,Col2 label Col1 \'\',Col2 \'\',sum(Col5) \'\',sum(Col8) \'\','
             'count(Col3) \'\',sum(Col9) \'\'",0),'
-            'SORT(totals,3,FALSE,5,FALSE,6,TRUE,4,TRUE,1,TRUE,2,TRUE)),"")')
+            'SORT(totals,3,FALSE,1,TRUE,2,TRUE)),"")')
 
 
 def ranking_formulas(last_row=1004):
     users=f'G5:G{last_row}'
     totals=f'I5:I{last_row}'
     return [
-        f'=ARRAYFORMULA(IF({users}="","",ROW({users})-ROW(G5)+1))',
+        f'=ARRAYFORMULA(IF({users}="","",RANK({totals},{totals},0)))',
         f'=ARRAYFORMULA(IF({users}="","",IFNA(VLOOKUP(TO_TEXT({users}),'
         '{TO_TEXT(\'Результати курсантів\'!N2:N),\'Результати курсантів\'!A2:A},2,FALSE),"")))',
         f'=ARRAYFORMULA(IF({users}="","",{totals}))',

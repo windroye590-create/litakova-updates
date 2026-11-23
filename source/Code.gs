@@ -817,14 +817,14 @@ function createInitialInstructorCode() {
   try {
     ensureSchema_(true);
     if (listUsers_().some(function (user) { return user.role === ROLE_INSTRUCTOR; })) {
-      throw new Error('Головний інструктор уже існує. Новий код створюється в застосунку.');
+      throw new Error('Розробник уже зареєстрований. Новий код створюється в застосунку.');
     }
     var code = generateInviteCode_();
     var expires = Date.now() + 30 * 60 * 1000;
     var properties = PropertiesService.getScriptProperties();
     properties.setProperty('INITIAL_INVITE_CODE', code);
     properties.setProperty('INITIAL_INVITE_EXPIRES_AT', String(expires));
-    return 'Код першого інструктора: ' + code + '. Діє 30 хвилин.';
+    return 'Код реєстрації розробника: ' + code + '. Діє 30 хвилин.';
   } finally {
     lock.releaseLock();
   }
@@ -2883,7 +2883,7 @@ function updateUserName_(id,actor,body) {
   requireRole_(actor,ROLE_INSTRUCTOR);
   var target=findUserById_(id);if(!target)fail_('Користувача не знайдено.','USER_NOT_FOUND');
   if(target.role===ROLE_CADET)requireCadetNotDeleting_(id);
-  else if(String(actor.id)!==String(id)&&!isPrimaryInstructor_(actor.id))fail_('ПІБ іншого інструктора змінює головний інструктор.','FORBIDDEN');
+  else if(String(actor.id)!==String(id)&&!isPrimaryInstructor_(actor.id))fail_('ПІБ іншого інструктора змінює розробник.','FORBIDDEN');
   var request=cleanRequired_(body.requestId,'Не задано ключ зміни ПІБ.',100);
   if(!/^[A-Za-z0-9_-]{8,100}$/.test(request)||typeof body.expectedFullName!=='string'||typeof body.fullName!=='string')fail_('Оновіть список користувачів і повторіть зміну.','BAD_REQUEST');
   var name=cleanRequired_(body.fullName,'Укажіть ПІБ повністю.',180),suffix=target.role===ROLE_INSTRUCTOR?target.fullName.match(/ · (Розробник\/Інструктор|Розробник|Старший викладач|Викладач|Старший інструктор|Інструктор)$/):null;
@@ -3209,7 +3209,7 @@ function getInvite_(user) {
 }
 
 function generateInvite_(user) {
-  if (!isPrimaryInstructor_(user.id)) fail_('Новий код може створити лише головний інструктор.', 'FORBIDDEN');
+  if (!isPrimaryInstructor_(user.id)) fail_('Новий код може створити лише розробник.', 'FORBIDDEN');
   var code = generateInviteCode_();
   var expires = Date.now() + INVITE_LIFETIME_MS;
   var properties = PropertiesService.getScriptProperties();
@@ -3587,7 +3587,7 @@ function beginMaterialUpload_(user,body) {
   reclaimMaterialStorage_();
   var files=dataRows_('materialFiles');
   var total=files.reduce(function(n,r){return n+Number(r[4]||0);},0);
-  if(total+size>100*1024*1024) fail_('Сховище матеріалів заповнено (100 МБ). Зверніться до головного інструктора.', 'MATERIAL_STORAGE_FULL');
+  if(total+size>100*1024*1024) fail_('Сховище матеріалів заповнено (100 МБ). Зверніться до розробника.', 'MATERIAL_STORAGE_FULL');
   var count=Math.ceil(size/MATERIAL_PART_BYTES),start=2;
   files.slice().sort(function(a,b){return Number(a[8])-Number(b[8]);}).forEach(function(r){if(Number(r[8])<start+count)start=Math.max(start,Number(r[8])+Number(r[6]));});
   var chunks=sheet_('materialChunks');if(start+count-1>chunks.getMaxRows())chunks.insertRowsAfter(chunks.getMaxRows(),start+count-1-chunks.getMaxRows());
@@ -4164,7 +4164,7 @@ function pcStateWrite_(user,key,body,observed) {
   if(expected!==(old?Number(old.row[2]):0))fail_('На іншому ПК вже збережена нова версія. Оберіть, яку чернетку продовжити.','REVISION_CONFLICT');
   var keys=Object.create(null);headers.forEach(function(h){var k=String(h.row[1]);if(!keys[k]||Number(h.row[2])>Number(keys[k].row[2]))keys[k]=h;});
   if(!old&&body.value!==null&&Object.keys(keys).filter(function(k){return !pcStateIsNull_(keys[k].row[8]);}).length>=200)fail_('Забагато незавершених чернеток. Завершіть або видаліть непотрібні роботи.','STATE_LIMIT');
-  if(!old&&Object.keys(keys).length>=10000)fail_('Досягнуто ліміту історії чернеток. Зверніться до головного інструктора.','STATE_LIMIT');
+  if(!old&&Object.keys(keys).length>=10000)fail_('Досягнуто ліміту історії чернеток. Зверніться до розробника.','STATE_LIMIT');
   var parts=[],start=0;
   while(start<raw.length){var end=Math.min(start+45000,raw.length);if(end<raw.length&&raw.charCodeAt(end-1)>=0xD800&&raw.charCodeAt(end-1)<=0xDBFF)end--;parts.push(raw.slice(start,end));start=end;}
   var generation=Utilities.getUuid(),revision=expected+1,updated=new Date().toISOString(),sheet=sheet_('pcState');

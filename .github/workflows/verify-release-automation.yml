@@ -75,6 +75,7 @@ jobs:
           node tests/cadet-card-ui.mjs
           node tests/section-filters-ui.mjs
           node tests/results-ui.mjs
+          node tests/instructors-ui.mjs
           node tests/user-result-edits-ui.mjs
           node tests/responsive-ui.mjs
           node tests/test-access-intake-ui.mjs

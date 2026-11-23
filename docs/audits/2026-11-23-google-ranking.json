@@ -1,0 +1,30 @@
+{
+  "sourceRows": 80,
+  "participants": 20,
+  "latest": 80,
+  "syntheticParticipants": 7,
+  "formulaErrors": 0,
+  "status": "passed",
+  "date": "2026-11-23",
+  "scope": "Google ranking worksheet formulas and time-column visibility",
+  "places": "Equal correct-answer totals share competition rank: 1,2,2,4",
+  "rankUsesDuration": false,
+  "rankUsesCompletedCount": false,
+  "sourceResultsUnchanged": true,
+  "sourceCellMetadataUnchanged": true,
+  "originalStylesPreserved": true,
+  "sumTimeColumnHidden": true,
+  "latestRetakeOnly": true,
+  "scratchCleared": true,
+  "applicationUpdateRequiredForRanking": false,
+  "independentCalculationMatches": true,
+  "syntheticCases": [
+    "higher total first",
+    "equal totals share place despite different durations",
+    "missing time has no ranking effect",
+    "equal totals share place despite different completed counts",
+    "latest lower retake replaces earlier higher score",
+    "zero score ranks as a real result"
+  ],
+  "visualVerification": "Sheets API cell, format and dimension metadata checked. Native browser and artifact renderer unavailable."
+}
