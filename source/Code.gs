@@ -56,6 +56,7 @@ const SHEETS = Object.freeze({
   materialChunks: '_Частини_матеріалів',
   materialProgress: '_Перегляди_матеріалів',
   cadetNotes: '_Примітки_курсантів',
+  answerChanges: '_Виправлення_відповідей',
   pcState: '_Чернетки_ПК',
   examRecoveries: '_Відновлення_іспитів'
 });
@@ -71,6 +72,7 @@ const HEADERS = Object.freeze({
   materialChunks: ['ID файлу','Частина','Base64'],
   materialProgress: ['ID матеріалу','Ревізія','ID курсанта','Сторінка','Найбільша сторінка','Сторінок','Відкрито','Оновлено'],
   cadetNotes: ['ID курсанта','ID запиту','ID інструктора','Примітка JSON','Створено'],
+  answerChanges: ['ID зміни','ID результату','ID курсанта','Частина','Усього частин','Довжина JSON','SHA256','Дані JSON'],
   users: ['ID', 'Логін', 'ПІБ', 'Група', 'Роль', 'Хеш пароля', 'Сіль пароля', 'Активний', 'Створено', 'Публікація таблиці'],
   groups: ['ID', 'Назва', 'Створив', 'Створено', 'Архівна', 'Ревізія'],
   tests: ['ID', 'Назва', 'Опис', 'Режим', 'Тривалість, хв', 'Прохідний бал, %', 'Опубліковано', 'Питання JSON', 'Створено', 'Кількість питань', 'Ключ створення JSON'],
@@ -132,6 +134,8 @@ function doGet() {
     deletedAttemptRetakes: true,
     singleAttempt: true,
     privateLocalStorage: true,
+    userNameEditing: true,
+    answerCorrections: true,
     trainingResume: true,
     publicTableSync: true,
     fastTestStart: true,
@@ -520,7 +524,7 @@ function continueIntake_(actor,body) {
       done=intakeDeleteRows_(sheet_('testParts'),function(row){return String(row[0])!==''&&!existing[String(row[0])];},true);
     }else if(phase==='audit')done=intakeDeleteRows_(sheet_('cadetNotes'),all)&&intakeDeleteRows_(sheet_('audit'),function(row){return ['cadet','result'].indexOf(String(row[4]))>=0;});
     else if(phase==='sync')done=intakeDeleteRows_(sheet_('sync'),function(row){return String(row[1]).indexOf('result:')===0;});
-    else if(phase==='results')done=intakeDeleteRows_(sheet_('deletedResults'),all)&&intakeDeleteRows_(sheet_('results'),all);
+    else if(phase==='results')done=intakeDeleteRows_(sheet_('answerChanges'),all)&&intakeDeleteRows_(sheet_('deletedResults'),all)&&intakeDeleteRows_(sheet_('results'),all);
     else if(phase==='users')done=intakeDeleteRows_(sheet_('users'),function(row){return row[4]===ROLE_CADET&&targets[String(row[0])];});
     else if(phase==='finish'){
       var values=props.getProperties(),keys=Object.keys(values).filter(function(key){return key.indexOf(REVIEW_LEASE_PREFIX)===0||['LK_PC_STATE_','SESSION_VERSION_','DELETING_CADET_'].some(function(prefix){return key.indexOf(prefix)===0&&targets[key.slice(prefix.length)];});});
@@ -585,7 +589,7 @@ function workspaceRevisions_(user,all) {
 function conditionalWorkspace_(user,body) {
   var all=body.allResults===true,known=body.known||{},before=workspaceRevisions_(user,all),props=PropertiesService.getScriptProperties();
   var busy=props.getProperty('LK_WORKSPACE_WRITE'),changes={},out={workspaceProtocol:1,user:publicUser_(user),revisions:before,changes:changes,
-    capabilities:{fastTestStart:true,deferredResultStats:true,cadetCriticalPath:true,singleAttempt:true,deletedAttemptRetakes:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true,formattedReports:true,intakeArchives:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
+    capabilities:{userNameEditing:true,answerCorrections:true,fastTestStart:true,deferredResultStats:true,cadetCriticalPath:true,singleAttempt:true,deletedAttemptRetakes:true,resultDeletion:user.role===ROLE_INSTRUCTOR,privateLocalStorage:true,trainingResume:true,testAccess:true,newIntake:true,reviewPresence:true,chunkedTests:true,examRecovery:true,testDeletion:true,multipleChoice:true,examResume:true,pcAccountSync:true,writtenTests:true,conditionalWorkspace:true,listPerformance:true,materials:true,groupArchive:true,bulkAssignment:true,filteredAnalytics:true,cadetTransfer:true,cadetCard:true,formattedReports:true,intakeArchives:true},resultScope:all?'all':'recent',intakeGeneration:props.getProperty('LK_INTAKE_GENERATION')||'0'};
   if(user.role===ROLE_INSTRUCTOR)out.intake=intakeStatus_();
   if(known.groups!==before.groups)changes.groups=listGroups_();
   if(known.tests!==before.tests)changes.tests=listTestsForUser_(user);
@@ -673,6 +677,10 @@ function routeApi_(request) {
 
   requireRole_(user, ROLE_INSTRUCTOR);
 
+  var answerEditMatch=path.match(/^\/api\/instructor\/results\/([^/]+)\/answers$/);
+  if(answerEditMatch&&method==='GET')return resultAnswersEditor_(user,decodePart_(answerEditMatch[1]));
+  if(answerEditMatch&&method==='POST')return correctResultAnswers_(user,decodePart_(answerEditMatch[1]),body);
+
   var cadetCardMatch=path.match(/^\/api\/instructor\/cadets\/([^/]+)(\/notes)?$/);
   if(cadetCardMatch){
     var cadetId=decodePart_(cadetCardMatch[1]);
@@ -708,7 +716,7 @@ function routeApi_(request) {
   if (method === 'POST' && path === '/api/instructor/results-sheet/sync') {
     return repairPublicResults_();
   }
-  if (method === 'GET' && path === '/api/instructor/instructors') return {instructors: listInstructors_()};
+  if (method === 'GET' && path === '/api/instructor/instructors') return {instructors: listInstructors_(user)};
   if (method === 'GET' && path === '/api/instructor/question-bank') return {questions: listQuestionBank_()};
   if (method === 'GET' && path === '/api/instructor/analytics') return instructorAnalytics_(body);
   if (method === 'GET' && path === '/api/instructor/audit') return {entries: listAudit_()};
@@ -750,6 +758,8 @@ function routeApi_(request) {
   if (method === 'DELETE' && deleteTestMatch) return deleteTest_(decodePart_(deleteTestMatch[1]), user);
 
   var statusMatch = path.match(/^\/api\/instructor\/users\/([^/]+)\/status$/);
+  var userNameMatch=path.match(/^\/api\/instructor\/users\/([^/]+)\/name$/);
+  if(method==='POST'&&userNameMatch)return updateUserName_(decodePart_(userNameMatch[1]),user,body);
   if (method === 'POST' && statusMatch) return updateUserStatus_(decodePart_(statusMatch[1]), user, body);
 
   var userGroupMatch = path.match(/^\/api\/instructor\/users\/([^/]+)\/group$/);
@@ -822,7 +832,7 @@ function createInitialInstructorCode() {
 
 function ensureSchema_(lockHeld, force) {
   var cache = CacheService.getScriptCache();
-  var schemaReady=cache.get('LK_SCHEMA_READY_API25')==='1'&&cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1')==='1'&&cache.get('LK_SCHEMA_CADET_CARD_V1')==='1';
+  var schemaReady=cache.get('LK_SCHEMA_READY_API25')==='1'&&cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1')==='1'&&cache.get('LK_SCHEMA_CADET_CARD_V1')==='1'&&cache.get('LK_SCHEMA_ANSWER_CHANGES_V1')==='1';
   if(!force&&schemaReady&&cache.get('LK_SCHEMA_EXCEL_V1')==='1'&&publicReportLayoutReady_())return;
   var ownLock = null;
   if (!lockHeld) {
@@ -857,6 +867,7 @@ function ensureSchema_(lockHeld, force) {
     cache.put('LK_SCHEMA_READY_API25', '1', 21600);
     cache.put('LK_SCHEMA_READY_PUBLIC_CADETS_V1', '1', 21600);
     cache.put('LK_SCHEMA_CADET_CARD_V1','1',21600);
+    cache.put('LK_SCHEMA_ANSWER_CHANGES_V1','1',21600);
     }
     migratePublicReports_();
     if(publicReportLayoutReady_())cache.put('LK_SCHEMA_EXCEL_V1','1',21600);
@@ -2493,6 +2504,7 @@ function deleteResult_(actor,id,body) {
     plans.push({sheet:sheet_(key),rows:plannedRowNumbers_(dataRows_(key),predicate)});
   }
   plan('resultDetails',function(row){return String(row[0])===id;});
+  plan('answerChanges',function(row){return String(row[1])===id;});
   plan('legacyResults',function(row){
     return String(row[3])===id&&String(row[4])===userId&&String(row[7])===testId;
   });
@@ -2543,7 +2555,7 @@ function canonicalResultTestId_(id) {
   return resultSeriesCache_(id);
 }
 function resultFromRow_(row) {
-  return {
+  var result={
     id: row[0], userId: row[1], userName: String(row[2] || ''), groupName: String(row[3] || ''),
     testId: row[4], canonicalTestId:canonicalResultTestId_(row[4]), testTitle: String(row[5] || ''), score: row[16] === 'pending_review' ? null : Number(row[6] || 0),
     correct: Number(row[7] || 0), total: Number(row[8] || 0), durationSeconds: Number(row[9] || 0),
@@ -2555,6 +2567,8 @@ function resultFromRow_(row) {
     pendingWritten: Number(row[20] || 0), gradingRevision: Number(row[21] || 0),
     examRecovered: row[23]===true, recoveredBy: String(row[24]||''), recoveredAt: String(row[25]||'')
   };
+  if(row[22]&&String(row[22]).indexOf('"_answerCorrection"')>=0){try{var correction=JSON.parse(String(row[22]))._answerCorrection;if(correction){result.answersCorrected=true;result.answerCorrectionCount=Number(correction.count)||1;}}catch(ignored){}}
+  return result;
 }
 
 function findResult_(userId, testId) {
@@ -2846,9 +2860,50 @@ function listAudit_() {
     }).sort(function (first, second) { return dateMillis_(second.createdAt) - dateMillis_(first.createdAt); });
 }
 
-function listInstructors_() {
+function listInstructors_(actor) {
+  var primary=actor&&isPrimaryInstructor_(actor.id);
   return listUsers_().filter(function (user) { return user.role === ROLE_INSTRUCTOR; })
-    .map(publicUser_).sort(function (first, second) { return dateMillis_(first.createdAt) - dateMillis_(second.createdAt); });
+    .map(function(user){var out=publicUser_(user);if(actor)out.canEditName=Boolean(primary||String(actor.id)===String(user.id));return out;})
+    .sort(function (first, second) { return dateMillis_(first.createdAt) - dateMillis_(second.createdAt); });
+}
+
+function userChangeAuditKey_(actor,requestId,action,targetId){return 'change-'+sha256Hex_(String(actor.id)+'\n'+requestId+'\n'+action+'\n'+targetId);}
+function findUserChangeAudit_(actor,requestId,action,targetId){
+  var key=userChangeAuditKey_(actor,requestId,action,targetId),sheet=sheet_('audit'),count=sheet.getLastRow()-1,index=-1;
+  if(count>0)sheet.getRange(2,1,count,1).getValues().some(function(row,i){if(String(row[0])===key){index=i+2;return true;}return false;});
+  return index<0?null:sheet.getRange(index,1,1,HEADERS.audit.length).getValues()[0];
+}
+function writeUserChangeAudit_(actor,requestId,action,targetType,targetId,targetName,details) {
+  var key=userChangeAuditKey_(actor,requestId,action,targetId),sheet=sheet_('audit');
+  if(findUserChangeAudit_(actor,requestId,action,targetId))return;
+  sheet.appendRow([key,actor.id,safeCellText_(actor.fullName||actor.username),action,targetType,String(targetId),safeCellText_(targetName),safeCellText_(details),new Date()]);
+  flushRequestWrites_();
+}
+function updateUserName_(id,actor,body) {
+  requireRole_(actor,ROLE_INSTRUCTOR);
+  var target=findUserById_(id);if(!target)fail_('Користувача не знайдено.','USER_NOT_FOUND');
+  if(target.role===ROLE_CADET)requireCadetNotDeleting_(id);
+  else if(String(actor.id)!==String(id)&&!isPrimaryInstructor_(actor.id))fail_('ПІБ іншого інструктора змінює головний інструктор.','FORBIDDEN');
+  var request=cleanRequired_(body.requestId,'Не задано ключ зміни ПІБ.',100);
+  if(!/^[A-Za-z0-9_-]{8,100}$/.test(request)||typeof body.expectedFullName!=='string'||typeof body.fullName!=='string')fail_('Оновіть список користувачів і повторіть зміну.','BAD_REQUEST');
+  var name=cleanRequired_(body.fullName,'Укажіть ПІБ повністю.',180),suffix=target.role===ROLE_INSTRUCTOR?target.fullName.match(/ · (Розробник\/Інструктор|Розробник|Старший викладач|Викладач|Старший інструктор|Інструктор)$/):null;
+  if(suffix)name=name.replace(/ · (Розробник\/Інструктор|Розробник|Старший викладач|Викладач|Старший інструктор|Інструктор)$/,'')+suffix[0];
+  if(name.length>180)fail_('ПІБ із посадою перевищує 180 символів.','BAD_REQUEST');
+  var details='ПІБ: '+body.expectedFullName+' → '+name+'.',saved=findUserChangeAudit_(actor,request,'USER_NAME',id);
+  if(saved){if(String(saved[6])!==safeCellText_(name)||String(saved[7])!==safeCellText_(details))fail_('Ключ зміни ПІБ вже використано для інших даних.','REQUEST_CONFLICT');return {changed:false,alreadyApplied:true,user:publicUser_(target)};}
+  if(target.fullName!==body.expectedFullName&&target.fullName!==name)fail_('ПІБ уже змінив інший інструктор. Оновіть список.','REVISION_CONFLICT');
+  var changed=target.fullName!==name;
+  if(changed){sheet_('users').getRange(target.rowNumber,3).setValue(safeCellText_(name));if(target.role===ROLE_CADET)sheet_('users').getRange(target.rowNumber,10).setValue('pending');}
+  // Retry reconciles every owned result even if a previous write stopped
+  // after updating the account. Names never select another person's work.
+  var results=sheet_('results'),count=results.getLastRow()-1;
+  if(count>0)results.getRange(2,2,count,2).getValues().forEach(function(row,i){
+    if(String(row[0])!==String(id)||String(row[1])===name)return;
+    results.getRange(i+2,3).setValue(safeCellText_(name));results.getRange(i+2,PUBLIC_SYNC_COLUMN).setValue('pending');
+  });
+  target.fullName=name;resultLookupCache_=null;invalidatePublicSync_();flushRequestWrites_();
+  writeUserChangeAudit_(actor,request,'USER_NAME',target.role===ROLE_CADET?'cadet':'instructor',id,name,details);
+  return {changed:changed,user:publicUser_(target)};
 }
 
 function createCadetByInstructor_(actor, body) {
@@ -3105,6 +3160,7 @@ function deleteCadet_(id, actor, body, preview) {
   plan(sheet_('legacyResults'), legacyRows, function (row) {
     return row[4] ? String(row[4]) === id : Boolean(resultIds[String(row[3])]);
   });
+  planPrivate('answerChanges',function(row){return String(row[2])===id;});
   plan(sheet_('deletedResults'), deletedRows, function (row) { return String(row[1]) === id; });
   plan(sheet_('results'), resultRows, function (row) { return String(row[1]) === id; });
   planPrivate('users', function (row) { return String(row[0]) === id; });
@@ -3861,7 +3917,7 @@ function gradeResult_(user,id,body) {
   var now=new Date().toISOString();
   normalized.forEach(function(g){var old=grades[g.questionId];if(!old || old.points!==g.points || old.comment!==g.comment)grades[g.questionId]={points:g.points,comment:g.comment,reviewerId:String(user.id),reviewerName:String(user.displayName||user.fullName||user.username),reviewedAt:now};});
   grades._requestId=requestId;grades._fingerprint=fingerprint;
-  var json=JSON.stringify(grades);if(json.length>48000)fail_('Сумарний обсяг коментарів завеликий. Скоротіть коментарі.','BAD_GRADE');
+  var json=resultGradesJson_(grades);
   var updated=resultGrading_(test,JSON.parse(String(r.row[13]||'{}')),grades);
   if(body.finalize===true && updated.pendingWritten)fail_('Перевірте всі письмові відповіді.','BAD_GRADE');
   r.row[6]=updated.score==null?'':updated.score;r.row[11]=updated.passed==null?'':updated.passed;r.row[PUBLIC_SYNC_COLUMN-1]='pending';
@@ -3872,6 +3928,91 @@ function gradeResult_(user,id,body) {
   logAudit_(user,'RESULT_GRADE','result',id,result.testTitle,'Ревізія '+result.gradingRevision+'; '+result.earnedPoints+'/'+result.maxPoints+' балів; очікує: '+result.pendingWritten+'.');
   var tableSynced=publishCommittedResult_(result,r.rowNumber);
   return {result:result,review:buildResultReview_(user,result,test,JSON.parse(String(r.row[13]||'{}')),grades),tableSynced:tableSynced};
+}
+
+// Immutable correction snapshots precede the single authoritative result-row
+// commit. The result's metadata points only to a verified complete snapshot.
+function resultGradesJson_(grades){
+  var ordinary={};Object.keys(grades).forEach(function(key){if(key!=='_answerCorrection')ordinary[key]=grades[key];});
+  var raw=JSON.stringify(grades);if(JSON.stringify(ordinary).length>48000||raw.length>49500)fail_('Сумарний обсяг коментарів завеликий. Скоротіть коментарі.','BAD_GRADE');return raw;
+}
+function storeAnswerChange_(change) {
+  var raw=JSON.stringify(change);if(raw.length>1000000)fail_('Історія виправлення завелика.','PAYLOAD_TOO_LARGE');
+  var parts=[],at=0;
+  while(at<raw.length){var end=Math.min(at+20000,raw.length);if(end<raw.length&&raw.charCodeAt(end-1)>=0xd800&&raw.charCodeAt(end-1)<=0xdbff)end--;parts.push(raw.slice(at,end));at=end;}
+  var hash=sha256Hex_(raw),rows=parts.map(function(part,index){return [change.id,String(change.resultId),String(change.userId),index,parts.length,raw.length,hash,'json:'+part];});
+  var sheet=sheet_('answerChanges'),first=sheet.getLastRow()+1;ensureRowCapacity_(sheet,first+rows.length-1);
+  sheet.getRange(first,1,rows.length,HEADERS.answerChanges.length).setValues(rows);flushRequestWrites_();
+  readAnswerChange_(change.id,change.resultId,change.userId);
+}
+function readAnswerChange_(id,resultId,userId) {
+  if(typeof id!=='string'||!/^answer-[A-Za-z0-9_-]{16,100}$/.test(id))fail_('Пошкоджено посилання на історію відповідей.','ANSWER_HISTORY_UNAVAILABLE');
+  var sheet=sheet_('answerChanges'),count=sheet.getLastRow()-1,positions=[];
+  if(count>0)sheet.getRange(2,1,count,3).getValues().forEach(function(row,i){if(String(row[0])===id&&String(row[1])===String(resultId)&&String(row[2])===String(userId))positions.push(i+2);});
+  if(!positions.length||positions.length>64)fail_('Історія відповідей недоступна. Поточну роботу залишено без змін.','ANSWER_HISTORY_UNAVAILABLE');
+  var rows=sheet.getRange(positions[0],1,positions[positions.length-1]-positions[0]+1,HEADERS.answerChanges.length).getValues(),parts=[],seen=Object.create(null),length=Number(rows[0][5]),hash=String(rows[0][6]);
+  rows.forEach(function(row){var n=Number(row[3]);if(String(row[0])!==id||String(row[1])!==String(resultId)||String(row[2])!==String(userId)||Number(row[4])!==positions.length||Number(row[5])!==length||String(row[6])!==hash||!Number.isInteger(n)||n<0||n>=positions.length||seen[n]||String(row[7]).indexOf('json:')!==0)fail_('Історія відповідей збережена не повністю.','ANSWER_HISTORY_UNAVAILABLE');seen[n]=true;parts[n]=String(row[7]).slice(5);});
+  var raw=parts.join('');if(raw.length!==length||raw.length>1000000||sha256Hex_(raw)!==hash)fail_('Перевірка цілісності історії відповідей не пройдена.','ANSWER_HISTORY_UNAVAILABLE');
+  var value;try{value=JSON.parse(raw);}catch(error){fail_('Історію відповідей неможливо прочитати.','ANSWER_HISTORY_UNAVAILABLE');}
+  if(value.protocol!==1||value.id!==id||String(value.resultId)!==String(resultId)||String(value.userId)!==String(userId))fail_('Історія належить іншій роботі.','ANSWER_HISTORY_UNAVAILABLE');
+  return value;
+}
+function resultAnswerData_(actor,id) {
+  requireRole_(actor,ROLE_INSTRUCTOR);
+  var record=resultRecordById_(id);if(!record)fail_('Результат не знайдено.','RESULT_NOT_FOUND');
+  requireCadetNotDeleting_(record.result.userId);if(record.row[PUBLIC_SYNC_COLUMN-1]===RESULT_DELETING)fail_('Триває видалення цієї роботи.','RESULT_DELETION_PENDING');
+  var test=getTestById_(record.result.testId);if(!test||!record.row[13])fail_('Для цієї старої роботи немає повних відповідей.','REVIEW_UNAVAILABLE');
+  var answers,grades;try{answers=JSON.parse(String(record.row[13]));grades=JSON.parse(String(record.row[22]||'{}'));}catch(error){fail_('Збережені відповіді неможливо прочитати.','REVIEW_UNAVAILABLE');}
+  if(!answers||typeof answers!=='object'||Array.isArray(answers)||!grades||typeof grades!=='object'||Array.isArray(grades))fail_('Некоректна структура збережених відповідей.','REVIEW_UNAVAILABLE');
+  var known=Object.create(null);test.questions.forEach(function(q){known[String(q.id)]=true;});
+  if(Object.keys(answers).some(function(key){return !known[key];}))fail_('Версія питань не збігається зі збереженою роботою.','REVIEW_UNAVAILABLE');
+  return {record:record,test:test,answers:answers,grades:grades};
+}
+function resultAnswersEditor_(actor,id) {
+  var data=resultAnswerData_(actor,id),meta=data.grades._answerCorrection||null,original=meta?readAnswerChange_(meta.originalId,id,data.record.result.userId).before.answers:data.answers;
+  return {answerCorrectionProtocol:1,result:data.record.result,questions:sanitizeTestForCadet_(data.test).questions,answers:data.answers,originalAnswers:original,correction:meta?{count:meta.count,actorName:meta.actorName,at:meta.at,reason:meta.reason}:null};
+}
+function correctResultAnswers_(actor,id,body) {
+  var data=resultAnswerData_(actor,id),r=data.record,test=data.test,grades=copyObject_(data.grades),previous=grades._answerCorrection||null;
+  var request=cleanRequired_(body.requestId,'Не задано ключ виправлення.',100),reason=cleanRequired_(body.reason,'Укажіть причину виправлення відповідей.',500);
+  if(!/^[A-Za-z0-9_-]{8,100}$/.test(request)||!Number.isInteger(body.expectedRevision)||body.expectedRevision<0||reason.length<3||!Array.isArray(body.changes)||!body.changes.length||body.changes.length>200)fail_('Перевірте причину та перелік виправлених відповідей.','BAD_REQUEST');
+  var byId=Object.create(null),seen=Object.create(null);test.questions.forEach(function(q){byId[String(q.id)]=q;});
+  var normalized=body.changes.map(function(change){
+    if(!change||typeof change!=='object')fail_('Некоректне виправлення відповіді.','BAD_REQUEST');
+    var key=String(change.questionId),q=byId[key];if(!q||seen[key])fail_('Невідоме або повторене питання.','BAD_REQUEST');seen[key]=true;
+    var value;
+    if(isWritten_(q)){if(typeof change.text!=='string'||change.text.length>3000)fail_('Письмова відповідь: до 3000 символів.','ANSWER_TOO_LONG');value=change.text.replace(/\u0000/g,'');}
+    else{if(!Array.isArray(change.answerIds))fail_('Оберіть варіанти відповіді.','BAD_REQUEST');value=choiceValue_(q,change.answerIds,true);}
+    return {questionId:key,value:value};
+  }).sort(function(a,b){return a.questionId.localeCompare(b.questionId);});
+  var fingerprint=sha256Hex_(JSON.stringify({actorId:String(actor.id),revision:body.expectedRevision,reason:reason,changes:normalized}));
+  if(previous&&previous.requestId===request){
+    if(previous.fingerprint!==fingerprint)fail_('Ключ виправлення вже використано для інших даних.','REQUEST_CONFLICT');
+    writeUserChangeAudit_(actor,request,'RESULT_ANSWERS_CORRECT','result',id,r.result.testTitle,'Причина: '+previous.reason+'; ревізія '+previous.revision+'.');
+    var replay=resultAnswersEditor_(actor,id);replay.review=buildResultReview_(actor,r.result,test,data.answers,data.grades);replay.alreadyApplied=true;replay.tableSynced=publishCommittedResult_(r.result,r.rowNumber);return replay;
+  }
+  if(body.expectedRevision!==r.result.gradingRevision)fail_('Роботу вже змінив інший інструктор. Оновіть її перед виправленням.','REVISION_CONFLICT');
+  requireReviewLease_(actor,id,body.reviewLease);
+  // Verify both the current chain link and the immutable original before a new commit.
+  if(previous){readAnswerChange_(previous.id,id,r.result.userId);readAnswerChange_(previous.originalId,id,r.result.userId);}
+  var selected=copyObject_(data.answers),changed=[];
+  normalized.forEach(function(change){var q=byId[change.questionId],old=selected[change.questionId]||(isWritten_(q)?'':'0');
+    if(JSON.stringify(old)===JSON.stringify(change.value))return;selected[change.questionId]=change.value;changed.push(change.questionId);if(isWritten_(q))delete grades[change.questionId];
+  });
+  if(!changed.length)fail_('Відповіді не змінилися.','NO_CHANGES');
+  if(JSON.stringify(selected).length>48000)fail_('Сумарний обсяг відповідей перевищує 48 000 символів.','ANSWERS_TOO_LARGE');
+  delete grades._requestId;delete grades._fingerprint;
+  var historyId='answer-'+Utilities.getUuid(),now=new Date().toISOString(),revision=r.result.gradingRevision+1;
+  var meta={id:historyId,originalId:previous?previous.originalId:historyId,previousId:previous?previous.id:null,count:(previous?Number(previous.count)||0:0)+1,requestId:request,fingerprint:fingerprint,revision:revision,actorId:String(actor.id),actorName:String(actor.fullName||actor.username),at:now,reason:reason};
+  grades._answerCorrection=meta;
+  var updated=resultGrading_(test,selected,grades),next=r.row.slice();
+  next[6]=updated.score==null?'':updated.score;next[7]=updated.correct;next[11]=updated.passed==null?'':updated.passed;next[13]=JSON.stringify(selected);
+  next[16]=updated.gradingStatus;next[17]=updated.earnedPoints;next[18]=updated.maxPoints;next[19]=updated.choiceTotal;next[20]=updated.pendingWritten;next[21]=revision;next[22]=resultGradesJson_(grades);next[PUBLIC_SYNC_COLUMN-1]='pending';
+  storeAnswerChange_({protocol:1,id:historyId,resultId:String(id),userId:String(r.result.userId),actorId:meta.actorId,actorName:meta.actorName,at:now,reason:reason,requestId:request,revision:revision,previousId:meta.previousId,changedQuestionIds:changed,before:{answers:data.answers,grades:data.grades,result:r.result},after:{answers:selected,grades:grades,result:resultFromRow_(next)}});
+  sheet_('results').getRange(r.rowNumber,7,1,HEADERS.results.length-6).setValues([next.slice(6)]);flushRequestWrites_();
+  resultLookupCache_=null;invalidatePublicSync_();
+  writeUserChangeAudit_(actor,request,'RESULT_ANSWERS_CORRECT','result',id,r.result.testTitle,'Причина: '+reason+'; ревізія '+revision+'.');
+  var out=resultAnswersEditor_(actor,id);out.review=buildResultReview_(actor,out.result,test,selected,grades);out.tableSynced=publishCommittedResult_(out.result,r.rowNumber);return out;
 }
 
 function containsWrittenResult_(value) {
@@ -4288,6 +4429,7 @@ function ensureIntakeArchive_(actor,job) {
   if(!job.value.archiveRequired)return false;
   if(job.value.archive){if(job.value.phase===0)readIntakeArchiveBytes_(job.value.id,job.value.archive);return false;}
   var data=instructorReportData_(actor,{}, {allowIntake:true,generatedAt:job.value.startedAt,name:job.value.archiveName}),model=LKReport_.reportModel(data,{name:job.value.archiveName,timezoneOffsetMinutes:job.value.timezoneOffsetMinutes||0});
+  var changes=dataRows_('answerChanges');if(changes.length)model.sheets.push({name:'Виправлення відповідей',columns:HEADERS.answerChanges.map(function(h){return [h,28];}),rows:changes,freezeColumns:3});
   var parts=LKReport_.xlsxParts(model),contentDigest=sha256Hex_(JSON.stringify(parts)),saved=[];
   dataRows_('intakeJobs').forEach(function(row){if(String(row[0])!==job.value.id||row[1]!=='archive-meta')return;var v;try{v=JSON.parse(String(row[3]));}catch(ignored){return;}if(v&&v.protocol===1&&v.contentDigest===contentDigest)saved.push(v);});
   var archive=saved.length?saved[saved.length-1]:null;

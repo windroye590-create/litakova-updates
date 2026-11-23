@@ -81,7 +81,7 @@ sandbox.instructor=()=>true;sandbox.resultsView=()=>account.resultsView||'compac
 sandbox.reviewPresence=createReviewPresence({session:()=>sandbox.S.session,rpc:sandbox.rpc,clientId:'review-audit-window'});
 sandbox.reviewPresenceMarkup=reviewPresenceMarkup;
 vm.createContext(sandbox);
-for (const name of ['openGrading','gradingScreen','choiceReview','gradingRecovery','publicTableSyncNotice']) {
+for (const name of ['acceptGradingReply','openGrading','gradingScreen','choiceReview','gradingRecovery','publicTableSyncNotice']) {
   const source = appFunction(name); if (source) vm.runInContext(source, sandbox);
 }
 await check('Viewing an ordinary test does not create an unfinished grading draft', async() => {

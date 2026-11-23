@@ -330,3 +330,5 @@ body.dark .choice-review.incorrect{border-color:#f87171;background:#450a0a}
 
 .editor-field-help{margin:-8px 0 0;color:var(--muted);font-size:13px;line-height:1.5;font-weight:400;overflow-wrap:anywhere}
 .editor-field-help>span{display:block;margin-top:4px}
+
+.answer-correction-question{margin-bottom:18px}.answer-correction-question h3{margin-bottom:16px;overflow-wrap:anywhere}.answer-correction-question details{margin-top:16px}.answer-correction-question .answer{margin-top:8px}#instructors-panel td>button{display:block;margin-top:6px}

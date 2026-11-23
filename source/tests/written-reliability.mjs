@@ -67,7 +67,8 @@ await check('Partial grading keeps the draft comment of an answer with no points
 });
 await check('Reopening a partial review preserves the pending comment and current revision',async()=>{
  const line=app.split('\n').find(line=>line.startsWith('async function openGrading('));assert.ok(line);
- vm.runInContext(line,sandbox);await vm.runInContext(`openGrading(${JSON.stringify(result.id)})`,sandbox);
+ const accept=app.split('\n').find(line=>line.startsWith('function acceptGradingReply('));assert.ok(accept);
+ vm.runInContext(accept+'\n'+line,sandbox);await vm.runInContext(`openGrading(${JSON.stringify(result.id)})`,sandbox);
  assert.equal(sandbox.grading.draft.items[small.questions[1].id].comment,draft.items[small.questions[1].id].comment);
  assert.equal(sandbox.grading.draft.revision,1);
 });
