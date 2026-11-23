@@ -1,0 +1,42 @@
+{
+  "backend": {
+    "status": "passed",
+    "passed": 14,
+    "checks": [
+      "A name edit updates the correct ID and its results while preserving login, password, key and dates",
+      "A retry after a partial name write reconciles results and creates a single audit entry",
+      "Stale names and cadet access cannot overwrite another instructor change",
+      "The primary instructor can edit staff names while their title and role remain intact",
+      "Choice corrections recalculate the existing result and retain the immutable submission identity",
+      "Changing a written answer invalidates only that answer grade and retains the original",
+      "Another active review lease blocks corrections before any snapshot is written",
+      "Stale revisions, missing reasons and unknown answer IDs cannot mutate accepted work",
+      "A lost canonical-write acknowledgement retries one correction and one journal entry",
+      "A snapshot-write failure leaves the result untouched and the same request can succeed later",
+      "Corrupted original snapshots block further edits without replacing current answers",
+      "Written grading after an answer correction preserves the correction chain",
+      "Deleting one result purges only its private answer history",
+      "Large Unicode answer originals survive chunk boundaries and are archived before intake cleanup"
+    ],
+    "actualAppsScriptExecuted": true,
+    "productionRecordsChanged": 0
+  },
+  "browser": {
+    "status": "passed",
+    "passed": 9,
+    "checks": [
+      "Cadet name dialog changes the selected ID and leaves login intact",
+      "Staff name controls are available to the primary instructor",
+      "Correction editor shows escaped original text and enforces two selected choices",
+      "Unsaved corrections survive reload and remain in this account",
+      "A disk-write failure retains the draft and prevents any correction RPC",
+      "Lost acknowledgement freezes the request; retry updates the same attempt once",
+      "Primary answers remain visible after correction and narrow layout fits",
+      "Stale work is rejected and reloading keeps the previous local draft for comparison",
+      "Cadet sees recalculated work without correction controls or private reasons"
+    ],
+    "pageErrors": [],
+    "productionWrites": false,
+    "testedAt": "2026-11-23T10:19:41.747Z"
+  }
+}
