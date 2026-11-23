@@ -16,8 +16,8 @@ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
 const PUBLIC_SYNC_DELAY_MS = 30000;
 const REVIEW_LEASE_MS = 120000;
 const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
-const LATEST_APP_VERSION_CODE = 173;
-const LATEST_APP_VERSION_NAME = '1.2.49';
+const LATEST_APP_VERSION_CODE = 174;
+const LATEST_APP_VERSION_NAME = '1.2.50';
 const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
 const ROLE_INSTRUCTOR = 'instructor';
 const ROLE_CADET = 'cadet';
@@ -129,7 +129,7 @@ function doGet() {
     ok: true,
     service: 'Літакова Комісія',
     version: API_VERSION,
-    serverBuild: 'pc-api26-46273c6207d3ecdc',
+    serverBuild: 'pc-api26-6445a96eb3e42ee1',
     resultDeletion: true,
     deletedAttemptRetakes: true,
     singleAttempt: true,
