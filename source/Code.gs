@@ -830,9 +830,12 @@ function createInitialInstructorCode() {
   }
 }
 
+function privateSchemaReady_(cache) {
+  return cache.get('LK_SCHEMA_READY_API25')==='1'&&cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1')==='1'&&cache.get('LK_SCHEMA_CADET_CARD_V1')==='1'&&cache.get('LK_SCHEMA_ANSWER_CHANGES_V1')==='1';
+}
 function ensureSchema_(lockHeld, force) {
   var cache = CacheService.getScriptCache();
-  var schemaReady=cache.get('LK_SCHEMA_READY_API25')==='1'&&cache.get('LK_SCHEMA_READY_PUBLIC_CADETS_V1')==='1'&&cache.get('LK_SCHEMA_CADET_CARD_V1')==='1'&&cache.get('LK_SCHEMA_ANSWER_CHANGES_V1')==='1';
+  var schemaReady=privateSchemaReady_(cache);
   if(!force&&schemaReady&&cache.get('LK_SCHEMA_EXCEL_V1')==='1'&&publicReportLayoutReady_())return;
   var ownLock = null;
   if (!lockHeld) {
@@ -840,6 +843,12 @@ function ensureSchema_(lockHeld, force) {
     if (!ownLock.tryLock(2000)) fail_('Сервер зайнятий. Спробуйте ще раз.', 'BUSY');
   }
   try {
+    // Another request may have completed initialization while this read waited
+    // for the lock. Do not repeat all header writes using the earlier cache.
+    if(!force){
+      schemaReady=privateSchemaReady_(cache);
+      if(schemaReady&&cache.get('LK_SCHEMA_EXCEL_V1')==='1'&&publicReportLayoutReady_())return;
+    }
     var properties=PropertiesService.getScriptProperties();
     if(force||!schemaReady){
     var spreadsheet = spreadsheet_();
@@ -1135,7 +1144,7 @@ function repairPublicResults_() {
   });
   var resultIds = Object.create(null);
   var userIds = Object.create(null);
-  var publicIndexes = Object.create(null);
+  var publicIndexes = Object.create(null),placeholderIndexes=Object.create(null);
   var resultsById = Object.create(null);
   var titlesChanged = false;
   results.forEach(function (result) { resultsById[String(result.id)] = result; });
@@ -1148,7 +1157,7 @@ function repairPublicResults_() {
       titlesChanged = true;
     }
   });
-  rows.forEach(function(row,index){var key=String(row[7]||'');if(key)(publicIndexes[key]|| (publicIndexes[key]=[])).push(index);});
+  rows.forEach(function(row,index){var key=String(row[7]||'');if(key)(publicIndexes[key]|| (publicIndexes[key]=[])).push(index);else if(isPublicCadetPlaceholder_(row)){var owner=String(row[6]||'');(placeholderIndexes[owner]||(placeholderIndexes[owner]=[])).push(index);}});
   if (titlesChanged) {
     writePublicRows_(sheet,2,rows);
   }
@@ -1206,7 +1215,10 @@ function repairPublicResults_() {
   listUsers_().filter(function (user) {
     return user.role === ROLE_CADET && !cadetDeletionPending_(user.id, properties);
   }).forEach(function (user) {
-    if (userIds[String(user.id)]) return;
+    if (userIds[String(user.id)]) {
+      (placeholderIndexes[String(user.id)]||[]).forEach(function(index){refreshPublicCadetPlaceholder_(sheet,index,rows[index],user);});
+      return;
+    }
     var values = publicPlaceholder_(user);
     appendPublicRow_(sheet,values);
     rows.push(values);
@@ -2893,13 +2905,15 @@ function updateUserName_(id,actor,body) {
   if(saved){if(String(saved[6])!==safeCellText_(name)||String(saved[7])!==safeCellText_(details))fail_('Ключ зміни ПІБ вже використано для інших даних.','REQUEST_CONFLICT');return {changed:false,alreadyApplied:true,user:publicUser_(target)};}
   if(target.fullName!==body.expectedFullName&&target.fullName!==name)fail_('ПІБ уже змінив інший інструктор. Оновіть список.','REVISION_CONFLICT');
   var changed=target.fullName!==name;
-  if(changed){sheet_('users').getRange(target.rowNumber,3).setValue(safeCellText_(name));if(target.role===ROLE_CADET)sheet_('users').getRange(target.rowNumber,10).setValue('pending');}
+  if(changed){if(target.role===ROLE_CADET)sheet_('users').getRange(target.rowNumber,10).setValue('pending');sheet_('users').getRange(target.rowNumber,3).setValue(safeCellText_(name));}
   // Retry reconciles every owned result even if a previous write stopped
   // after updating the account. Names never select another person's work.
   var results=sheet_('results'),count=results.getLastRow()-1;
   if(count>0)results.getRange(2,2,count,2).getValues().forEach(function(row,i){
     if(String(row[0])!==String(id)||String(row[1])===name)return;
-    results.getRange(i+2,3).setValue(safeCellText_(name));results.getRange(i+2,PUBLIC_SYNC_COLUMN).setValue('pending');
+    // Queue publication first: a lost name-write acknowledgement must not
+    // leave a changed name with no durable obligation to update the report.
+    results.getRange(i+2,PUBLIC_SYNC_COLUMN).setValue('pending');results.getRange(i+2,3).setValue(safeCellText_(name));
   });
   target.fullName=name;resultLookupCache_=null;invalidatePublicSync_();flushRequestWrites_();
   writeUserChangeAudit_(actor,request,'USER_NAME',target.role===ROLE_CADET?'cadet':'instructor',id,name,details);
@@ -3242,11 +3256,23 @@ function generateInviteCode_() {
   return raw.match(/.{1,4}/g).join('-');
 }
 
+function isPublicCadetPlaceholder_(row) {
+  return !String(row[7]||'')&&!String(row[5]||'')&&row.slice(1,5).every(function(value){return value==='';});
+}
+function refreshPublicCadetPlaceholder_(sheet,index,row,user) {
+  if(!isPublicCadetPlaceholder_(row))return;
+  var name=safeCellText_(user.fullName),group=safeCellText_(user.groupName);
+  if(String(row[0]||'')===name&&String(row[12]||'')===group)return;
+  var updated=row.slice();updated[0]=name;updated[12]=group;
+  writePublicRows_(sheet,index+2,[updated]);row[0]=name;row[12]=group;
+}
 function addVisibleCadetPlaceholder_(user) {
   var sheet = publicResultsSheet_();
   var rows = publicResultRows_();
-  var exists = rows.some(function (row) {
-    return String(row[6]) === String(user.id);
+  var exists = false;
+  rows.forEach(function (row,index) {
+    if(String(row[6])!==String(user.id))return;
+    exists=true;refreshPublicCadetPlaceholder_(sheet,index,row,user);
   });
   if (!exists) appendPublicRow_(sheet,publicPlaceholder_(user));
 }
