@@ -35,6 +35,7 @@ jobs:
       - name: Verify sandbox guards before any Google writes
         run: |
           python3 -m unittest discover -s release-tools/tests -p 'test_google_load_sandbox.py'
+          python3 -m unittest discover -s release-tools/tests -p 'test_live_google_verdict.py'
           node source/tests/google-load-isolation.mjs
           node --check source/tests/live-google-load.mjs
       - name: Create isolated books and temporary test deployment, restore original HEAD
@@ -45,6 +46,8 @@ jobs:
       - name: Exercise actual Google login, starts, checkpoints, finishes and publication
         timeout-minutes: 35
         run: node source/tests/live-google-load.mjs --state "$LOAD_STATE" --report-dir "$LOAD_REPORT"
+      - name: Check classroom delivery acceptance
+        run: python3 release-tools/verify_live_google_load.py --report-dir "$LOAD_REPORT"
       - name: Retire only created test resources and verify production deployment
         if: always()
         timeout-minutes: 5
