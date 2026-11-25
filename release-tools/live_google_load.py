@@ -61,11 +61,13 @@ class Drive:
                     column=re.match(r'[A-Z]+',cell.get('r','')).group();kind=cell.get('t','n');node=cell.find('x:v',ns);value=node.text if node is not None else ''
                     if kind=='s':value=strings[int(value)]
                     elif kind=='inlineStr':value=''.join(cell.itertext())
-                    cells[column]=(kind,value or '')
+                    formula=cell.find('x:f',ns);formula_text=formula.text or '' if formula is not None else ''
+                    cells[column]=(kind,value or '',{'hasFormula':formula is not None,'formulaLength':len(formula_text),'formulaUnaryPlus':formula_text.startswith('+'),'formulaEquals':formula_text.startswith('=')})
                 if not cells.get('A',('', ''))[1]:continue
                 shapes.append({'userId':cells['A'][1],'role':cells.get('E',('', ''))[1],
                     'hashLength':len(cells.get('F',('', ''))[1]),'saltLength':len(cells.get('G',('', ''))[1]),
-                    'hashCellType':cells.get('F',('', ''))[0],'saltCellType':cells.get('G',('', ''))[0]})
+                    'hashCellType':cells.get('F',('', ''))[0],'saltCellType':cells.get('G',('', ''))[0],
+                    'hashFormula':cells.get('F',('', '',{}))[2],'saltFormula':cells.get('G',('', '',{}))[2]})
         return shapes
 
 def control(state, action, extra=None):
