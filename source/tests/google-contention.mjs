@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import * as C from '../web/core.js';
+import {createExamSession} from '../web/exam-session.js';
 import {context,api,instructorToken,credential,regressionTest} from './fixtures/server_model.mjs';
 const checks=[],measurements={};
 async function check(name,work){await work();checks.push(name);console.log('PASS '+name);}
@@ -111,6 +112,21 @@ await check('Busy delivery retries stay staggered and bounded while offline back
  }
  assert.equal(C.deliveryRetryDelay(9,'NETWORK',()=>1),300000);
 });
+await check('Cloud checkpoints coalesce for a minute while explicit save and finish send the latest local answer immediately',async()=>{
+ const owner=person(),account={run:null,results:[]},calls=[];let ticks=0,saves=0;
+ const controller=createExamSession({session:()=>owner,account:()=>account,deviceId:()=>'coalesced-device',now:()=>ticks,random:()=>0,persist:async()=>{saves++;},
+  rpc:async(method,path,body)=>{calls.push(path);return request(method,path,owner,body);},completed:async reply=>account.results.push(reply.result)});
+ await controller.start(exam.id);const q=exam.questions[0],key=String(q.id);
+ account.run.answers[key]=String(q.answers[0].id);await controller.background();
+ assert.equal(calls.filter(path=>path.endsWith('/save')).length,1);
+ account.run.answers[key]=String(q.answers[1].id);
+ for(const time of [15000,30000,59000]){ticks=time;await controller.background();}
+ assert.equal(calls.filter(path=>path.endsWith('/save')).length,1);
+ await controller.sync();assert.equal(calls.filter(path=>path.endsWith('/save')).length,2);
+ account.run.answers[key]=String(q.answers[0].id);await controller.finish();
+ assert.equal(account.run,null);assert.ok(saves>0);
+ assert.equal(JSON.parse(context.resultRecordById_(account.results[0].id).row[13])[key],String(q.answers[0].id));
+});
 await check('Publication repairs only the matching details within a large unrelated history',()=>{
  const details=context.sheet_('resultDetails');
  for(let i=0;i<10000;i++)details.appendRow(['foreign-history-'+i,'foreign-user','foreign-test','Історія','foreign-question','Історія',false,new Date(now)]);
@@ -122,5 +138,17 @@ await check('Publication repairs only the matching details within a large unrela
  assert.equal(details.rows.filter(row=>String(row[0])===String(record.result.id)).length,50);
  assert.equal(JSON.stringify(details.rows.filter(row=>String(row[0]).startsWith('foreign-history-'))),foreign);
  measurements.publicationDetailReadCellsWith10000ForeignRows=cells;
+});
+await check('Ordinary idle instructor refreshes finish bounded maintenance after the publication queue is empty',()=>{
+ quiet();for(let i=0;i<20&&context.scanPublicSync_(true).summary.count;i++)request('GET','/api/public-table-sync',{token:instructorToken});
+ assert.equal(context.scanPublicSync_(true).summary.count,0);
+ const user=context.findUserById_(other.user.id);let doc=context.examDocument_(user);
+ for(let i=0;i<70;i++)doc=context.examWrite_(user,doc,doc.value,randomUUID());
+ const wanted=JSON.stringify(context.examDocument_(user).value);
+ assert.ok(headers(other).length>3);
+ request('GET','/api/workspace',{token:instructorToken});assert.equal(props.getProperty('LK_PC_STATE_GC_V1'),'1');
+ for(let i=0;i<10&&props.getProperty('LK_PC_STATE_GC_V1');i++)request('GET','/api/workspace',{token:instructorToken});
+ assert.equal(props.getProperty('LK_PC_STATE_GC_V1'),null);assert.equal(headers(other).length,3);
+ assert.equal(JSON.stringify(context.examDocument_(user).value),wanted);
 });
 fs.writeFileSync(new URL('../verification/google-contention.json',import.meta.url),JSON.stringify({status:'passed',passed:checks.length,checks,measurements,syntheticDataOnly:true,productionRequests:0,liveGoogleLoadMeasured:false},null,2)+'\n');

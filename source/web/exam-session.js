@@ -145,7 +145,7 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   const urgent=r?.examProtocol===1&&status().pending&&!failures&&(r.deadline-r.startedAt)-elapsed(r)*1000<=30000;
   if(busy||backgroundFlight||now()<nextSyncAt&&!urgent)return false;
   const epoch=generation;
-  const interval=r?.examProtocol===1?(r.finishRequested||r.releaseRequested?5000:status().pending?15000:30000):60000;
+  const interval=r?.examProtocol===1?(r.finishRequested||r.releaseRequested?5000:status().pending?60000:30000):60000;
   nextSyncAt=now()+interval*(1+random()*.3);
   const task=sync().then(value=>{if(epoch===generation)failures=0;return value;}).catch(x=>{
    if(epoch===generation){failures++;nextSyncAt=now()+(['BUSY','STATE_BUSY','HTTP_429'].includes(x.code)?deliveryRetryDelay(failures,x.code,random):Math.min(5000*2**Math.min(failures,3),30000)*(.5+random()*.5));}

@@ -135,7 +135,7 @@ function doGet() {
     ok: true,
     service: 'Літакова Комісія',
     version: API_VERSION,
-    serverBuild: 'pc-api26-494373c77f7372eb',
+    serverBuild: 'pc-api26-1037d6bbc7506c17',
     resultDeletion: true,
     deletedAttemptRetakes: true,
     singleAttempt: true,
@@ -265,7 +265,7 @@ function doPost(e) {
         if (!deferPublicSync_) {
           drainPublicResults_(Boolean(lock), 2);
           response.publicTableSync = publicSyncStatus_(publicSyncActor_);
-          if(!lock&&request.method==='GET'&&request.path==='/api/public-table-sync'&&publicSyncActor_.role===ROLE_INSTRUCTOR&&!response.publicTableSync.pendingCount)
+          if(!lock&&request.method==='GET'&&publicSyncActor_.role===ROLE_INSTRUCTOR&&!response.publicTableSync.pendingCount)
             compactPcState_();
         } else {
           // Starting/saving an attempt must not scan every result and account

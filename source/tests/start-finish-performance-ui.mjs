@@ -62,6 +62,7 @@ try{
   result=context.listResults_(p.user.id).find(r=>String(r.testId)===String(training.id));assert.ok(result);assert.equal(details.rows.filter(row=>String(row[0])===String(result.id)).length,0);assert.equal(Object.keys(JSON.parse(context.resultRecordById_(result.id).row[13])).length,50);assert.equal(criticalWrites,0);
  });
  await check('Background synchronization fills 50 details once after the statistics service recovers',async()=>{
+  context.CacheService.getScriptCache().remove(context.ATTEMPT_TRAFFIC_CACHE_); // simulate the idle interval after classroom submission
   blockStats=false;await page.locator('.result-card [data-action=nav][data-page=results]').click();await page.locator('.topbar [data-action=refresh]:not([disabled])').waitFor();await page.locator('.topbar [data-action=refresh]').click();await until(()=>details.rows.filter(row=>String(row[0])===String(result.id)).length===50);assert.equal(context.listResults_(p.user.id).filter(r=>String(r.testId)===String(training.id)).length,1);
  });
  await check('A newly owned exam also reaches question one without discovery or claim calls',async()=>{
