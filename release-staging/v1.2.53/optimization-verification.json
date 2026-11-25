@@ -1,0 +1,94 @@
+{
+  "server": {
+    "status": "passed",
+    "benchmarkOnly": false,
+    "syntheticAdditionalUsers": 3000,
+    "passed": 8,
+    "checks": [
+      "Warm authentication reads one current identity row instead of every account",
+      "A cold schema verifies existing headers without rewriting them",
+      "Stale, foreign and out-of-bounds row hints cannot select another account",
+      "Name, disabled status, role and credentials are always read from the live row",
+      "Cache read/write failures preserve authentication and no missing identity is cached",
+      "A row move between the narrow index scan and identity read uses a fresh atomic fallback",
+      "Login hints validate current spelling, group, password salt and row position",
+      "Missing and damaged private headers are repaired, with explicit maintenance still available"
+    ],
+    "measurements": {
+      "coldAuthentication": {
+        "userReads": 2,
+        "userCells": 3023,
+        "headerWrites": 0
+      },
+      "warmAuthentication": {
+        "userReads": 1,
+        "userCells": 9,
+        "headerWrites": 0
+      },
+      "coldLoginLookup": {
+        "userReads": 2,
+        "userCells": 3023,
+        "headerWrites": 0
+      },
+      "warmLoginLookup": {
+        "userReads": 1,
+        "userCells": 9,
+        "headerWrites": 0
+      },
+      "fourUnchangedWorkspaces": {
+        "userReads": 4,
+        "userCells": 36,
+        "headerWrites": 0
+      },
+      "coldSchema": {
+        "userReads": 3,
+        "userCells": 3033,
+        "headerWrites": 0
+      },
+      "forcedSchema": {
+        "userReads": 1,
+        "userCells": 9,
+        "headerWrites": 22
+      }
+    },
+    "sourceSHA256": "109bb85b08f223092423d235650bddb6ae5c354b618fbc35cb0113c81e876332",
+    "productionRequests": 0,
+    "liveGoogleTimingMeasured": false
+  },
+  "client": {
+    "status": "passed",
+    "passed": 6,
+    "checks": [
+      "Unchanged account polls do not re-encrypt and rewrite the local profile",
+      "A changed remote document is applied and durably saved",
+      "A local change cannot be posted before its request ID is durably saved",
+      "An unchanged poll retries an earlier failed save of applied remote data",
+      "An unstable cursor is persisted and forces a later retry",
+      "An immediate save supersedes the pending autosave without a duplicate write"
+    ],
+    "benchmarkOnly": false,
+    "measurements": {
+      "unchangedAccountPollDiskWrites": 0,
+      "answerThenImmediateSaveDiskWrites": 1
+    },
+    "productionRequests": 0
+  },
+  "browser": {
+    "status": "passed",
+    "benchmarkOnly": false,
+    "passed": 4,
+    "checks": [
+      "Question two renders while a 1200 ms profile write is pending",
+      "Rapid navigation and newer answers are durably saved after the delayed write",
+      "A disk failure remains visible and retry preserves both answers",
+      "Restart restores every selected answer without application errors"
+    ],
+    "questions": 200,
+    "simulatedDiskMilliseconds": 1200,
+    "navigationMilliseconds": 20,
+    "renderedBeforeDiskAcknowledgement": true,
+    "productionWrites": false,
+    "pageErrors": [],
+    "appSHA256": "780179503776c22b984567f2022ef32937c38681a2043e337bbc2ebebb09db34"
+  }
+}
