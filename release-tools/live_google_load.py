@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import re
 import time
 from urllib.parse import urlencode
 from urllib.request import Request, build_opener
@@ -152,12 +153,41 @@ def cleanup(path, report_path):
     save(report_path/'cleanup.json',result);print(json.dumps(result),flush=True)
     require(not failures,'Test cleanup needs attention; see the bounded cleanup report')
 
+def observe(report_path):
+    settings=config();client=Google(os.environ.get('GAS_CREDENTIALS',''));base='/v1/projects/'+settings['scriptId']
+    deployments=client.call('GET',base+'/deployments').get('deployments',[])
+    candidates=[item for item in deployments if item['deploymentId']!=settings['deploymentId'] and re.fullmatch(r'Isolated load test LK_LT_[0-9a-f]{20}_',item['deploymentConfig'].get('description',''))]
+    if not candidates:
+        result={'status':'no_active_test','productionDataReads':0,'productionDataWrites':0}
+    else:
+        require(len(candidates)==1,'Multiple test deployments; observer stopped')
+        item=candidates[0];files=content_files(client.call('GET',base+'/content?versionNumber='+str(item['deploymentConfig']['versionNumber'])))
+        matches=[file for file in files if file['name']=='LoadTestHarness' and file['type']=='SERVER_JS'];require(len(matches)==1,'No test guard found')
+        source=matches[0]['source']
+        def value(name):
+            found=re.findall(r'^var LT_'+name+r' = ("[^"]+");$',source,re.M);require(len(found)==1,'Invalid test guard identity');return json.loads(found[0])
+        namespace,secret,private_id,public_id=[value(name) for name in ['NAMESPACE','SECRET','PRIVATE','PUBLIC']]
+        require(item['deploymentConfig']['description']=='Isolated load test '+namespace,'Namespace differs from deployment')
+        require(settings['spreadsheetId'] not in [private_id,public_id] and private_id!=public_id,'Observer cannot read production books')
+        drive=Drive(client)
+        for file_id,kind in [(private_id,'private'),(public_id,'public')]:
+            meta=drive.call('GET','/drive/v3/files/'+file_id+'?fields=id,appProperties,trashed')
+            require(meta.get('appProperties')=={'litakovaLoadRun':namespace,'litakovaLoadKind':kind} and not meta.get('trashed'),'Observer target is not the active test')
+        snapshot=control({'secret':secret,'webAppUrl':'https://script.google.com/macros/s/'+item['deploymentId']+'/exec'},'load-test-inspect')['snapshot']
+        tests={}
+        for row in snapshot['privateRows']:
+            entry=tests.setdefault(row['testId'],{'works':0,'questions':row['total'],'pendingPublication':0});entry['works']+=1;entry['pendingPublication']+=int(row['publicState']=='pending')
+        result={'status':'observed','namespace':namespace,'authoritativeResults':len(snapshot['privateRows']),'publicResults':len(snapshot['publicResultIds']),'byTest':tests,
+                'scriptFileNames':[file['name'] for file in files],'productionDataReads':0,'productionDataWrites':0}
+    save(report_path/'observation.json',result);print(json.dumps(result),flush=True)
+
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('operation',choices=['setup','cleanup']);p.add_argument('--state',type=Path,required=True);p.add_argument('--report-dir',type=Path,required=True);p.add_argument('--clients',type=int,default=27)
+    p=argparse.ArgumentParser();p.add_argument('operation',choices=['setup','cleanup','observe']);p.add_argument('--state',type=Path,required=True);p.add_argument('--report-dir',type=Path,required=True);p.add_argument('--clients',type=int,default=27)
     a=p.parse_args()
     try:
         if a.operation=='setup':setup(a.state,a.report_dir,a.clients)
-        else:cleanup(a.state,a.report_dir)
+        elif a.operation=='cleanup':cleanup(a.state,a.report_dir)
+        else:observe(a.report_dir)
     except Exception as error:
         # Google helpers deliberately omit OAuth values and raw response bodies.
         print(type(error).__name__+': '+str(error),flush=True);raise SystemExit(1)

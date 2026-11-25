@@ -1,0 +1,25 @@
+name: Переглянути лише ізольований контроль Google
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: live-google-observer
+  cancel-in-progress: false
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read only the running synthetic test
+        env:
+          GAS_CREDENTIALS: ${{ secrets.GAS_CREDENTIALS }}
+        run: python3 release-tools/live_google_load.py observe --state /tmp/unused-observer-state.json --report-dir /tmp/live-google-observation
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: live-google-observation
+          path: /tmp/live-google-observation

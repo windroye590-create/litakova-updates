@@ -11,8 +11,11 @@ const files = JSON.parse(execFileSync('python3', ['-c', code, privateBook.id, pu
 const created = [], box = {...model.context};
 box.ContentService = {...box.ContentService, createTextOutput: text => ({text, getContent() {return this.text;}, setMimeType() {return this;}})};
 box.SpreadsheetApp = {...box.SpreadsheetApp, openById: id => {created.push(id);assert.notEqual(String(id), String(original.id), 'Sandbox accessed production database');return model.context.SpreadsheetApp.openById(id);}};
-vm.createContext(box);for (const file of files.filter(file => file.type === 'SERVER_JS')) vm.runInContext(file.source, box);
-const post = value => JSON.parse(box.doPost({postData: {contents: JSON.stringify(value)}}).getContent());
+const post = value => {
+  const execution = vm.createContext({...box});
+  for (const file of files.filter(file => file.type === 'SERVER_JS')) vm.runInContext(file.source, execution);
+  return JSON.parse(execution.doPost({postData: {contents: JSON.stringify(value)}}).getContent());
+};
 assert.equal(post({action: 'api', method: 'GET', path: '/api/groups'}).code, 'LOAD_TEST_FORBIDDEN');
 assert.equal(created.length, 0);
 const secret = 'b'.repeat(64), seeded = post({action: 'load-test-seed', loadTestKey: secret});assert.ok(seeded.inviteCode);
