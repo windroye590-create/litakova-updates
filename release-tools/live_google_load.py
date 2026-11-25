@@ -15,8 +15,8 @@ from urllib.request import Request, build_opener
 from urllib.error import HTTPError
 from github_release import SafeRedirect
 
-from appscript_deploy import Google, config, content_files, content_hash, inspect, read_json, require
-from google_load_sandbox import sandbox_files
+from appscript_deploy import Google, config, content_files, content_hash, inspect, read_json, require, server_file, source_info
+from google_load_sandbox import sandbox_files, candidate_files
 
 def save(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -98,7 +98,7 @@ def production_unchanged(client, state):
     head=content_files(client.call('GET',base+'/content'))
     require(content_hash(head)==state['originalHeadSHA256'],'Production project HEAD changed')
 
-def setup(path, report_path, count):
+def setup(path, report_path, count, candidate=False):
     require(20<=count<=27,'Only 20–27 test clients are supported')
     settings=config();client=Google(os.environ.get('GAS_CREDENTIALS',''));drive=Drive(client)
     base,deployment,version,head,deployed,info=inspect(client,settings)
@@ -116,7 +116,9 @@ def setup(path, report_path, count):
             require(file_id!=settings['spreadsheetId'],'Test file aliases production')
             state['createdBooks'][kind]=file_id;save(path,state)
             print('Created isolated '+kind+' spreadsheet',flush=True)
-        files=sandbox_files(deployed,settings,state['namespace'],state['secret'],state['createdBooks']['private'],state['createdBooks']['public'])
+        tested=candidate_files(deployed,settings,(Path(__file__).resolve().parents[1]/'source/Code.gs').read_text()) if candidate else deployed
+        tested_info=source_info(server_file(tested)['source'],settings)
+        files=sandbox_files(tested,settings,state['namespace'],state['secret'],state['createdBooks']['private'],state['createdBooks']['public'])
         state['testHeadSHA256']=content_hash(files)
         require(content_hash(content_files(client.call('GET',base+'/content')))==state['originalHeadSHA256'],'HEAD changed during test preparation')
         state['headTouched']=True;save(path,state)
@@ -140,6 +142,7 @@ def setup(path, report_path, count):
         reaped=control(state,'load-test-reap');state['orphanTestKeysRemoved']=reaped['removedProperties'];save(path,state)
         summary={'status':'ready','namespace':state['namespace'],'clients':count,'productionVersionPreserved':version,
                  'productionBuildPreserved':info['build'],'headRestored':True,'separatePrivateAndPublicBooks':True,
+                 'testedCandidate':candidate,'testedServerBuild':tested_info['build'],'testedServerSHA256':tested_info['sha256'],
                  'sharedGoogleAccountAndScriptLock':True,'productionDataWrites':0}
         save(report_path/'setup.json',summary)
         print(json.dumps(summary),flush=True)
@@ -213,10 +216,10 @@ def observe(report_path):
     save(report_path/'observation.json',result);print(json.dumps(result),flush=True)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('operation',choices=['setup','cleanup','observe']);p.add_argument('--state',type=Path,required=True);p.add_argument('--report-dir',type=Path,required=True);p.add_argument('--clients',type=int,default=27)
+    p=argparse.ArgumentParser();p.add_argument('operation',choices=['setup','cleanup','observe']);p.add_argument('--state',type=Path,required=True);p.add_argument('--report-dir',type=Path,required=True);p.add_argument('--clients',type=int,default=27);p.add_argument('--candidate',action='store_true')
     a=p.parse_args()
     try:
-        if a.operation=='setup':setup(a.state,a.report_dir,a.clients)
+        if a.operation=='setup':setup(a.state,a.report_dir,a.clients,a.candidate)
         elif a.operation=='cleanup':cleanup(a.state,a.report_dir)
         else:observe(a.report_dir)
     except Exception as error:

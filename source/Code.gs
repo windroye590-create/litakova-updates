@@ -16,8 +16,8 @@ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
 const PUBLIC_SYNC_DELAY_MS = 30000;
 const REVIEW_LEASE_MS = 120000;
 const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
-const LATEST_APP_VERSION_CODE = 177;
-const LATEST_APP_VERSION_NAME = '1.2.53';
+const LATEST_APP_VERSION_CODE = 178;
+const LATEST_APP_VERSION_NAME = '1.2.54';
 const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
 const ROLE_INSTRUCTOR = 'instructor';
 const ROLE_CADET = 'cadet';
@@ -123,13 +123,19 @@ var publicSyncCacheBypass_ = false;
 var deferPublicSync_ = false;
 var deletedRetakeRequest_ = false;
 var deletedRetakeEpochs_ = null;
+var requestSigningSecret_ = null;
+var requestSigningActive_ = false;
+var attemptTrafficRequest_ = false;
+var attemptTrafficHint_ = false;
+var ATTEMPT_TRAFFIC_CACHE_ = 'LK_ATTEMPT_TRAFFIC_V1';
+var ATTEMPT_QUIET_MS_ = 10000;
 
 function doGet() {
   return jsonResponse_({
     ok: true,
     service: 'Літакова Комісія',
     version: API_VERSION,
-    serverBuild: 'pc-api26-8dbd47e1688a5b58',
+    serverBuild: 'pc-api26-494373c77f7372eb',
     resultDeletion: true,
     deletedAttemptRetakes: true,
     singleAttempt: true,
@@ -206,6 +212,7 @@ function setAppDownloadUrl(url, versionCode, versionName) {
 }
 
 function doPost(e) {
+  requestSigningSecret_=null;requestSigningActive_=true;attemptTrafficRequest_=false;attemptTrafficHint_=false;
   responsePresentations_ = [];requestWriteFlushed_ = false;requestCommitFailed_ = false;
   resultSeriesCache_ = null;
   resultLookupCache_ = null;
@@ -230,6 +237,7 @@ function doPost(e) {
         && (request.path === '/api/results' || /^\/api\/exam-session\//.test(String(request.path)) || /^\/api\/tests\/[^/]+\/start$/.test(String(request.path))
           || request.path === '/api/account-state/document' && request.body && request.body.key === 'training')
         || String(request.method).toUpperCase() === 'GET' && request.path === '/api/exam-session');
+    noteAttemptTraffic_(request);
     var mutation = requiresWriteLock_(request);
     if (mutation) {
       lock = LockService.getScriptLock();
@@ -257,6 +265,8 @@ function doPost(e) {
         if (!deferPublicSync_) {
           drainPublicResults_(Boolean(lock), 2);
           response.publicTableSync = publicSyncStatus_(publicSyncActor_);
+          if(!lock&&request.method==='GET'&&request.path==='/api/public-table-sync'&&publicSyncActor_.role===ROLE_INSTRUCTOR&&!response.publicTableSync.pendingCount)
+            compactPcState_();
         } else {
           // Starting/saving an attempt must not scan every result and account
           // just to update a report badge. A committed result carries its own
@@ -294,6 +304,7 @@ function doPost(e) {
       finishRequestWrite_();
       try { lock.releaseLock(); } catch (ignored) {}
     }
+    requestSigningSecret_=null;requestSigningActive_=false;attemptTrafficRequest_=false;attemptTrafficHint_=false;
   }
 }
 
@@ -572,6 +583,7 @@ function recoverWorkspaceChange_(lockHeld) {
 }
 function beginWorkspaceChange_(scopes) {
   if (!workspaceWriteRequest_ || !scopes.length) return;
+  if(workspaceMutation_&&scopes.every(function(k){return workspaceMutation_.scopes.indexOf(k)>=0;}))return;
   var next=workspaceMutation_?copyObject_(workspaceMutation_):{v:1,nonce:Utilities.getUuid(),scopes:[]};
   scopes.forEach(function(k){if(next.scopes.indexOf(k)<0)next.scopes.push(k);});
   PropertiesService.getScriptProperties().setProperty('LK_WORKSPACE_WRITE',JSON.stringify(next));
@@ -632,6 +644,10 @@ function routeApi_(request) {
 
   var user = requireSession_(request.token);
   publicSyncActor_ = user;
+  if(user.role===ROLE_CADET&&method==='POST'&&deferPublicSync_){
+    attemptTrafficRequest_=true;
+    if(!attemptTrafficHint_)try{CacheService.getScriptCache().put(ATTEMPT_TRAFFIC_CACHE_,String(Date.now()+ATTEMPT_QUIET_MS_),30);}catch(ignored){}
+  }
   if (method !== 'GET') {
     if (path.indexOf('/api/instructor/') === 0) requireRole_(user, ROLE_INSTRUCTOR);
     beginWorkspaceChange_(workspaceScopes_(path));
@@ -1336,7 +1352,7 @@ function publishCommittedResult_(result,rowNumber,storedRow) {
   if(cadetDeletionPending_(result.userId))return false;
   var sheet=sheet_('results');
   if(sheet.getRange(rowNumber,PUBLIC_SYNC_COLUMN).getValue()!=='pending')return true;
-  if(deferPublicSync_)return false;
+  if(deferPublicSync_||attemptTrafficPending_())return false;
   var properties=PropertiesService.getScriptProperties();
   if(Number(properties.getProperty(PUBLIC_SYNC_RETRY)||0)>Date.now())return false;
   var synced=tryPublicWrite_(function(){
@@ -1355,6 +1371,7 @@ function publishCommittedCadet_(user,rowNumber) {
   var sheet=sheet_('users');
   if(rowNumber==null){var stored=findUserById_(user.id);if(!stored)return false;rowNumber=stored.rowNumber;}
   if(sheet.getRange(rowNumber,10).getValue()!=='pending')return true;
+  if(attemptTrafficPending_())return false;
   var properties=PropertiesService.getScriptProperties();
   if(Number(properties.getProperty(PUBLIC_SYNC_RETRY)||0)>Date.now())return false;
   var synced=tryPublicWrite_(function(){addVisibleCadetPlaceholder_(user);});
@@ -1363,6 +1380,7 @@ function publishCommittedCadet_(user,rowNumber) {
   invalidatePublicSync_();return synced;
 }
 function drainPublicResults_(lockHeld,limit) {
+  if(attemptTrafficPending_())return;
   var properties=PropertiesService.getScriptProperties();
   if(properties.getProperty('LK_INTAKE_ACTIVE')||Number(properties.getProperty(PUBLIC_SYNC_RETRY)||0)>Date.now())return;
   if(!scanPublicSync_(false).summary.count)return;
@@ -1371,10 +1389,11 @@ function drainPublicResults_(lockHeld,limit) {
   try{
     // Row numbers may shift after a deletion. Re-read under the lock before
     // using them, and never carry deleted results into a new training intake.
-    if(properties.getProperty('LK_INTAKE_ACTIVE'))return;
+    if(properties.getProperty('LK_INTAKE_ACTIVE')||attemptTrafficPending_())return;
     var pending=scanPublicSync_(true).entries.slice(0,Math.max(1,Math.min(2,limit||2)));
     var sheet=sheet_('results');
     for(var i=0;i<pending.length;i++) {
+      if(i>0&&attemptTrafficPending_())break;
       var entry=pending[i];
       if(entry.kind==='cadet'){
         var userRow=sheet_('users').getRange(entry.row,1,1,HEADERS.users.length).getValues()[0];
@@ -1387,6 +1406,26 @@ function drainPublicResults_(lockHeld,limit) {
       if(!publishCommittedResult_(resultFromRow_(row),entry.row,row))break;
     }
   }finally{if(ownLock)ownLock.releaseLock();}
+}
+function attemptTrafficPending_() {
+  if(attemptTrafficRequest_)return true;
+  try{return Number(CacheService.getScriptCache().get(ATTEMPT_TRAFFIC_CACHE_)||0)>Date.now();}catch(ignored){return false;}
+}
+function noteAttemptTraffic_(request) {
+  if(!deferPublicSync_||String(request.method).toUpperCase()!=='POST')return;
+  // An advisory hint can precede the lock, so even a waiting finish can make a
+  // publisher yield. It grants no authority: full live checks still run inside
+  // the write lock. Anonymous/forged tokens cannot postpone maintenance.
+  try{
+    var parts=String(request.token||'').split('.');if(parts.length!==2)return;
+    var secret=PropertiesService.getScriptProperties().getProperty('APP_SECRET');if(!secret)return;
+    requestSigningSecret_=secret;
+    if(!secureEquals_(parts[1],signText_(parts[0])))return;
+    var payload=JSON.parse(base64UrlToText_(parts[0]));
+    if(payload.r===ROLE_CADET&&payload.u&&Number(payload.e)>Date.now()){
+      CacheService.getScriptCache().put(ATTEMPT_TRAFFIC_CACHE_,String(Date.now()+ATTEMPT_QUIET_MS_),30);attemptTrafficHint_=true;
+    }
+  }catch(ignored){}
 }
 
 function spreadsheet_() {
@@ -1689,18 +1728,16 @@ function requireSession_(token) {
   if (parts.length !== 2 || !secureEquals_(parts[1], signText_(parts[0]))) {
     fail_('Сеанс завершено. Увійдіть ще раз.', 'SESSION_EXPIRED');
   }
-  try {
-    var payload = JSON.parse(base64UrlToText_(parts[0]));
-    if (!payload.u || Number(payload.e || 0) <= Date.now()) throw new Error('expired');
-    var user = findUserById_(payload.u);
-    if (!user || !user.active || cadetDeletionPending_(user.id) || user.role !== payload.r
+  var payload;
+  try {payload=JSON.parse(base64UrlToText_(parts[0]));}catch(ignored){fail_('Сеанс завершено. Увійдіть ще раз.','SESSION_EXPIRED');}
+  if(!payload||!payload.u||Number(payload.e||0)<=Date.now())fail_('Сеанс завершено. Увійдіть ще раз.','SESSION_EXPIRED');
+  // Service failures must remain retryable, rather than logging out a valid user.
+  var user = findUserById_(payload.u);
+  if (!user || !user.active || cadetDeletionPending_(user.id) || user.role !== payload.r
         || Number(payload.v || 0) !== sessionVersion_(user.id)
         || (payload.c!=null&&!secureEquals_(payload.c,sessionCredential_(user)))
-        || (user.role === ROLE_CADET && PropertiesService.getScriptProperties().getProperty('LK_INTAKE_ACTIVE'))) throw new Error('invalid');
-    return user;
-  } catch (ignored) {
-    fail_('Сеанс завершено. Увійдіть ще раз.', 'SESSION_EXPIRED');
-  }
+        || (user.role === ROLE_CADET && PropertiesService.getScriptProperties().getProperty('LK_INTAKE_ACTIVE')))fail_('Сеанс завершено. Увійдіть ще раз.', 'SESSION_EXPIRED');
+  return user;
 }
 
 function requireRole_(user, role) {
@@ -2308,7 +2345,7 @@ function resultDetailRows_(result,test,selected,completedAt) {
 function ensureResultAuxiliaries_(result,row) {
   if(String(row[0])!==String(result.id)||row[PUBLIC_SYNC_COLUMN-1]!== 'pending')return;
   var key=String(row[12]||('result-'+result.id)),kind='result:'+String(result.id);
-  if(!dataRows_('sync').some(function(item){return String(item[0])===key&&String(item[1])===kind;}))
+  if(!matchingSheetRows_(sheet_('sync'),1,key,HEADERS.sync.length).some(function(entry){return String(entry.row[1])===kind;}))
     sheet_('sync').appendRow([safeCellText_(key),kind,new Date(result.completedAt)]);
   // Historical imports can have a score and old details but no immutable
   // answer snapshot. Never replace those details with invented empty answers.
@@ -2320,17 +2357,27 @@ function ensureResultAuxiliaries_(result,row) {
   var expected=resultDetailRows_(result,test,selected,new Date(result.completedAt)),wanted=Object.create(null),seen=Object.create(null),remove=[];
   expected.forEach(function(item){wanted[String(item[4])]=item;});
   var detailSheet=sheet_('resultDetails');
-  dataRows_('resultDetails').forEach(function(item,index){
-    if(String(item[0])!==String(result.id))return;
+  matchingSheetRows_(detailSheet,1,result.id,HEADERS.resultDetails.length).forEach(function(entry){
+    var item=entry.row;
     var qid=String(item[4]),value=wanted[qid];
-    if(!value||seen[qid]){remove.push(index+2);return;}
+    if(!value||seen[qid]){remove.push(entry.number);return;}
     seen[qid]=true;
     var same=value.every(function(v,i){var old=item[i];return v instanceof Date&&old instanceof Date?v.getTime()===old.getTime():String(v)===String(old);});
-    if(!same)detailSheet.getRange(index+2,1,1,HEADERS.resultDetails.length).setValues([value]);
+    if(!same)detailSheet.getRange(entry.number,1,1,HEADERS.resultDetails.length).setValues([value]);
   });
   remove.sort(function(a,b){return b-a;}).forEach(function(number){detailSheet.deleteRow(number);});
   var missing=expected.filter(function(item){return !seen[String(item[4])];});
   if(missing.length){var first=detailSheet.getLastRow()+1;ensureRowCapacity_(detailSheet,first+missing.length-1);detailSheet.getRange(first,1,missing.length,HEADERS.resultDetails.length).setValues(missing);}
+}
+function matchingSheetRows_(sheet,column,value,width) {
+  var count=sheet.getLastRow()-1;if(count<1)return [];
+  var numbers=sheet.getRange(2,column,count,1).createTextFinder(String(value))
+    .matchEntireCell(true).matchCase(true).useRegularExpression(false).findAll()
+    .map(function(range){return range.getRow();}).sort(function(a,b){return a-b;}),spans=[],out=[];
+  numbers.forEach(function(number){var last=spans[spans.length-1];if(last&&last.first+last.count===number)last.count++;else spans.push({first:number,count:1});});
+  spans.forEach(function(span){sheet.getRange(span.first,1,span.count,width).getValues().forEach(function(row,index){
+    if(String(row[column-1])===String(value))out.push({row:row,number:span.first+index});
+  });});return out;
 }
 
 function examRecoveryFromRow_(row) {
@@ -3412,14 +3459,16 @@ function nextId_(type, sheetKey) {
 
 function ensureAppSecret_() {
   var properties = PropertiesService.getScriptProperties();
-  if (!properties.getProperty('APP_SECRET')) {
-    properties.setProperty('APP_SECRET', randomBase64_(48));
+  var secret=properties.getProperty('APP_SECRET');
+  if (!secret) {
+    secret=randomBase64_(48);properties.setProperty('APP_SECRET', secret);
   }
+  return secret;
 }
 
 function signText_(text) {
-  ensureAppSecret_();
-  var secret = PropertiesService.getScriptProperties().getProperty('APP_SECRET');
+  var secret = requestSigningActive_&&requestSigningSecret_||ensureAppSecret_();
+  if(requestSigningActive_)requestSigningSecret_=secret;
   return stripPadding_(Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(String(text), String(secret))));
 }
 
@@ -4100,7 +4149,8 @@ function legacyChoiceResponse_(response) {
 }
 
 // Account-owned documents. Payload chunks precede the commit marker, so a
-// failed upload cannot replace the last complete revision. Retain three versions.
+// failed upload cannot replace the last complete revision. Idle maintenance
+// retains three committed versions; accepting an answer never deletes rows.
 function sha256Hex_(value) {
   return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,value,Utilities.Charset.UTF_8)
     .map(function(b){return ('0'+((b+256)%256).toString(16)).slice(-2);}).join('');
@@ -4244,15 +4294,8 @@ function pcStateWrite_(user,key,body,observed) {
   sheet.appendRow(committed);
   props.setProperty('LK_PC_STATE_'+user.id,Utilities.getUuid());
   var nextMetadata=metadata.concat(rows.map(function(row){return row.slice(0,9);}),[committed.slice(0,9)]);
-  try{
-    var keep=Object.create(null);keep[generation]=true;
-    headers.filter(function(h){return String(h.row[1])===key;})
-      .sort(function(a,b){return Number(b.row[2])-Number(a.row[2]);}).slice(0,2)
-      .forEach(function(h){keep[String(h.row[3])]=true;});
-    for(var i=metadata.length-1;i>=0;i--)if(metadata[i]&&String(metadata[i][0])===String(user.id)&&String(metadata[i][1])===key&&!keep[String(metadata[i][3])]){
-      sheet.deleteRow(i+2);nextMetadata.splice(i,1);
-    }
-  }catch(ignored){nextMetadata=null;}
+  if(headers.filter(function(h){return String(h.row[1])===key;}).length>=3)
+    props.setProperty('LK_PC_STATE_GC_V1','1');
   if(observed)observed.rows=nextMetadata;
   // Apps Script buffers spreadsheet writes. Finish them while the request
   // still holds its script lock, before acknowledging the saved document.
@@ -4261,6 +4304,36 @@ function pcStateWrite_(user,key,body,observed) {
   // their exact JSON snapshot without rereading the whole table and payload.
   var document=pcStateDescriptor_({row:committed});document.value=JSON.parse(raw);
   return {accountSyncProtocol:1,userId:String(user.id),document:document};
+}
+function compactPcState_() {
+  if(attemptTrafficPending_())return;
+  var props=PropertiesService.getScriptProperties();
+  if(props.getProperty('LK_INTAKE_ACTIVE')||!props.getProperty('LK_PC_STATE_GC_V1'))return;
+  var lock=LockService.getScriptLock();if(!lock.tryLock(1))return;
+  try{
+    if(attemptTrafficPending_()||props.getProperty('LK_INTAKE_ACTIVE'))return;
+    var sheet=sheet_('pcState'),count=sheet.getLastRow()-1;
+    var metadata=count>0?sheet.getRange(2,1,count,9).getValues():[],documents=Object.create(null),keep=Object.create(null);
+    metadata.forEach(function(row,index){if(Number(row[4])!==-1)return;
+      var key=JSON.stringify([String(row[0]),String(row[1])]);(documents[key]||(documents[key]=[])).push({row:row,number:index+2});
+    });
+    Object.keys(documents).forEach(function(key){documents[key].sort(function(a,b){return Number(b.row[2])-Number(a.row[2])||b.number-a.number;}).slice(0,3)
+      .forEach(function(item){keep[JSON.stringify([String(item.row[0]),String(item.row[1]),String(item.row[3])])]=true;});});
+    var spans=[];
+    for(var i=metadata.length-1;i>=0;i--){var row=metadata[i];
+      if(!row[0]||keep[JSON.stringify([String(row[0]),String(row[1]),String(row[3])])])continue;
+      var last=spans[spans.length-1],number=i+2;
+      if(last&&last.first===number+1){last.first=number;last.count++;}else spans.push({first:number,count:1});
+    }
+    // A small maintenance slice cannot monopolize the same lock as submission.
+    var selected=spans.slice(0,4),removed=0;
+    for(var batch=0;batch<selected.length;batch++){
+      if(attemptTrafficPending_())break;
+      var span=selected[batch],amount=Math.min(128,span.count);sheet.deleteRows(span.first+span.count-amount,amount);removed++;
+    }
+    if(removed)SpreadsheetApp.flush();
+    if(removed===spans.length&&selected.every(function(span){return span.count<=128;}))props.deleteProperty('LK_PC_STATE_GC_V1');
+  }finally{lock.releaseLock();}
 }
 
 // Account-owned exam attempts. Only these endpoints can write the reserved document.
@@ -4318,6 +4391,12 @@ function examExpand_(doc) {
 function examDocument_(user) {
   var observed={rows:pcStateMetadata_(user)};
   var doc=examExpand_(pcStateRead_(user,EXAM_STATE_KEY_,pcStateLatest_(pcStateHeaders_(user,observed.rows),EXAM_STATE_KEY_)));
+  // The immutable result is the terminal commit. A separate rewrite of the
+  // whole attempt would add another flush and row allocation to every finish.
+  if(doc.value&&doc.value.status!=='completed'){
+    var accepted=findResultRecord_(user.id,doc.value.test.id);
+    if(accepted&&accepted.row[PUBLIC_SYNC_COLUMN-1]!==RESULT_DELETING&&String(accepted.row[12])===String(doc.value.submissionId))doc.value.status='completed';
+  }
   doc.pcStateObserved=observed;return doc;
 }
 function examReply_(user,doc,completion) {
@@ -4363,7 +4442,7 @@ function examFinalize_(user,doc) {
   var body={writtenProtocol:1,choiceProtocol:2,testId:v.test.id,submissionId:v.submissionId,retakeEpoch:v.retakeEpoch,durationSeconds:Math.max(1,Math.ceil((v.finishedAt-v.startedAt)/1000)),examExitCount:v.exitCount||0,answers:v.test.questions.map(function(q){return isWritten_(q)?{questionId:q.id,text:v.answers[String(q.id)]||''}:Array.isArray(v.answers[String(q.id)])?{questionId:q.id,answerIds:v.answers[String(q.id)]}:{questionId:q.id,answerId:v.answers[String(q.id)]||'0'};})};
   beginWorkspaceChange_(['results']);
   var completion=submitResult_(user,body,v.sourceTest);
-  if(v.status!=='completed'){v.status='completed';doc=examWrite_(user,doc,v);}
+  v.status='completed';
   return examReply_(user,doc,completion);
 }
 function routeExam_(method,path,body,user,choiceProtocol) {

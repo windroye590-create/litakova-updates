@@ -1,4 +1,4 @@
-export const APP_VERSION='1.2.53';
+export const APP_VERSION='1.2.54';
 export const PREVIEW_BUILD=false;
 // Suspended browser timers must not stop the EXE. Closing is an explicit event.
 export function createHostWindow({local,beacon,key,windowId,alive,updating}){
@@ -163,9 +163,16 @@ export function enrichReview(rows,test){
   return {...row,questionText:row.questionText||q?.text||'',selectedAnswerIds:selected,correctAnswerIds:correct,selectedAnswerText:row.selectedAnswerText||(selected.length?text(selected):'Без відповіді'),correctAnswerText:row.correctAnswerText||text(correct)||'Відповідь недоступна'};
  });
 }
-export function retryable(code){return ['NETWORK','LOCAL_HOST_UNAVAILABLE','TIMEOUT','BUSY','HTTP_408','HTTP_429','HTTP_500','HTTP_502','HTTP_503','HTTP_AUTH','SERVER_ERROR','EMPTY','BAD_JSON','BAD_RESULT_RESPONSE','RESULT_DELETION_PENDING'].includes(code);}
+export function retryable(code){return ['NETWORK','LOCAL_HOST_UNAVAILABLE','TIMEOUT','BUSY','STATE_BUSY','HTTP_408','HTTP_429','HTTP_500','HTTP_502','HTTP_503','HTTP_AUTH','SERVER_ERROR','EMPTY','BAD_JSON','BAD_RESULT_RESPONSE','RESULT_DELETION_PENDING'].includes(code);}
 export function canRetrySubmission(p){return !p.permanent||retryable(p.failureCode);}
 export function retryDelay(n,random=Math.random){const cap=Math.min(10000*2**Math.min(Math.max(n-1,0),5),300000);return Math.round(cap*(.5+random()*.5));}
+// A busy but reachable server needs staggered retries, not minutes of offline
+// backoff. Network outages retain their longer exponential delays.
+export function deliveryRetryDelay(n,code,random=Math.random){
+ if(!['BUSY','STATE_BUSY','HTTP_429'].includes(code))return retryDelay(n,random);
+ const cap=Math.min(3000*2**Math.min(Math.max(n-1,0),2),12000);
+ return Math.round(cap*(.75+random()*.5));
+}
 export function mergeResults(a,b){return [...new Map([...a,...b].map(r=>[id(r.id),r])).values()].sort((x,y)=>Date.parse(y.completedAt)-Date.parse(x.completedAt));}
 export function completed(testId,results,pending,run,deletedTests=[]){return deletedTests.includes(id(testId))||results.some(r=>id(r.testId)===id(testId))||pending.some(p=>id(p.body.testId)===id(testId))||(run&&id(run.test.id)===id(testId));}
 export function resultCSV(results){const value=v=>{let s=String(v??'');if(/^[\t\r\n ]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};const rows=[['ПІБ','Група','Тест','Правильних з вибором','Неправильних з вибором','Час, с','Підсумковий бал, %','Дата','Стан перевірки','Набрано балів','Максимум балів','Підтвердження збереженої роботи'],...results.map(r=>[r.userName,r.groupName,r.testTitle,r.correct,choiceCount(r)-r.correct,r.durationSeconds,pendingReview(r)?'':r.score,r.completedAt,pendingReview(r)?'Очікує перевірки':'Перевірено',r.earnedPoints??r.correct,r.maxPoints??r.total,r.examRecovered?'Підтвердив інструктор: '+r.recoveredBy+'; час не перевірено сервером':''])];return '\uFEFF'+rows.map(row=>row.map(value).join(';')).join('\r\n');}

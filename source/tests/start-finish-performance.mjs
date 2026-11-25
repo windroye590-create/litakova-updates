@@ -31,7 +31,9 @@ function answer(run,test=training){run.answers=Object.fromEntries(test.questions
 const props=context.PropertiesService.getScriptProperties(),details=context.sheet_('resultDetails'),ledger=context.sheet_('sync'),results=context.sheet_('results');
 const detailsFor=id=>details.rows.slice(1).filter(row=>String(row[0])===String(id));
 const ledgerFor=id=>ledger.rows.slice(1).filter(row=>String(row[1])==='result:'+String(id));
-function poll(){props.deleteProperty('LK_PUBLIC_SYNC_RETRY_V1');return raw('GET','/api/public-table-sync',instructorToken);}
+// These statistics checks exercise the idle worker; peak-time deferral has its
+// own coverage in google-contention.mjs.
+function poll(){context.CacheService.getScriptCache().remove(context.ATTEMPT_TRAFFIC_CACHE_);props.deleteProperty('LK_PUBLIC_SYNC_RETRY_V1');return raw('GET','/api/public-table-sync',instructorToken);}
 function flush(){for(let i=0;i<100&&context.scanPublicSync_(true).summary.count;i++)poll();assert.equal(context.scanPublicSync_(true).summary.count,0);}
 await check('Cancelling the confirmation does not fetch questions or start a server attempt',async()=>{const pc=client(person(),training);await pc.box.start(training.id);assert.equal(pc.calls.length,0);assert.ok(pc.dialog().text.includes('50'));assert.equal(pc.a.run,null);});
 let baselineCalls;

@@ -12,6 +12,10 @@ on:
         type: boolean
         required: true
         default: false
+      candidate:
+        description: Перевірити підготовлений сервер із цього commit, зберігши робочий
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -42,7 +46,13 @@ jobs:
         env:
           GAS_CREDENTIALS: ${{ secrets.GAS_CREDENTIALS }}
           CLIENTS: ${{ inputs.clients }}
-        run: python3 release-tools/live_google_load.py setup --state "$LOAD_STATE" --report-dir "$LOAD_REPORT" --clients "$CLIENTS"
+          TEST_CANDIDATE: ${{ inputs.candidate }}
+        run: |
+          if [ "$TEST_CANDIDATE" = true ]; then
+            python3 release-tools/live_google_load.py setup --state "$LOAD_STATE" --report-dir "$LOAD_REPORT" --clients "$CLIENTS" --candidate
+          else
+            python3 release-tools/live_google_load.py setup --state "$LOAD_STATE" --report-dir "$LOAD_REPORT" --clients "$CLIENTS"
+          fi
       - name: Exercise actual Google login, starts, checkpoints, finishes and publication
         timeout-minutes: 35
         run: node source/tests/live-google-load.mjs --state "$LOAD_STATE" --report-dir "$LOAD_REPORT"

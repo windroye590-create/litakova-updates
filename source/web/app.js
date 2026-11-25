@@ -222,7 +222,7 @@ async function rpc(method,path,body={},token=S.session?.token||''){
  if(updateApplying)throw Error('Застосунок оновлюється.');
  const envelope=C.payload(method,path,token,body);
  const send=()=>{if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});return local('/rpc',envelope);};
- const critical=method==='POST'&&(/^\/api\/tests\/[^/]+\/start$/.test(path)||/^\/api\/exam-session\/(start|claim|finish|release)$/.test(path));
+ const critical=method==='POST'&&(path==='/api/results'||/^\/api\/tests\/[^/]+\/start$/.test(path)||/^\/api\/exam-session\/(start|claim|finish|release)$/.test(path));
  rpcFlights++;let r;try{r=await (critical?C.requestCapacity(send):send());}catch(x){x.code??='NETWORK';throw x;}finally{rpcFlights--;}
  if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});
  if(!r.ok){
@@ -770,7 +770,7 @@ async function syncQueue(force=false){
      try{const r=await rpc('GET','/api/my-results',{},session.token);if(S.session?.token!==session.token)break;const authoritative=r.results.find(v=>id(v.testId)===id(p.body.testId));if(authoritative){C.validateResult(authoritative,session.user.id,p.body.testId);a.results=C.mergeResults(a.results,[authoritative]);a.pending=a.pending.filter(q=>q.body.submissionId!==p.body.submissionId);if(page==='result'&&lastResult?.submissionId===p.body.submissionId)lastResult={result:authoritative,review:a.reviews[id(authoritative.id)]||[],testId:id(p.body.testId),submissionId:p.body.submissionId};lastError='';try{await persist();}catch(x){if(!a.pending.some(q=>q.body.submissionId===p.body.submissionId))a.pending.push(p);throw x;}continue;}p.failure='Очікуємо підтвердження сервера.';}
      catch(problem){if(S.session?.token!==session.token)break;p.failure=problem.message;}
      p.permanent=false;p.nextAt=Date.now()+C.retryDelay(p.attempts);
-    }else if((x.localSave||C.retryable(x.code))){p.permanent=false;p.nextAt=Date.now()+C.retryDelay(p.attempts);}else p.permanent=true;
+    }else if((x.localSave||C.retryable(x.code))){p.permanent=false;p.nextAt=Date.now()+C.deliveryRetryDelay(p.attempts,x.code);}else p.permanent=true;
     await persist();lastError=p.failure;break;
    }
   }

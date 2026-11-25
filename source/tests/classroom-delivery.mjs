@@ -118,6 +118,7 @@ await check('Account polling yields to a user action, preserves dirty local data
 });
 context.publishVisibleResult_=publish;
 await check('Authenticated background polling eventually publishes every accepted training result once',()=>{
+ context.CacheService.getScriptCache().remove(context.ATTEMPT_TRAFFIC_CACHE_); // classroom has finished submitting
  for(let i=0;i<25;i++)raw('GET','/api/public-table-sync',instructorToken);
  for(const person of people){const r=context.listResults_(person.user.id).find(r=>r.testId===training.id);assert.equal(publicRows(context.publicResultsSheet_()).filter(row=>String(row[7])===String(r.id)).length,1);}
 });

@@ -77,20 +77,24 @@ try{
   const again=request('POST','/api/exam-session/finish',finishBody);assert.equal(again.completion.result.id,examFinish.completion.result.id);assert.equal(again.document.value.status,'completed');
   assert.equal(results.rows.filter(r=>String(r[0])===String(again.completion.result.id)).length,1);
  });
- await check('Sparse row offsets survive multiple saves and a lost cleanup acknowledgement',()=>{
+ await check('Sparse row offsets survive deferred maintenance and a lost cleanup acknowledgement',()=>{
   const initial=request('POST','/api/exam-session/start',{testId:exam.id,deviceId,requestId:crypto.randomUUID()},other),value=initial.document.value;
   let revision=initial.document.revision;
   const answers=Object.fromEntries(exam.questions.map(q=>[String(q.id),q.answers[0].id]));
   for(let i=0;i<4;i++)revision=request('POST','/api/exam-session/save',{submissionId:value.submissionId,testId:exam.id,deviceId,requestId:crypto.randomUUID(),fence:value.fence,expectedRevision:revision,checkpoint:{answers,index:i,exitCount:0}},other).document.revision;
-  const foreignBefore=JSON.stringify(states.rows.filter(row=>String(row[0])!==String(other.user.id))),remove=states.deleteRow;let dropped=false;
-  states.deleteRow=function(number){const owned=String(this.rows[number-1]?.[0])===String(other.user.id);const out=remove.call(this,number);if(owned&&!dropped){dropped=true;throw Error('Lost cleanup acknowledgement');}return out;};
+  const protectedForeign=()=>{const foreign=states.rows.filter(row=>String(row[0])!==String(other.user.id)),groups=new Map(),keep=new Set();for(const row of foreign)if(row[4]===-1){const k=JSON.stringify([row[0],row[1]]);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(row);}for(const rows of groups.values())for(const row of rows.sort((a,b)=>b[2]-a[2]).slice(0,3))keep.add(JSON.stringify([row[0],row[1],row[3]]));return JSON.stringify(foreign.filter(row=>keep.has(JSON.stringify([row[0],row[1],row[3]]))));};
+  const foreignBefore=protectedForeign(),remove=states.deleteRows;let dropped=false;
+  states.deleteRows=function(number,count){const owned=String(this.rows[number-1]?.[0])===String(other.user.id);const out=remove.call(this,number,count);if(owned&&!dropped){dropped=true;throw Error('Lost cleanup acknowledgement');}return out;};
   try{
    const done=request('POST','/api/exam-session/finish',{submissionId:value.submissionId,testId:exam.id,deviceId,requestId:crypto.randomUUID(),fence:value.fence,expectedRevision:revision,checkpoint:{answers,index:49,exitCount:0}},other);
-   assert.equal(dropped,true);assert.equal(done.document.value.status,'completed');assert.equal(done.completion.result.correct,50);
+   assert.equal(dropped,false);assert.equal(done.document.value.status,'completed');assert.equal(done.completion.result.correct,50);
+   context.CacheService.getScriptCache().remove(context.ATTEMPT_TRAFFIC_CACHE_);
+   assert.throws(()=>context.compactPcState_(),/Lost cleanup acknowledgement/);assert.equal(dropped,true);
+   context.compactPcState_();
    const saved=context.examDocument_(context.findUserById_(other.user.id));assert.equal(saved.value.status,'completed');assert.equal(Object.keys(saved.value.answers).length,50);
    assert.equal(states.rows.filter(row=>String(row[0])===String(other.user.id)&&row[1]==='exam-attempt'&&row[4]===-1).length,3);
-   assert.equal(JSON.stringify(states.rows.filter(row=>String(row[0])!==String(other.user.id))),foreignBefore);
-  }finally{states.deleteRow=remove;}
+   assert.equal(protectedForeign(),foreignBefore);
+  }finally{states.deleteRows=remove;}
  });
  await check('A failed write-cache flush cannot acknowledge completion and retries keep one result',()=>{
   for(const failAt of [1,2]){

@@ -6,7 +6,7 @@ const transient=code=>['NETWORK','TIMEOUT','BUSY','STATE_BUSY','SERVER_ERROR','H
 
 // Each computer keeps the last acknowledged value and revision. A remote write
 // can replace a clean local copy, never an unacknowledged local change.
-export function createAccountSync({session,account,snapshot,apply,rpc,persist,changed=()=>{},now=Date.now,uuid=()=>crypto.randomUUID(),delay=3000,pollInterval=0,canSync=()=>true}){
+export function createAccountSync({session,account,snapshot,apply,rpc,persist,changed=()=>{},now=Date.now,uuid=()=>crypto.randomUUID(),delay=3000,pollInterval=0,canSync=()=>true,random=Math.random}){
  let generation=0,readyToken='',running=null,timer=null,busy=false,error='',unsupported=false,lastAt=0,retryAt=0;
  const pendingSaves=new WeakMap();let saveSerial=0;
  async function save(a){const serial=++saveSerial;pendingSaves.set(a,serial);await persist();if(pendingSaves.get(a)===serial)pendingSaves.delete(a);}
@@ -100,7 +100,7 @@ export function createAccountSync({session,account,snapshot,apply,rpc,persist,ch
    if(current(s)){
     unsupported=x.code==='NOT_FOUND';
     error=unsupported?'Для синхронізації між ПК потрібно оновити серверний Code.gs.':x.message;
-    retryAt=now()+(transient(x.code)?10000:30000);
+    retryAt=now()+(transient(x.code)?Math.round(5000+random()*5000):30000);
    }
   }finally{
    if(current(s)){

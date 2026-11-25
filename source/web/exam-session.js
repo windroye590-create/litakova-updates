@@ -1,3 +1,4 @@
+import {deliveryRetryDelay} from './core.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const checkpoint=r=>({answers:copy(r.answers||{}),index:r.index||0,exitCount:r.exitCount||0});
 const encode=x=>JSON.stringify(x);
@@ -147,7 +148,7 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   const interval=r?.examProtocol===1?(r.finishRequested||r.releaseRequested?5000:status().pending?15000:30000):60000;
   nextSyncAt=now()+interval*(1+random()*.3);
   const task=sync().then(value=>{if(epoch===generation)failures=0;return value;}).catch(x=>{
-   if(epoch===generation){failures++;nextSyncAt=now()+Math.min(5000*2**Math.min(failures,3),30000)*(.5+random()*.5);}
+   if(epoch===generation){failures++;nextSyncAt=now()+(['BUSY','STATE_BUSY','HTTP_429'].includes(x.code)?deliveryRetryDelay(failures,x.code,random):Math.min(5000*2**Math.min(failures,3),30000)*(.5+random()*.5));}
    throw x;
   }).finally(()=>{if(backgroundFlight===task)backgroundFlight=null;});
   backgroundFlight=task;return task;

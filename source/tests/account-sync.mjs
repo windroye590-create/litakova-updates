@@ -109,7 +109,8 @@ try{
   const r=api('POST','/api/account-state/document',instructorToken,request);assert.equal(api('POST','/api/account-state/document',instructorToken,request).document.revision,r.document.revision);
   assert.throws(()=>api('POST','/api/account-state/document',instructorToken,{...request,value:draft()}),x=>x.code==='REQUEST_CONFLICT');
  });
- await check('Only the latest three committed generations are retained',()=>{
+ await check('Idle maintenance retains the latest three committed generations',()=>{
+  context.compactPcState_();
   const rows=spreadsheet.getSheetByName('_Чернетки_ПК').rows.filter(r=>String(r[0])===String(teacher.id)&&r[1]==='test-draft'&&r[4]===-1);assert.equal(rows.length,3);
  });
  await check('Unauthenticated requests cannot read account documents',()=>{

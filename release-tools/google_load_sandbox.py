@@ -5,6 +5,14 @@ import re
 from pathlib import Path
 from appscript_deploy import require, server_file, source_info
 
+def candidate_files(files, settings, source):
+    """Keep the deployed manifest/files; replace only the validated server."""
+    info=source_info(source,settings)
+    build='pc-api'+str(info['api'])+'-'+info['sha256'][:16]
+    result=copy.deepcopy(files)
+    server_file(result)['source']=re.sub(r"serverBuild:\s*'[^']+'", "serverBuild: '"+build+"'", source)
+    return result
+
 def sandbox_files(files, settings, namespace, secret, private_id, public_id):
     require(re.fullmatch(r'LK_LT_[0-9a-f]{20}_', namespace), 'Invalid test namespace')
     require(re.fullmatch(r'[0-9a-f]{64}', secret), 'Invalid test secret')

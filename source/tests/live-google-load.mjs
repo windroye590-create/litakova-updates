@@ -67,7 +67,7 @@ async function once(method, endpoint, body = {}, token = '', client = -1, label 
   return reply;
 }
 async function rpc(method, endpoint, body = {}, token = '', client = -1) {
-  const critical = method === 'POST' && (/^\/api\/tests\/[^/]+\/start$/.test(endpoint) || /^\/api\/exam-session\/(start|claim|finish|release)$/.test(endpoint));
+  const critical = method === 'POST' && (endpoint === '/api/results' || /^\/api\/tests\/[^/]+\/start$/.test(endpoint) || /^\/api\/exam-session\/(start|claim|finish|release)$/.test(endpoint));
   const send = () => once(method, endpoint, body, token, client);
   const reply = critical ? await C.requestCapacity(send) : await send();
   if (!reply.ok) throw Object.assign(Error(reply.code || 'API_ERROR'), {code: reply.code || 'API_ERROR'});
@@ -78,7 +78,7 @@ async function retry(work, deadline = 240000) {
   for (;;) {
     try {return await work();} catch (error) {
       if (!C.retryable(error.code) || Date.now() - started >= deadline) throw error;
-      const delay = C.retryDelay(++attempt);
+      const delay = C.deliveryRetryDelay(++attempt,error.code);
       if (Date.now() - started + delay >= deadline) throw Object.assign(Error('CLIENT_RETRY_BUDGET'), {code: 'CLIENT_RETRY_BUDGET'});
       await pause(delay);
     }
@@ -103,7 +103,7 @@ async function inspectSandbox() {
   const wire = await transport({action: 'load-test-inspect'}); assert.equal(wire.reply.ok, true); return wire.reply.snapshot;
 }
 const percentiles = values => {values = values.filter(Number.isFinite).sort((a, b) => a - b); return {count: values.length, p50: values[Math.floor((values.length - 1) * .5)] ?? null, p95: values[Math.floor((values.length - 1) * .95)] ?? null, max: values.at(-1) ?? null};};
-const started = Date.now(); let finalSnapshot = null, runError = null, expected = [];
+const started = Date.now(); let finalSnapshot = null, runError = null, expected = [], publication = null;
 try {
   const password = 'Synthetic_' + randomUUID();
   teacher = await rpc('POST', '/api/instructor/register', {fullName: 'Синтетичний Інструктор', username: 'load_teacher_' + state.namespace.slice(6, 14), inviteCode: state.inviteCode, ...await C.credential(password)});
@@ -171,8 +171,16 @@ try {
   });
   await stopTeacherPoll();
   phase = 'publication-drain';
-  const publishUntil = Date.now() + 180000;
-  do {await rpc('GET', '/api/public-table-sync', {}, teacher.token).catch(() => {}); finalSnapshot = await inspectSandbox(); if (expected.every(x => finalSnapshot.publicResultIds.includes(x.id))) break; await pause(3000);} while (Date.now() < publishUntil);
+  const publishStarted=Date.now(),publishUntil=publishStarted+600000;
+  publication={budgetSeconds:600,publicRowsAfter180Seconds:null,seconds:null};
+  do {
+    await rpc('GET', '/api/public-table-sync', {}, teacher.token).catch(() => {});finalSnapshot=await inspectSandbox();
+    if(publication.publicRowsAfter180Seconds===null&&Date.now()-publishStarted>=180000)publication.publicRowsAfter180Seconds=finalSnapshot.publicResultIds.length;
+    if(expected.every(x=>finalSnapshot.publicResultIds.includes(x.id)))break;
+    await pause(3000);
+  }while(Date.now()<publishUntil);
+  publication.seconds=Math.round((Date.now()-publishStarted)/1000);
+  if(publication.publicRowsAfter180Seconds===null)publication.publicRowsAfter180Seconds=finalSnapshot.publicResultIds.length;
   for (const item of expected) {
     const rows = finalSnapshot.privateRows.filter(row => row.id === item.id); assert.equal(rows.length, 1, 'Duplicate or missing result');
     assert.equal(rows[0].userId, item.userId); assert.equal(rows[0].testId, String(item.test.id));
@@ -196,7 +204,7 @@ finally {
   }
   const report = {status: runError ? 'test_error' : 'completed', runError, actualGoogleServer: true, isolatedSyntheticData: true, productionDataWrites: 0,
     sharedGoogleAccountAndScriptLock: true, sourceVersion: C.APP_VERSION, clients: state.clients, authenticated: clients.filter(c => c.session).length,
-    seconds: Math.round((Date.now() - started) / 1000), peakActiveHTTP: peakActive, phases, summaries,
+    seconds: Math.round((Date.now() - started) / 1000), peakActiveHTTP: peakActive, phases, summaries, publication,
     findings: {busyResponses: calls.filter(row => row.code === 'BUSY').length, googleQuotaResponses: calls.filter(row => row.category === 'GOOGLE_QUOTA_OR_CONCURRENCY').length,
       timeouts: calls.filter(row => row.code === 'TIMEOUT').length, phaseFailures: phases.reduce((n, p) => n + p.clients - p.succeeded, 0)},
     results: {target: state.clients * 2, acknowledged: expected.length, authoritative: finalSnapshot?.privateRows.length ?? null, publicRows: finalSnapshot?.publicResultIds.length ?? null,
