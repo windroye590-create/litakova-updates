@@ -129,7 +129,7 @@ function doGet() {
     ok: true,
     service: 'Літакова Комісія',
     version: API_VERSION,
-    serverBuild: 'pc-api26-5798277cf35550b9',
+    serverBuild: 'pc-api26-8dbd47e1688a5b58',
     resultDeletion: true,
     deletedAttemptRetakes: true,
     singleAttempt: true,
