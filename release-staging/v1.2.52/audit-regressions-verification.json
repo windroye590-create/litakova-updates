@@ -1,0 +1,91 @@
+{
+  "backend": {
+    "status": "passed",
+    "passed": 14,
+    "checks": [
+      "A name edit updates the correct ID and its results while preserving login, password, key and dates",
+      "A retry after a partial name write reconciles results and creates a single audit entry",
+      "Stale names and cadet access cannot overwrite another instructor change",
+      "The primary instructor can edit staff names while their title and role remain intact",
+      "Choice corrections recalculate the existing result and retain the immutable submission identity",
+      "Changing a written answer invalidates only that answer grade and retains the original",
+      "Another active review lease blocks corrections before any snapshot is written",
+      "Stale revisions, missing reasons and unknown answer IDs cannot mutate accepted work",
+      "A lost canonical-write acknowledgement retries one correction and one journal entry",
+      "A snapshot-write failure leaves the result untouched and the same request can succeed later",
+      "Corrupted original snapshots block further edits without replacing current answers",
+      "Written grading after an answer correction preserves the correction chain",
+      "Deleting one result purges only its private answer history",
+      "Large Unicode answer originals survive chunk boundaries and are archived before intake cleanup"
+    ],
+    "actualAppsScriptExecuted": true,
+    "productionRecordsChanged": 0
+  },
+  "browser": {
+    "status": "passed",
+    "passed": 9,
+    "checks": [
+      "Cadet name dialog changes the selected ID and leaves login intact",
+      "Staff name controls are available to the primary instructor",
+      "Correction editor shows escaped original text and enforces two selected choices",
+      "Unsaved corrections survive reload and remain in this account",
+      "A disk-write failure retains the draft and prevents any correction RPC",
+      "Lost acknowledgement freezes the request; retry updates the same attempt once",
+      "Primary answers remain visible after correction and narrow layout fits",
+      "Stale work is rejected and reloading keeps the previous local draft for comparison",
+      "Cadet sees recalculated work without correction controls or private reasons"
+    ],
+    "pageErrors": [],
+    "productionWrites": false,
+    "testedAt": "2026-11-25T08:16:59.170Z"
+  },
+  "audit": {
+    "status": "passed",
+    "passed": 10,
+    "total": 10,
+    "checks": [
+      {
+        "name": "A cadet without submissions keeps one existing public row and receives the corrected name",
+        "status": "passed"
+      },
+      {
+        "name": "A failed cadet-publication marker cannot leave the acknowledged retry with an old public name",
+        "status": "passed"
+      },
+      {
+        "name": "A lost account-name acknowledgement retains publication and retry does not duplicate the cadet",
+        "status": "passed"
+      },
+      {
+        "name": "A failed publication marker retries the existing result without losing its public name update",
+        "status": "passed"
+      },
+      {
+        "name": "A failed result-name acknowledgement retries the existing result without losing its public name update",
+        "status": "passed"
+      },
+      {
+        "name": "Manual table repair updates a stale placeholder by ID without changing a namesake or creating an attempt",
+        "status": "passed"
+      },
+      {
+        "name": "Name publication preserves manual columns and does not reinterpret unidentified historical work as a placeholder",
+        "status": "passed"
+      },
+      {
+        "name": "A queued cold read rechecks readiness after the first initializer finishes under the shared lock",
+        "status": "passed"
+      },
+      {
+        "name": "Explicit maintenance still repairs headers even when readiness is already cached",
+        "status": "passed"
+      },
+      {
+        "name": "Failure during schema repair cannot mark a partial initialization as ready",
+        "status": "passed"
+      }
+    ],
+    "actualAppsScriptExecuted": true,
+    "productionRequests": 0
+  }
+}
