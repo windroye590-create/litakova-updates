@@ -62,7 +62,7 @@ async function once(method, endpoint, body = {}, token = '', client = -1, label 
   for (const key of metrics.cacheKeys || []) if (!cacheKeys.has(key)) {cacheKeys.add(key); await fs.appendFile(path.join(scratch, 'cache-keys.ndjson'), JSON.stringify(key) + '\n', {mode: 0o600});}
   const record = {phase: label, client, method, path: endpoint, status: wire.status, code: reply.ok ? 'OK' : reply.code || 'API_ERROR', category: wire.category,
     milliseconds: Math.round(performance.now() - started), serverMilliseconds: metrics.elapsedMs ?? null, lockWaitMilliseconds: metrics.lockWaitMs ?? null,
-    lockHeldMilliseconds: metrics.lockHeldMs ?? null, stages: metrics.stages || {}, encoding: wire.encoding};
+    lockHeldMilliseconds: metrics.lockHeldMs ?? null, stages: metrics.stages || {}, sessionFailure: metrics.sessionFailure || null, encoding: wire.encoding};
   calls.push(record); await fs.appendFile(path.join(out, 'requests.jsonl'), JSON.stringify(record) + '\n');
   return reply;
 }

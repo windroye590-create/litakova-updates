@@ -4,7 +4,10 @@ var LT_SECRET = __LT_SECRET__;
 var LT_PRIVATE = __LT_PRIVATE__;
 var LT_PUBLIC = __LT_PUBLIC__;
 var ltMetrics = {lockWaitMs:0,lockHeldMs:0,locksAcquired:0,cacheKeys:[],stages:{}};
-function loadTestStage_(name,fn,args){var start=Date.now();try{return fn.apply(null,args);}finally{var value=ltMetrics.stages[name]||(ltMetrics.stages[name]={calls:0,milliseconds:0});value.calls++;value.milliseconds+=Date.now()-start;}}
+function loadTestStage_(name,fn,args){var start=Date.now();try{return fn.apply(null,args);}catch(error){if(name==='requireSession_')ltMetrics.sessionFailure=loadTestSessionDebug_(args[0]);throw error;}finally{var value=ltMetrics.stages[name]||(ltMetrics.stages[name]={calls:0,milliseconds:0});value.calls++;value.milliseconds+=Date.now()-start;}}
+function loadTestSessionDebug_(token){
+  var out={};try{var parts=String(token||'').split('.');out.parts=parts.length;out.signatureValid=parts.length===2&&secureEquals_(parts[1],signText_(parts[0]));var payload=JSON.parse(base64UrlToText_(parts[0]));out.expired=Number(payload.e||0)<=Date.now();var user=findUserById_(payload.u);out.userFound=!!user;if(user){out.active=user.active;out.roleMatches=user.role===payload.r;out.versionMatches=Number(payload.v||0)===sessionVersion_(user.id);out.credentialMatches=payload.c==null||secureEquals_(payload.c,sessionCredential_(user));out.hashLength=String(user.passwordHash).length;out.saltLength=String(user.passwordSalt).length;out.deleting=cadetDeletionPending_(user.id);}}catch(error){out.debugError=String(error.name||'ERROR');}return out;
+}
 function loadTestProperties_() {
   var native = PropertiesService.getScriptProperties();
   return {
@@ -66,6 +69,6 @@ function doPost(e) {
     createInitialInstructorCode();reply={ok:true,inviteCode:props.getProperty('INITIAL_INVITE_CODE')};
   }else if(request.action==='load-test-inspect')reply={ok:true,snapshot:loadTestSnapshot_()};
   else reply=JSON.parse(loadTestOriginalDoPost_(e).getContent());
-  reply.loadTestMetrics={elapsedMs:Date.now()-start,lockWaitMs:ltMetrics.lockWaitMs,lockHeldMs:ltMetrics.lockHeldMs,locksAcquired:ltMetrics.locksAcquired,cacheKeys:ltMetrics.cacheKeys,stages:ltMetrics.stages};
+  reply.loadTestMetrics={elapsedMs:Date.now()-start,lockWaitMs:ltMetrics.lockWaitMs,lockHeldMs:ltMetrics.lockHeldMs,locksAcquired:ltMetrics.locksAcquired,cacheKeys:ltMetrics.cacheKeys,stages:ltMetrics.stages,sessionFailure:ltMetrics.sessionFailure||null};
   return jsonResponse_(reply);
 }
