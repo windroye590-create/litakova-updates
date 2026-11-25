@@ -23,6 +23,9 @@ const scratch = path.dirname(statePath), calls = [], phases = [], clients = [], 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const clone = value => JSON.parse(JSON.stringify(value));
 let phase = 'setup', teacher = null, teacherPolling = false, teacherFlight = null, active = 0, peakActive = 0;
+async function trackCacheKeys(metrics){
+  for(const key of metrics.cacheKeys||[])if(!cacheKeys.has(key)){cacheKeys.add(key);await fs.appendFile(path.join(scratch,'cache-keys.ndjson'),JSON.stringify(key)+'\n',{mode:0o600});}
+}
 async function localSave(client) {
   const filename = path.join(scratch, 'client-' + client.index + '.json'), temporary = filename + '.tmp';
   const raw = JSON.stringify(client.account);
@@ -59,10 +62,11 @@ async function once(method, endpoint, body = {}, token = '', client = -1, label 
   catch (error) {wire = {reply: {ok: false, code: error.name === 'TimeoutError' ? 'TIMEOUT' : 'NETWORK'}, status: 0, category: error.name || 'NETWORK'};}
   finally {active--;}
   const reply = wire.reply, metrics = reply.loadTestMetrics || {};
-  for (const key of metrics.cacheKeys || []) if (!cacheKeys.has(key)) {cacheKeys.add(key); await fs.appendFile(path.join(scratch, 'cache-keys.ndjson'), JSON.stringify(key) + '\n', {mode: 0o600});}
+  await trackCacheKeys(metrics);
   const record = {phase: label, client, method, path: endpoint, status: wire.status, code: reply.ok ? 'OK' : reply.code || 'API_ERROR', category: wire.category,
     milliseconds: Math.round(performance.now() - started), serverMilliseconds: metrics.elapsedMs ?? null, lockWaitMilliseconds: metrics.lockWaitMs ?? null,
-    lockHeldMilliseconds: metrics.lockHeldMs ?? null, stages: metrics.stages || {}, sessionFailure: metrics.sessionFailure || null, encoding: wire.encoding};
+    lockHeldMilliseconds: metrics.lockHeldMs ?? null, stages: metrics.stages || {}, sessionFailure: metrics.sessionFailure || null, signingKeyFingerprint:metrics.signingKeyFingerprint||null,encoding: wire.encoding,
+    ...(endpoint==='/api/challenge'&&reply.ok?{challengeSaltLength:typeof reply.salt==='string'?reply.salt.length:null,challengeSaltBase64:typeof reply.salt==='string'&&/^[A-Za-z0-9+/]+={0,2}$/.test(reply.salt)}:{})};
   calls.push(record); await fs.appendFile(path.join(out, 'requests.jsonl'), JSON.stringify(record) + '\n');
   return reply;
 }
@@ -89,6 +93,7 @@ async function stage(name, work, people = clients.filter(client => client.sessio
   const outcomes = await Promise.all(people.map(async client => {const at = Date.now(); try {await work(client); return {client: client.index, ok: true, milliseconds: Date.now() - at};} catch (error) {return {client: client.index, ok: false, code: error.code || error.name, milliseconds: Date.now() - at};}}));
   const item = {name, seconds: Math.round((Date.now() - started) / 1000), clients: people.length, succeeded: outcomes.filter(x => x.ok).length, outcomes};
   phases.push(item); console.log(JSON.stringify({phase: name, clients: people.length, succeeded: item.succeeded, seconds: item.seconds}));
+  await fs.writeFile(path.join(out,'phases.json'),JSON.stringify(phases,null,2)+'\n');
   return item;
 }
 function select(test, index, half = false) {
@@ -103,10 +108,16 @@ async function inspectSandbox() {
   const wire = await transport({action: 'load-test-inspect'}); assert.equal(wire.reply.ok, true); return wire.reply.snapshot;
 }
 const percentiles = values => {values = values.filter(Number.isFinite).sort((a, b) => a - b); return {count: values.length, p50: values[Math.floor((values.length - 1) * .5)] ?? null, p95: values[Math.floor((values.length - 1) * .95)] ?? null, max: values.at(-1) ?? null};};
-const started = Date.now(); let finalSnapshot = null, runError = null, expected = [], publication = null;
+const started = Date.now(); let finalSnapshot = null, runError = null, expected = [], publication = null,credentialStorage=null;
 try {
   const password = 'Synthetic_' + randomUUID();
   teacher = await rpc('POST', '/api/instructor/register', {fullName: 'Синтетичний Інструктор', username: 'load_teacher_' + state.namespace.slice(6, 14), inviteCode: state.inviteCode, ...await C.credential(password)});
+  if(state.testedCandidate){
+    const probe=await transport({action:'load-test-credential-check'});assert.equal(probe.reply.ok,true);await trackCacheKeys(probe.reply.loadTestMetrics||{});
+    credentialStorage=probe.reply.credentialStorage;await fs.writeFile(path.join(out,'credential-storage.json'),JSON.stringify(credentialStorage,null,2)+'\n');
+    assert.equal(credentialStorage.newWriterPreservedCredentials,true);assert.equal(credentialStorage.newCellsLiteral,true);
+    if(credentialStorage.legacyRecoverable)assert.equal(credentialStorage.legacyRecovered,true);
+  }
   const group = (await rpc('POST', '/api/instructor/groups', {name: 'Контроль Google ' + state.namespace.slice(6, 14)}, teacher.token)).group;
   for (let index = 0; index < state.clients; index++) {
     const username = 'load_' + state.namespace.slice(6, 14) + '_' + index;
@@ -204,9 +215,10 @@ finally {
   }
   const report = {status: runError ? 'test_error' : 'completed', runError, actualGoogleServer: true, isolatedSyntheticData: true, productionDataWrites: 0,
     sharedGoogleAccountAndScriptLock: true, sourceVersion: C.APP_VERSION, clients: state.clients, authenticated: clients.filter(c => c.session).length,
+    testedCandidate:state.testedCandidate===true,credentialStorage,
     seconds: Math.round((Date.now() - started) / 1000), peakActiveHTTP: peakActive, phases, summaries, publication,
     findings: {busyResponses: calls.filter(row => row.code === 'BUSY').length, googleQuotaResponses: calls.filter(row => row.category === 'GOOGLE_QUOTA_OR_CONCURRENCY').length,
-      timeouts: calls.filter(row => row.code === 'TIMEOUT').length, phaseFailures: phases.reduce((n, p) => n + p.clients - p.succeeded, 0)},
+      timeouts: calls.filter(row => row.code === 'TIMEOUT').length,signingKeyFingerprints:new Set(calls.map(row=>row.signingKeyFingerprint).filter(Boolean)).size, phaseFailures: phases.reduce((n, p) => n + p.clients - p.succeeded, 0)},
     results: {target: state.clients * 2, acknowledged: expected.length, authoritative: finalSnapshot?.privateRows.length ?? null, publicRows: finalSnapshot?.publicResultIds.length ?? null,
       answersVerifiedForAcknowledgedResults: !runError && !!finalSnapshot, pendingOnClients: clients.reduce((n, c) => n + c.account.pending.length + Number(!!c.account.run?.finishRequested), 0)}};
   await fs.writeFile(path.join(out, 'summary.json'), JSON.stringify(report, null, 2) + '\n'); console.log(JSON.stringify({status: report.status, findings: report.findings, results: report.results}));

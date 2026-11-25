@@ -22,11 +22,12 @@ class Range {
   setValues(values) {
     for (let y = 0; y < this.rowCount; y += 1) {
       const target = this.sheet.ensureRow(this.row - 1 + y);
-      for (let x = 0; x < this.columnCount; x += 1) target[this.column - 1 + x] = values[y][x];
+      for (let x = 0; x < this.columnCount; x += 1) {target[this.column - 1 + x] = values[y][x];this.sheet.formulas?.delete((this.row+y)+':'+(this.column+x));}
     }
     return this;
   }
   getValue() { return this.getValues()[0][0]; }
+  getFormulas() {return Array.from({length:this.rowCount},(_,y)=>Array.from({length:this.columnCount},(_,x)=>this.sheet.formulas?.get((this.row+y)+':'+(this.column+x))||''));}
   createTextFinder(text) {
     const range=this;let entire=false,sensitive=false,regex=false;
     const finder={
@@ -68,6 +69,7 @@ class Sheet {
     this.id=crypto.randomInt(1,2000000000);
     this.name = name;
     this.rows = [];
+    this.formulas = new Map();
     this.maxColumns = 1;
     this.maxRows = 1000;
     this.hidden = false;

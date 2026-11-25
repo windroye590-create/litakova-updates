@@ -65,7 +65,8 @@ class Drive:
                     cells[column]=(kind,value or '',{'hasFormula':formula is not None,'formulaLength':len(formula_text),'formulaUnaryPlus':formula_text.startswith('+'),'formulaEquals':formula_text.startswith('=')})
                 if not cells.get('A',('', ''))[1]:continue
                 shapes.append({'userId':cells['A'][1],'role':cells.get('E',('', ''))[1],
-                    'hashLength':len(cells.get('F',('', ''))[1]),'saltLength':len(cells.get('G',('', ''))[1]),
+                    'hashLength':len(cells.get('F',('', ''))[1].removeprefix('b64:')),'saltLength':len(cells.get('G',('', ''))[1].removeprefix('b64:')),
+                    'hashLiteralEncoding':cells.get('F',('', ''))[1].startswith('b64:'),'saltLiteralEncoding':cells.get('G',('', ''))[1].startswith('b64:'),
                     'hashCellType':cells.get('F',('', ''))[0],'saltCellType':cells.get('G',('', ''))[0],
                     'hashFormula':cells.get('F',('', '',{}))[2],'saltFormula':cells.get('G',('', '',{}))[2]})
         return shapes
@@ -120,6 +121,7 @@ def setup(path, report_path, count, candidate=False):
             print('Created isolated '+kind+' spreadsheet',flush=True)
         tested=candidate_files(deployed,settings,(Path(__file__).resolve().parents[1]/'source/Code.gs').read_text()) if candidate else deployed
         tested_info=source_info(server_file(tested)['source'],settings)
+        state['testedCandidate']=candidate;state['testedServerBuild']=tested_info['build'];state['testedServerSHA256']=tested_info['sha256'];save(path,state)
         files=sandbox_files(tested,settings,state['namespace'],state['secret'],state['createdBooks']['private'],state['createdBooks']['public'])
         state['testHeadSHA256']=content_hash(files)
         require(content_hash(content_files(client.call('GET',base+'/content')))==state['originalHeadSHA256'],'HEAD changed during test preparation')
@@ -187,7 +189,7 @@ def cleanup(path, report_path):
     save(report_path/'cleanup.json',result);print(json.dumps(result),flush=True)
     require(not failures,'Test cleanup needs attention; see the bounded cleanup report')
 
-def observe(report_path):
+def observe(report_path, credential_shapes=False):
     settings=config();client=Google(os.environ.get('GAS_CREDENTIALS',''));base='/v1/projects/'+settings['scriptId']
     deployments=client.call('GET',base+'/deployments').get('deployments',[])
     candidates=[item for item in deployments if item['deploymentId']!=settings['deploymentId'] and re.fullmatch(r'Isolated load test LK_LT_[0-9a-f]{20}_',item['deploymentConfig'].get('description',''))]
@@ -212,18 +214,20 @@ def observe(report_path):
         for row in snapshot['privateRows']:
             entry=tests.setdefault(row['testId'],{'works':0,'questions':row['total'],'pendingPublication':0});entry['works']+=1;entry['pendingPublication']+=int(row['publicState']=='pending')
         result={'status':'observed','namespace':namespace,'authoritativeResults':len(snapshot['privateRows']),'publicResults':len(snapshot['publicResultIds']),'byTest':tests,
+                'credentialStorage':snapshot.get('credentialStorage'),
                 'scriptFileNames':[file['name'] for file in files],'productionDataReads':0,'productionDataWrites':0}
-        try:result['syntheticCredentialShapes']=drive.credential_shapes(private_id)
-        except Exception as error:result['credentialShapeDiagnostic']=type(error).__name__
+        if credential_shapes:
+            try:result['syntheticCredentialShapes']=drive.credential_shapes(private_id)
+            except Exception as error:result['credentialShapeDiagnostic']=type(error).__name__
     save(report_path/'observation.json',result);print(json.dumps(result),flush=True)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('operation',choices=['setup','cleanup','observe']);p.add_argument('--state',type=Path,required=True);p.add_argument('--report-dir',type=Path,required=True);p.add_argument('--clients',type=int,default=27);p.add_argument('--candidate',action='store_true')
+    p=argparse.ArgumentParser();p.add_argument('operation',choices=['setup','cleanup','observe']);p.add_argument('--state',type=Path,required=True);p.add_argument('--report-dir',type=Path,required=True);p.add_argument('--clients',type=int,default=27);p.add_argument('--candidate',action='store_true');p.add_argument('--credential-shapes',action='store_true')
     a=p.parse_args()
     try:
         if a.operation=='setup':setup(a.state,a.report_dir,a.clients,a.candidate)
         elif a.operation=='cleanup':cleanup(a.state,a.report_dir)
-        else:observe(a.report_dir)
+        else:observe(a.report_dir,a.credential_shapes)
     except Exception as error:
         # Google helpers deliberately omit OAuth values and raw response bodies.
         print(type(error).__name__+': '+str(error),flush=True);raise SystemExit(1)

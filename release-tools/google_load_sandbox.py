@@ -26,7 +26,7 @@ def sandbox_files(files, settings, namespace, secret, private_id, public_id):
     for name in ['doPost', 'doGet']:
         server['source'], count=re.subn(r'\bfunction '+name+r'\s*\(', 'function loadTestOriginal'+name[0].upper()+name[1:]+'_(', server['source'])
         require(count == 1, 'Entrypoint replacement was not unique')
-    stages=['requireSession_','getTestById_','pcStateMetadata_','pcStateRead_','pcStateWrite_','readResultRecord_','submitResult_','flushRequestWrites_','drainPublicResults_']
+    stages=['requireSession_','getTestById_','pcStateMetadata_','pcStateRead_','pcStateWrite_','readResultRecord_','submitResult_','flushRequestWrites_','drainPublicResults_','signText_']
     wrappers=[]
     for name in stages:
         renamed='loadTestActual_'+name

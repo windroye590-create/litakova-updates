@@ -42,6 +42,7 @@ export async function signIn(username,password,groupName,request,pause=ms=>new P
    const identity={username:username.trim(),groupName};
    const challenge=await request('/api/challenge',identity);
    if(typeof challenge.salt!=='string'||!challenge.salt||typeof challenge.nonce!=='string'||!challenge.nonce)throw Object.assign(Error('Сервер не повернув дані для безпечного входу.'),{code:'BAD_LOGIN_RESPONSE'});
+   try{if(unb64(challenge.salt).length!==16)throw Error();}catch{throw Object.assign(Error('Сервер повернув пошкоджені дані входу. Зверніться до інструктора для відновлення пароля цього акаунта.'),{code:'BAD_LOGIN_RESPONSE'});}
    const value=await proof(password,challenge.salt,challenge.nonce);
    return await request('/api/login',{...identity,nonce:challenge.nonce,proof:value});
   }catch(error){if(attempt>=(['NETWORK','TIMEOUT'].includes(error.code)?1:error.code==='SERVER_ERROR'?2:10)||!transient.has(error.code))throw error;const cap=Math.min(1500*2**attempt,10000);await pause(Math.round(cap*(.5+random()*.5)));}

@@ -135,7 +135,7 @@ function doGet() {
     ok: true,
     service: 'Літакова Комісія',
     version: API_VERSION,
-    serverBuild: 'pc-api26-1037d6bbc7506c17',
+    serverBuild: 'pc-api26-b44b075754351786',
     resultDeletion: true,
     deletedAttemptRetakes: true,
     singleAttempt: true,
@@ -1447,22 +1447,55 @@ function dataRows_(key) {
 }
 
 function listUsers_() {
-  return dataRows_('users').map(userFromRow_).filter(function (user) { return user.id !== ''; });
+  return dataRows_('users').map(function(row,index){return userFromRow_(row,index,true);}).filter(function (user) { return user.id !== ''; });
 }
 
-function userFromRow_(row, index) {
+function userFromRow_(row, index, skipCredentialRepair) {
+  if(!skipCredentialRepair)row=restoreLegacyCredentialRow_(row,index);
   return {
     id: row[0],
     username: String(row[1] || ''),
     fullName: String(row[2] || ''),
     groupName: String(row[3] || ''),
     role: String(row[4] || ''),
-    passwordHash: String(row[5] || ''),
-    passwordSalt: String(row[6] || ''),
+    passwordHash: credentialCellValue_(row[5]),
+    passwordSalt: credentialCellValue_(row[6]),
     active: asBoolean_(row[7], true),
     createdAt: iso_(row[8]),
     rowNumber: index == null ? null : index + 2
   };
+}
+function credentialCell_(value) {return 'b64:'+String(value);}
+function credentialCellValue_(value) {
+  var text=String(value||'');
+  if(text.indexOf('b64:')===0)return text.slice(4);
+  if(text.charAt(0)==="'"&&/^[A-Za-z0-9+/]+={0,2}$/.test(text.slice(1)))return text.slice(1);
+  return text;
+}
+function legacyCredentialFormula_(formula,bytes) {
+  var text=String(formula||''),values=[text,text.replace(/^=/,''),text.replace(/^=/,'+')];
+  for(var i=0;i<values.length;i++){
+    var value=credentialCellValue_(values[i]);
+    if(!/^[A-Za-z0-9+/]+={0,2}$/.test(value))continue;
+    try{var decoded=Utilities.base64Decode(value);if(decoded.length===bytes&&stripPadding_(Utilities.base64Encode(decoded))===stripPadding_(value))return value;}catch(ignored){}
+  }
+  return null;
+}
+function restoreLegacyCredentialRow_(row,index) {
+  if(index==null||!row[0]||![row[5],row[6]].some(function(value){return String(value||'').charAt(0)==='#';}))return row;
+  var lock=LockService.getScriptLock(),own=!workspaceWriteRequest_&&!(typeof lock.hasLock==='function'&&lock.hasLock());
+  if(own&&!lock.tryLock(1))fail_('Дані акаунта зараз оновлюються. Спробуйте ще раз.','BUSY');
+  try{
+    var sheet=sheet_('users'),fresh=sheet.getRange(index+2,1,1,9).getValues()[0];
+    if(String(fresh[0])!==String(row[0]))fail_('Рядок акаунта змінився. Спробуйте ще раз.','BUSY');
+    var formulas=sheet.getRange(index+2,6,1,2).getFormulas()[0],values=[credentialCellValue_(fresh[5]),credentialCellValue_(fresh[6])],sizes=[32,16];
+    for(var i=0;i<2;i++)if(String(values[i]).charAt(0)==='#'){
+      var recovered=legacyCredentialFormula_(formulas[i],sizes[i]);if(!recovered)return fresh;values[i]=recovered;
+    }
+    try{validateCredential_(values[1],values[0]);}catch(ignored){return fresh;}
+    sheet.getRange(index+2,6,1,2).setValues([[credentialCell_(values[0]),credentialCell_(values[1])]]);
+    SpreadsheetApp.flush();fresh[5]=credentialCell_(values[0]);fresh[6]=credentialCell_(values[1]);return fresh;
+  }finally{if(own)lock.releaseLock();}
 }
 
 function publicUser_(user) {
@@ -1674,7 +1707,7 @@ function createUser_(source) {
   beginWorkspaceChange_(['cadets']);
   sheet_('users').appendRow([
     id, safeCellText_(username), safeCellText_(fullName), safeCellText_(source.groupName || ''),
-    source.role, String(source.passwordHash), String(source.passwordSalt), true, createdAt, source.role===ROLE_CADET?'pending':''
+    source.role, credentialCell_(source.passwordHash), credentialCell_(source.passwordSalt), true, createdAt, source.role===ROLE_CADET?'pending':''
   ]);
   if(source.role===ROLE_CADET)invalidatePublicSync_();
   return {
@@ -3071,7 +3104,7 @@ function updateUserPassword_(id, actor, body) {
   requireCadetNotDeleting_(id);
   validateCredential_(body.passwordSalt, body.passwordHash);
   bumpSessionVersion_(user.id);
-  sheet_('users').getRange(user.rowNumber, 6, 1, 2).setValues([[String(body.passwordHash), String(body.passwordSalt)]]);
+  sheet_('users').getRange(user.rowNumber, 6, 1, 2).setValues([[credentialCell_(body.passwordHash), credentialCell_(body.passwordSalt)]]);
   logAudit_(actor, 'CADET_PASSWORD', 'cadet', user.id, user.fullName, 'Пароль змінено інструктором.');
   return {changed: true};
 }
@@ -3461,6 +3494,13 @@ function ensureAppSecret_() {
   var properties = PropertiesService.getScriptProperties();
   var secret=properties.getProperty('APP_SECRET');
   if (!secret) {
+    secret=properties.getProperty('APP_SECRET');
+    if(secret)return secret;
+    // Existing vaults and signed sessions must never acquire a new key merely
+    // because a Google property read failed or the property was removed.
+    var users=spreadsheet_().getSheetByName(SHEETS.users);
+    if(properties.getProperty('PRIMARY_INSTRUCTOR_ID')||(users&&users.getLastRow()>1))
+      fail_('Не вдалося прочитати ключ сервера. Повторіть запит; ключі акаунтів не змінено.','SERVER_ERROR');
     secret=randomBase64_(48);properties.setProperty('APP_SECRET', secret);
   }
   return secret;

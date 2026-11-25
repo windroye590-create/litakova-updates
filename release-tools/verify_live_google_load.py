@@ -46,6 +46,14 @@ def verdict(report):
         failures.append('answers_unverified')
     if results.get('pendingOnClients') != 0:
         failures.append('client_queue_not_empty')
+    if report.get('testedCandidate') is True:
+        storage=report.get('credentialStorage') or {}
+        if storage.get('newWriterPreservedCredentials') is not True or storage.get('newCellsLiteral') is not True:
+            failures.append('credential_storage_unverified')
+        if storage.get('legacyRecoverable') is True and storage.get('legacyRecovered') is not True:
+            failures.append('legacy_credentials_not_recovered')
+        if (report.get('findings') or {}).get('signingKeyFingerprints') != 1:
+            failures.append('signing_key_not_stable')
     return {'status': 'failed' if failures else 'passed',
             'scope': 'all classroom stages, durable delivery and publication within the scenario budgets',
             'failures': failures}

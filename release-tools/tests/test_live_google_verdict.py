@@ -53,6 +53,14 @@ class LiveGoogleVerdictTest(unittest.TestCase):
                 report.update(changes)
                 self.assertEqual(verdict(report)['status'], 'failed')
 
+    def test_candidate_requires_live_literal_storage_checks(self):
+        report=complete_report();report['testedCandidate']=True;report['findings']={'signingKeyFingerprints':1}
+        self.assertIn('credential_storage_unverified',verdict(report)['failures'])
+        report['credentialStorage']={'newWriterPreservedCredentials':True,'newCellsLiteral':True,'legacyRecoverable':True,'legacyRecovered':False}
+        self.assertIn('legacy_credentials_not_recovered',verdict(report)['failures'])
+        report['credentialStorage']['legacyRecovered']=True
+        self.assertEqual(verdict(report)['status'],'passed')
+
 
 if __name__ == '__main__':
     unittest.main()
