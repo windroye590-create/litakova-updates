@@ -74,4 +74,5 @@ try{
   assert.deepEqual(api('GET','/api/local-storage/key',person.token),vault);
  });
 }finally{prototype.setValues=nativeSet;users.appendRow=nativeAppend;}
+fs.mkdirSync(new URL('../verification/',import.meta.url),{recursive:true});
 fs.writeFileSync(new URL('../verification/credential-literals.json',import.meta.url),JSON.stringify({status:'passed',passed:checks.length,checks,leadingPlusHashAndSalt:true,preservesExistingVaultKey:true,syntheticOnly:true,productionRequests:0},null,2)+'\n');
