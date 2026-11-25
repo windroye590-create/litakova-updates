@@ -7,7 +7,9 @@ from pathlib import Path
 import secrets
 import time
 from urllib.parse import urlencode
-from urllib.request import Request
+from urllib.request import Request, build_opener
+from urllib.error import HTTPError
+from github_release import SafeRedirect
 
 from appscript_deploy import Google, config, content_files, content_hash, inspect, read_json, require
 from google_load_sandbox import sandbox_files
@@ -38,7 +40,12 @@ class Drive:
 
 def control(state, action, extra=None):
     body={'action':action,'loadTestKey':state['secret'],**(extra or {})}
-    reply=read_json(Request(state['webAppUrl'],data=json.dumps(body).encode(),headers={'Content-Type':'application/json'},method='POST'))
+    try:
+        with build_opener(SafeRedirect()).open(Request(state['webAppUrl'],data=json.dumps(body).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=330) as response:
+            raw=response.read(8*1024*1024+1)
+        require(len(raw)<=8*1024*1024,'Sandbox control response too large')
+        reply=json.loads(raw)
+    except HTTPError as error:raise RuntimeError('Sandbox control failed: HTTP '+str(error.code)) from None
     require(reply.get('ok') is True,'Sandbox control failed: '+str(reply.get('code','UNKNOWN')))
     return reply
 
@@ -78,6 +85,7 @@ def setup(path, report_path, count):
             file_id=drive.create(state['namespace'],kind)
             require(file_id!=settings['spreadsheetId'],'Test file aliases production')
             state['createdBooks'][kind]=file_id;save(path,state)
+            print('Created isolated '+kind+' spreadsheet',flush=True)
         files=sandbox_files(deployed,settings,state['namespace'],state['secret'],state['createdBooks']['private'],state['createdBooks']['public'])
         state['testHeadSHA256']=content_hash(files)
         require(content_hash(content_files(client.call('GET',base+'/content')))==state['originalHeadSHA256'],'HEAD changed during test preparation')
@@ -92,12 +100,14 @@ def setup(path, report_path, count):
             require(state['testDeploymentId']!=settings['deploymentId'],'Refusing to use production deployment')
             state['webAppUrl']='https://script.google.com/macros/s/'+state['testDeploymentId']+'/exec';save(path,state)
         finally:restore_head(client,state,path)
+        print('Temporary deployment created; original project HEAD restored',flush=True)
         production_unchanged(client,state)
         # Only the guarded test URL receives initialization requests.
         seeded=control(state,'load-test-seed')
         require(isinstance(seeded.get('inviteCode'),str) and seeded['inviteCode'],'No isolated instructor code')
         state['inviteCode']=seeded['inviteCode'];state['initialCacheKeys']=seeded.get('loadTestMetrics',{}).get('cacheKeys',[]);save(path,state)
         save(path.parent/'cache-keys.json',state['initialCacheKeys'])
+        reaped=control(state,'load-test-reap');state['orphanTestKeysRemoved']=reaped['removedProperties'];save(path,state)
         summary={'status':'ready','namespace':state['namespace'],'clients':count,'productionVersionPreserved':version,
                  'productionBuildPreserved':info['build'],'headRestored':True,'separatePrivateAndPublicBooks':True,
                  'sharedGoogleAccountAndScriptLock':True,'productionDataWrites':0}

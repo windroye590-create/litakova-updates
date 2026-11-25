@@ -47,6 +47,12 @@ function doPost(e) {
   try{request=JSON.parse(e&&e.postData&&e.postData.contents||'{}');}catch(ignored){}
   if(!request||request.loadTestKey!==LT_SECRET)return jsonResponse_({ok:false,code:'LOAD_TEST_FORBIDDEN'});
   var native=PropertiesService.getScriptProperties();
+  if(request.action==='load-test-reap'){
+    var all=native.getProperties(),count=0,prefixes={};
+    Object.keys(all).forEach(function(key){var match=key.match(/^(LK_LT_[0-9a-f]{20}_)/);if(match&&match[1]!==LT_NAMESPACE){prefixes[match[1]]=true;native.deleteProperty(key);count++;}});
+    var cache=CacheService.getScriptCache();Object.keys(prefixes).forEach(function(prefix){['LK_SCHEMA_READY_API25','LK_SCHEMA_READY_PUBLIC_CADETS_V1','LK_SCHEMA_CADET_CARD_V1','LK_SCHEMA_ANSWER_CHANGES_V1','LK_SCHEMA_EXCEL_V1','LK_PUBLIC_SYNC_SUMMARY_V1'].forEach(function(key){cache.remove(prefix+key);});});
+    return jsonResponse_({ok:true,removedProperties:count,removedNamespaces:Object.keys(prefixes).length});
+  }
   if(request.action==='load-test-purge'){
     var keys=Array.isArray(request.cacheKeys)?request.cacheKeys:[];
     if(keys.length>10000||keys.some(function(key){return typeof key!=='string'||key.length+LT_NAMESPACE.length>250;}))return jsonResponse_({ok:false,code:'BAD_CACHE_KEYS'});

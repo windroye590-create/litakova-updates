@@ -20,6 +20,8 @@ const admin = post({action: 'api', method: 'POST', path: '/api/instructor/regist
 const reply = post({action: 'api', method: 'GET', path: '/api/workspace', token: admin.token, body: {}, writtenProtocol: 1, choiceProtocol: 2, loadTestKey: secret});assert.equal(reply.ok, true, reply.error);assert.ok(reply.loadTestMetrics.stages.requireSession_);
 assert.equal(JSON.stringify(original.getSheets().map(s => [s.getName(), s.rows])), before);
 assert.deepEqual(Object.fromEntries(Object.entries(properties.getProperties()).filter(([key]) => !key.startsWith('LK_LT_'))), beforeProps);
+properties.setProperty('LK_LT_' + 'c'.repeat(20) + '_ORPHAN', 'synthetic orphan state');
+const reaped = post({action: 'load-test-reap', loadTestKey: secret});assert.equal(reaped.removedProperties, 1);assert.ok(Object.keys(properties.getProperties()).some(key => key.startsWith('LK_LT_' + 'a'.repeat(20))));
 const keys = [...new Set([...(seeded.loadTestMetrics.cacheKeys || []), ...(reply.loadTestMetrics.cacheKeys || [])])];
 assert.equal(post({action: 'load-test-purge', loadTestKey: secret, cacheKeys: keys}).ok, true);
 assert.equal(Object.keys(properties.getProperties()).filter(key => key.startsWith('LK_LT_')).length, 0);
