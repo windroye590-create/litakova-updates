@@ -1,0 +1,60 @@
+name: Контроль навантаження Google на ізольованих даних
+on:
+  workflow_dispatch:
+    inputs:
+      clients:
+        description: Кількість одночасних тестових клієнтів
+        type: choice
+        options: ['20', '27']
+        default: '27'
+      no_active_class:
+        description: Підтверджено відсутність активного заняття
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: signed-windows-release
+  cancel-in-progress: false
+jobs:
+  load:
+    if: github.ref == 'refs/heads/main' && inputs.no_active_class
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      LOAD_STATE: /tmp/litakova-live-load/state.json
+      LOAD_REPORT: /tmp/litakova-live-report
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Verify sandbox guards before any Google writes
+        run: |
+          python3 -m unittest discover -s release-tools/tests -p 'test_google_load_sandbox.py'
+          node source/tests/google-load-isolation.mjs
+          node --check source/tests/live-google-load.mjs
+      - name: Create isolated books and temporary test deployment, restore original HEAD
+        env:
+          GAS_CREDENTIALS: ${{ secrets.GAS_CREDENTIALS }}
+          CLIENTS: ${{ inputs.clients }}
+        run: python3 release-tools/live_google_load.py setup --state "$LOAD_STATE" --report-dir "$LOAD_REPORT" --clients "$CLIENTS"
+      - name: Exercise actual Google login, starts, checkpoints, finishes and publication
+        timeout-minutes: 35
+        run: node source/tests/live-google-load.mjs --state "$LOAD_STATE" --report-dir "$LOAD_REPORT"
+      - name: Retire only created test resources and verify production deployment
+        if: always()
+        timeout-minutes: 5
+        env:
+          GAS_CREDENTIALS: ${{ secrets.GAS_CREDENTIALS }}
+        run: python3 release-tools/live_google_load.py cleanup --state "$LOAD_STATE" --report-dir "$LOAD_REPORT"
+      - name: Save bounded reports without tokens, credentials or raw client state
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: live-google-load
+          path: /tmp/litakova-live-report
+          if-no-files-found: warn
