@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 import secrets
 import re
+import io
+import zipfile
+import xml.etree.ElementTree as ET
 import time
 from urllib.parse import urlencode
 from urllib.request import Request, build_opener
@@ -38,6 +41,32 @@ class Drive:
         value=self.call('GET','/drive/v3/files/'+file_id+'?fields=id,mimeType,trashed,appProperties')
         require(value.get('appProperties')=={'litakovaLoadRun':namespace,'litakovaLoadKind':kind},'Refusing to trash an unowned test file')
         if not value.get('trashed'):self.call('PATCH','/drive/v3/files/'+file_id+'?fields=id,trashed',{'trashed':True})
+    def credential_shapes(self, file_id):
+        # This method is called only after the observer proves the book is ours.
+        url='https://www.googleapis.com/drive/v3/files/'+file_id+'/export?'+urlencode({'mimeType':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
+        with build_opener(SafeRedirect()).open(Request(url,headers={'Authorization':'Bearer '+self.token}),timeout=60) as response:raw=response.read(10*1024*1024+1)
+        require(len(raw)<=10*1024*1024,'Synthetic book export exceeds its diagnostic bound')
+        ns={'x':'http://schemas.openxmlformats.org/spreadsheetml/2006/main','r':'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+        with zipfile.ZipFile(io.BytesIO(raw)) as book:
+            workbook=ET.fromstring(book.read('xl/workbook.xml'));sheets=[s for s in workbook.findall('x:sheets/x:sheet',ns) if s.get('name')=='_Користувачі'];require(len(sheets)==1,'Synthetic users sheet not found')
+            relationship=sheets[0].get('{'+ns['r']+'}id');rels=ET.fromstring(book.read('xl/_rels/workbook.xml.rels'));target=next(r.get('Target') for r in rels if r.get('Id')==relationship)
+            target=target.lstrip('/') if target.startswith('/') else 'xl/'+target
+            strings=[]
+            if 'xl/sharedStrings.xml' in book.namelist():strings=[''.join(s.itertext()) for s in ET.fromstring(book.read('xl/sharedStrings.xml'))]
+            shapes=[]
+            for row in ET.fromstring(book.read(target)).findall('x:sheetData/x:row',ns):
+                if row.get('r')=='1':continue
+                cells={}
+                for cell in row:
+                    column=re.match(r'[A-Z]+',cell.get('r','')).group();kind=cell.get('t','n');node=cell.find('x:v',ns);value=node.text if node is not None else ''
+                    if kind=='s':value=strings[int(value)]
+                    elif kind=='inlineStr':value=''.join(cell.itertext())
+                    cells[column]=(kind,value or '')
+                if not cells.get('A',('', ''))[1]:continue
+                shapes.append({'userId':cells['A'][1],'role':cells.get('E',('', ''))[1],
+                    'hashLength':len(cells.get('F',('', ''))[1]),'saltLength':len(cells.get('G',('', ''))[1]),
+                    'hashCellType':cells.get('F',('', ''))[0],'saltCellType':cells.get('G',('', ''))[0]})
+        return shapes
 
 def control(state, action, extra=None):
     body={'action':action,'loadTestKey':state['secret'],**(extra or {})}
@@ -179,6 +208,8 @@ def observe(report_path):
             entry=tests.setdefault(row['testId'],{'works':0,'questions':row['total'],'pendingPublication':0});entry['works']+=1;entry['pendingPublication']+=int(row['publicState']=='pending')
         result={'status':'observed','namespace':namespace,'authoritativeResults':len(snapshot['privateRows']),'publicResults':len(snapshot['publicResultIds']),'byTest':tests,
                 'scriptFileNames':[file['name'] for file in files],'productionDataReads':0,'productionDataWrites':0}
+        try:result['syntheticCredentialShapes']=drive.credential_shapes(private_id)
+        except Exception as error:result['credentialShapeDiagnostic']=type(error).__name__
     save(report_path/'observation.json',result);print(json.dumps(result),flush=True)
 
 if __name__=='__main__':
