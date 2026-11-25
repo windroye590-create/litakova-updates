@@ -43,7 +43,8 @@ int check_manifest(const BYTE*d,DWORD n){UPDATE_RELEASE r;return update_parse(d,
         data[position]=ord('A') if data[position]!=ord('A') else ord('B')
         assert not native.check_manifest(bytes(data),len(data)), 'Tampered signature accepted'
     print('Native parser fuzz: 20000 malformed or signature-tampered catalogs rejected')
-    report={'passed':len(checks),'checks':checks,'parser':'actual native/update_protocol.h','rsa':'OpenSSL SHA256withRSA on Linux','windowsCryptoAPIRuntimeVerified':False}
+    report={'status':'passed','passed':len(checks),'checks':checks,'parser':'actual native/update_protocol.h','rsa':'OpenSSL SHA256withRSA on Linux','windowsCryptoAPIRuntimeVerified':False,
+            'fuzzSeed':20261028,'malformedCatalogsRejected':10000,'tamperedSignaturesRejected':10000}
     if len(sys.argv)>1:
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric import rsa

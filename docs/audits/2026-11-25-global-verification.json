@@ -1,0 +1,691 @@
+{
+  "status": "passed",
+  "application": "Litakova",
+  "version": "1.2.52",
+  "code": 176,
+  "reviewBaseCommit": "1105644c9fa51731375940903ef3e9d0926d1b68",
+  "verifiedAt": "2026-11-25T09:37:50.965944+00:00",
+  "fullGlobalAuditExitCode": 0,
+  "commands": [
+    "npm run test:global-audit",
+    "python3 -m unittest discover -s release-tools/tests -p 'test_*.py'",
+    "PACKED_EXE=<fresh published EXE> node tests/packaged-startup.mjs"
+  ],
+  "releaseAutomationTestsPassed": 46,
+  "productionHealthReadRequests": 1,
+  "productionStudentRecordsChanged": 0,
+  "liveAppsScriptCapacityMeasured": false,
+  "applicationRuntimeChanged": false,
+  "newReleasePublished": false,
+  "fpvChanged": false,
+  "newReproducibleApplicationDefects": 0,
+  "logs": [
+    {
+      "file": "global-audit-2026-11-25-full.log",
+      "sha256": "a76249d5b22f15976a7026dda18f1e8d30cd4a846039cc91084b57eb020d71ab",
+      "bytes": 166288,
+      "exitCode": 0
+    },
+    {
+      "file": "global-audit-2026-11-25-release-automation.log",
+      "sha256": "ba6ceee2ff6102238ae4021d3127a64565ca2dc3404578b645a10bdae3742517",
+      "bytes": 855,
+      "exitCode": 0
+    },
+    {
+      "file": "global-audit-2026-11-25-packaged-startup.log",
+      "sha256": "51f3e31b82bd333342cdff32828e3081ef8d52c58d012b11cc9383542083cb9f",
+      "bytes": 1022,
+      "exitCode": 0
+    }
+  ],
+  "evidence": {
+    "browser": {
+      "path": "source/verification/stress/browser-27.json",
+      "sha256": "cba01cdb7bd4bc1107e4a6785f47eaecf5d119a42954157e7f1b5e828eee084c",
+      "result": {
+        "status": "passed",
+        "kind": "isolated_27_chromium_clients_real_app_and_real_Code_gs",
+        "version": "1.2.52",
+        "productionWrites": false,
+        "liveGoogleCapacityMeasured": false,
+        "windowsRuntimeVerified": false,
+        "clients": 27,
+        "committedResults": 54,
+        "choiceAnswersChecked": 5940,
+        "writtenAnswersChecked": 405,
+        "writtenChars": 1214595,
+        "checks": [
+          "27 separate Chromium sessions initialized with real server authentication",
+          "27 simultaneous 200-question submissions survive BUSY, 429, lost replies and restarts",
+          "All 27 large written submissions stay on disk during a total outage",
+          "Reopening all application windows preserves every offline answer",
+          "Restored connection commits 27 mixed works once, with pending manual grades",
+          "405 large written answers remain byte-for-byte identical in authoritative storage",
+          "Every saved queue is empty only after a server acknowledgement",
+          "No application exceptions, leaked cross-account requests or external traffic"
+        ],
+        "metrics": {
+          "requests": 363,
+          "peakActive": 28,
+          "busy": 9,
+          "quota": 9,
+          "lostReplies": 9,
+          "offlineReplies": 60,
+          "stateWrites": 416
+        },
+        "wallSeconds": 28,
+        "localFinishMilliseconds": {
+          "median": 3220,
+          "p95": 3496
+        }
+      }
+    },
+    "concurrencyA": {
+      "path": "source/verification/stress/concurrency-120-271828.json",
+      "sha256": "06f94d53a66d04487d0aa5a7acd33d04ac415b2f324710e5e525bfa7160c851b",
+      "result": {
+        "kind": "isolated_concurrency_fault_model",
+        "liveAppsScriptMeasured": false,
+        "participants": 120,
+        "accepted": 120,
+        "duplicates": 0,
+        "pending": 0,
+        "slowSheetsModelMillis": 5000,
+        "executionSlotsModel": 30,
+        "reservedInstructorSlots": 1,
+        "busyResponses": 641,
+        "quotaResponses": 109,
+        "repliesLostAfterCommit": 18,
+        "attempts": 888,
+        "wallClockMillis": 14372,
+        "simulationTimeScale": 100
+      }
+    },
+    "concurrencyB": {
+      "path": "source/verification/stress/concurrency-120-31427.json",
+      "sha256": "57b5b9d60337a4280ef8f6bba67f757570468618fbc31f4575c99fc339e9e969",
+      "result": {
+        "kind": "isolated_concurrency_fault_model",
+        "liveAppsScriptMeasured": false,
+        "participants": 120,
+        "accepted": 120,
+        "duplicates": 0,
+        "pending": 0,
+        "slowSheetsModelMillis": 5000,
+        "executionSlotsModel": 30,
+        "reservedInstructorSlots": 1,
+        "busyResponses": 632,
+        "quotaResponses": 100,
+        "repliesLostAfterCommit": 18,
+        "attempts": 870,
+        "wallClockMillis": 18159,
+        "simulationTimeScale": 100
+      }
+    },
+    "stateMachine": {
+      "path": "source/verification/stress/global-state-machine.json",
+      "sha256": "6bf1ebf00858ae58ffa5cdfebfb9fb8d8ab23be82085fb8f6a2ae96835540bd2",
+      "result": {
+        "status": "passed",
+        "kind": "isolated_randomized_api_state_machine",
+        "seeds": [
+          271828,
+          314159
+        ],
+        "works": 40,
+        "productionRequests": 0,
+        "independentScoringOracle": true,
+        "sourceSHA256": "439d7e198d8b3152236fecd77b775c0bdf419dac1848a47ae31020ab73c25adb",
+        "transitions": 480,
+        "scoringSnapshots": 520,
+        "rejectedWrites": 1280,
+        "requests": 3486,
+        "seconds": 3.874
+      }
+    },
+    "access": {
+      "path": "source/verification/storage-recovery/access-matrix.json",
+      "sha256": "40d0779a5e3e7077b9a270527fc23554fe77a00dae808f22441cbac661999715",
+      "result": {
+        "scope": "access-matrix",
+        "status": "passed",
+        "passed": 13,
+        "failed": 0,
+        "checks": [
+          {
+            "name": "cadet A cannot execute any of the 54 instructor operations",
+            "status": "passed"
+          },
+          {
+            "name": "cadet B cannot execute any of the 54 instructor operations",
+            "status": "passed"
+          },
+          {
+            "name": "anonymous cannot execute any of the 54 instructor operations",
+            "status": "passed"
+          },
+          {
+            "name": "Foreign result IDs cannot expose answers, mistakes or grading through encoded IDs",
+            "status": "passed"
+          },
+          {
+            "name": "Unsubmitted test downloads and start replies contain no keys, rubrics or explanations",
+            "status": "passed"
+          },
+          {
+            "name": "User and role fields cannot expand the cadet workspace or personal results",
+            "status": "passed"
+          },
+          {
+            "name": "A cadet cannot use instructor draft keys or another account ID",
+            "status": "passed"
+          },
+          {
+            "name": "Signature, role and user changes in session tokens do not authenticate",
+            "status": "passed"
+          },
+          {
+            "name": "Alternate methods and route encodings cannot reach instructor data as a cadet",
+            "status": "passed"
+          },
+          {
+            "name": "Legacy non-API actions cannot invoke editor-only functions",
+            "status": "passed"
+          },
+          {
+            "name": "Closing a managed test blocks downloads and new starts without leaking questions",
+            "status": "passed"
+          },
+          {
+            "name": "An account disabled by an instructor cannot reuse its existing session",
+            "status": "passed"
+          },
+          {
+            "name": "The owner may read their submitted work and instructors retain legitimate shared access",
+            "status": "passed"
+          }
+        ],
+        "requests": 303,
+        "sourceSHA256": "439d7e198d8b3152236fecd77b775c0bdf419dac1848a47ae31020ab73c25adb",
+        "productionRequests": 0,
+        "windowsRuntimeVerified": false,
+        "instructorOperations": 54,
+        "negativeResponses": 284,
+        "existingOwnPostSubmissionReviewIsIntended": true
+      }
+    },
+    "officeFuzz": {
+      "path": "source/verification/stress/global-office-fuzz.json",
+      "sha256": "ecb196b8bba157f9aff3351c77c3029d280c820510631020d86eb8f95418d5dc",
+      "result": {
+        "status": "passed",
+        "kind": "actual_chromium_office_parser_mutations",
+        "seed": 20261125,
+        "variants": 1600,
+        "rejected": 1584,
+        "acceptedMutations": 16,
+        "acceptedMutationsPreserveQuestions": true,
+        "validFilesRetested": 2,
+        "maxVariantMs": 102,
+        "productionWrites": false
+      }
+    },
+    "intake": {
+      "path": "source/verification/intake-stress.json",
+      "sha256": "7630b23555be8951d9d41ce0bc2ff410c63f5d80dba65245584e05bd65e32641",
+      "result": {
+        "status": "passed",
+        "syntheticCadets": 2000,
+        "syntheticResults": 10000,
+        "questionCount": 200,
+        "requests": 182,
+        "maxRowDeletesPerRequest": 20,
+        "maxPropertyDeletesPerRequest": 31,
+        "localModelMs": 9578,
+        "liveAccountsModified": false
+      }
+    },
+    "ranking": {
+      "path": "source/verification/stress/ranking-fuzz.json",
+      "sha256": "eab743e67902936de91018da2dd60cacf5eb786ed10a57fff08339655f0f8db9",
+      "result": {
+        "status": "passed",
+        "deterministicSeed": 987654321,
+        "rounds": 150,
+        "generatedRecords": 460748,
+        "totalsVerifiedAgainstIndependentOracle": 10648,
+        "sourceMutation": false,
+        "large": {
+          "cadets": 270,
+          "tests": 200,
+          "records": 50000,
+          "cells": 54000,
+          "buildMilliseconds": 74
+        },
+        "roundMaxMilliseconds": 32
+      }
+    },
+    "nativeUpdateProtocol": {
+      "path": "source/verification/update-protocol.json",
+      "sha256": "00529c2b8df582119939dc3008c57410e21fa52e098f44dfd387afc93dd99fa8",
+      "result": {
+        "status": "passed",
+        "passed": 28,
+        "checks": [
+          "valid",
+          "tampered payload",
+          "tampered signature",
+          "truncated file",
+          "missing newline",
+          "duplicate field",
+          "unknown schema",
+          "path traversal",
+          "external URL",
+          "embedded dots",
+          "oversized binary",
+          "negative version",
+          "zero version",
+          "wrong extension",
+          "invalid hash",
+          "extra CR",
+          "wrong version name",
+          "field order",
+          "NUL value",
+          "length 0",
+          "length 1",
+          "length 9",
+          "length 10",
+          "length 100",
+          "length 522",
+          "length 523",
+          "length 16385",
+          "length 65536"
+        ],
+        "parser": "actual native/update_protocol.h",
+        "rsa": "OpenSSL SHA256withRSA on Linux",
+        "windowsCryptoAPIRuntimeVerified": false,
+        "fuzzSeed": 20261028,
+        "malformedCatalogsRejected": 10000,
+        "tamperedSignaturesRejected": 10000,
+        "catalogReferenceVerified": true,
+        "binaryArtifactsVerified": [
+          "windows"
+        ],
+        "signedReleaseBundleVerified": true,
+        "signedReleaseBundleChecks": 4,
+        "networkDownloadVerified": false
+      }
+    },
+    "packagedStartup": {
+      "path": "source/verification/packaged-startup.json",
+      "sha256": "dfd6ef610f9e8abf4888f17a7fd172387e5e978c7e592fdcfe8ddb44207ecfd6",
+      "result": {
+        "status": "passed",
+        "version": "1.2.52",
+        "assets": 27,
+        "checks": [
+          "All public assets and JavaScript routes exist in the fixed PE with exact bytes and MIME",
+          "A clean profile reaches login using only files extracted from the EXE",
+          "A saved offline session restores without losing queued answers or drafts",
+          "The packed app omits the materials reader while preserving legacy private data and PDF export",
+          "The post-update return marker opens the profile and retains the queued written answer",
+          "A failed initial read shows recovery and closing cannot overwrite saved data",
+          "A failed journal read cannot open or write an older state and retry restores the last answer",
+          "Closing during a stalled journal read preserves the complete profile and journal",
+          "A missing module shows recovery controls and retry opens the preserved account",
+          "A stalled startup offers recovery and retry opens the cabinet after the disk responds",
+          "Errors after a successful launch cannot replace the opened cabinet with a startup warning"
+        ],
+        "productionWrites": false,
+        "physicalWindowsRuntimeVerified": false
+      }
+    },
+    "publishedBundle": {
+      "path": "source/verification/stress/global-published-bundle.json",
+      "sha256": "dd63161245612c72d6b2c26ccc4e83f5f36d7924052dd528986884a517f9c383",
+      "result": {
+        "status": "passed",
+        "version": "1.2.52",
+        "code": 176,
+        "publicDownloadFresh": true,
+        "catalogSignatureVerified": true,
+        "allFourFilesMatchChannel": true,
+        "exeSHA256": "7a0aca189ff7cfdd56e8ec7001858c1b7d21e741cd70b4c2b9c2ff4e5ec5453e",
+        "exeBytes": 3216028,
+        "packedAssetsMatchCurrentSource": true,
+        "packedAssets": 27
+      }
+    },
+    "liveHealth": {
+      "path": "source/verification/stress/global-live-health.json",
+      "sha256": "6c2ad209c703a87cd8b604902f3dd48a769dfdd77050e167bedea8db6c6ab239",
+      "result": {
+        "status": "passed",
+        "kind": "production_read_only_health",
+        "api": 26,
+        "serverBuild": "pc-api26-5798277cf35550b9",
+        "matchesPublishedCandidate": true,
+        "userNameEditing": true,
+        "answerCorrections": true,
+        "formattedResultsReady": true,
+        "productionRequests": 1,
+        "productionWrites": 0,
+        "healthSeconds": 2.045,
+        "capacityMeasured": false
+      }
+    },
+    "syntax": {
+      "path": "source/verification/stress/global-syntax.json",
+      "sha256": "88942c516a450b5588fb3cf9f9bc7c8ae42ec32b719e663f0f00c8887b803bd4",
+      "result": {
+        "status": "passed",
+        "javascriptFiles": 23,
+        "pythonFiles": 27,
+        "failures": []
+      }
+    },
+    "vendorAdvisories": {
+      "path": "source/verification/stress/global-vendor-advisories.json",
+      "sha256": "98cc3924c9d4fa7ab6f1972b96de8dcd4b0a6d230d1117899f926a47454438ef",
+      "result": {
+        "status": "no_advisories_returned",
+        "registry": "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk",
+        "packages": {
+          "jspdf": [
+            "4.2.1"
+          ]
+        },
+        "advisories": {},
+        "scope": "Vendored jsPDF included in published desktop assets; not a full source security audit"
+      }
+    },
+    "readVolume": {
+      "path": "source/verification/optimization-server-volume.json",
+      "sha256": "4adfd715d7747727b2ced182e6a94f8216999db386628b31b99efdd15b13a62d",
+      "result": {
+        "kind": "isolated_spreadsheet_read_volume",
+        "results": 12000,
+        "unchangedRefreshes": 4,
+        "rpc": 4,
+        "rangeReads": 4,
+        "cells": 12520,
+        "readBytes": 118632,
+        "responseBytes": 872,
+        "milliseconds": 4.032709999999952,
+        "liveGoogleCapacityMeasured": false
+      }
+    },
+    "optimizationUI": {
+      "path": "source/verification/optimization-ui.json",
+      "sha256": "693d6cdb711e3c98b2e7b9f10db678deb07d3eef6b275042103a9c5f08ab634f",
+      "result": {
+        "status": "passed",
+        "kind": "real_chromium_synthetic_data",
+        "results": 12000,
+        "cadets": 300,
+        "tests": 60,
+        "controlledApiDelayMs": 150,
+        "rankingSearchMedianMs": 12.5,
+        "rankingSearchSamplesMs": [
+          29.200000000186265,
+          12.099999999627471,
+          12.799999999813735,
+          12.5,
+          7.599999999627471,
+          10.700000000186265,
+          12.599999999627471,
+          14.399999999441206,
+          11.5,
+          12,
+          12.900000000372529
+        ],
+        "reviewRefreshMs": 460.19999999925494,
+        "reviewRefreshCloudRequests": 1,
+        "pageErrors": [],
+        "liveGoogleCapacityMeasured": false
+      }
+    },
+    "userResultEdits": {
+      "path": "source/verification/user-result-edits.json",
+      "sha256": "d5c8c16b32daaec6a2eeaf762d672d7510cdfeb3872ab8e4d89dba222c3e2f94",
+      "result": {
+        "status": "passed",
+        "passed": 14,
+        "checks": [
+          "A name edit updates the correct ID and its results while preserving login, password, key and dates",
+          "A retry after a partial name write reconciles results and creates a single audit entry",
+          "Stale names and cadet access cannot overwrite another instructor change",
+          "The primary instructor can edit staff names while their title and role remain intact",
+          "Choice corrections recalculate the existing result and retain the immutable submission identity",
+          "Changing a written answer invalidates only that answer grade and retains the original",
+          "Another active review lease blocks corrections before any snapshot is written",
+          "Stale revisions, missing reasons and unknown answer IDs cannot mutate accepted work",
+          "A lost canonical-write acknowledgement retries one correction and one journal entry",
+          "A snapshot-write failure leaves the result untouched and the same request can succeed later",
+          "Corrupted original snapshots block further edits without replacing current answers",
+          "Written grading after an answer correction preserves the correction chain",
+          "Deleting one result purges only its private answer history",
+          "Large Unicode answer originals survive chunk boundaries and are archived before intake cleanup"
+        ],
+        "actualAppsScriptExecuted": true,
+        "productionRecordsChanged": 0
+      }
+    },
+    "auditRegressions": {
+      "path": "source/verification/audit-cold-start-and-names.json",
+      "sha256": "76f2b736b9509680312885c7f3c02d47aebe046dc7f5bca7682043c3a56ff377",
+      "result": {
+        "status": "passed",
+        "passed": 10,
+        "total": 10,
+        "checks": [
+          {
+            "name": "A cadet without submissions keeps one existing public row and receives the corrected name",
+            "status": "passed"
+          },
+          {
+            "name": "A failed cadet-publication marker cannot leave the acknowledged retry with an old public name",
+            "status": "passed"
+          },
+          {
+            "name": "A lost account-name acknowledgement retains publication and retry does not duplicate the cadet",
+            "status": "passed"
+          },
+          {
+            "name": "A failed publication marker retries the existing result without losing its public name update",
+            "status": "passed"
+          },
+          {
+            "name": "A failed result-name acknowledgement retries the existing result without losing its public name update",
+            "status": "passed"
+          },
+          {
+            "name": "Manual table repair updates a stale placeholder by ID without changing a namesake or creating an attempt",
+            "status": "passed"
+          },
+          {
+            "name": "Name publication preserves manual columns and does not reinterpret unidentified historical work as a placeholder",
+            "status": "passed"
+          },
+          {
+            "name": "A queued cold read rechecks readiness after the first initializer finishes under the shared lock",
+            "status": "passed"
+          },
+          {
+            "name": "Explicit maintenance still repairs headers even when readiness is already cached",
+            "status": "passed"
+          },
+          {
+            "name": "Failure during schema repair cannot mark a partial initialization as ready",
+            "status": "passed"
+          }
+        ],
+        "actualAppsScriptExecuted": true,
+        "productionRequests": 0
+      }
+    },
+    "officeImports": {
+      "path": "source/verification/office-import.json",
+      "sha256": "afb0620df317d98109d62d23389427786f170aebc79f683a177fc93bab269b52",
+      "result": {
+        "passed": 41,
+        "files": [
+          "sample.docx",
+          "sample.xlsx",
+          "word-end-keys.docx",
+          "word-no-key.docx",
+          "word-unknown-key.docx",
+          "word-conflict.docx",
+          "word-duplicate-number.docx",
+          "word-missing-option.docx",
+          "word-multiline.docx",
+          "word-extra-key.docx",
+          "word-200.docx",
+          "word-201.docx",
+          "word-numbering.docx",
+          "word-style-numbering.docx",
+          "word-table.docx",
+          "word-mixed.docx",
+          "excel-shared.xlsx",
+          "excel-inline.xlsx",
+          "excel-two-sheets.xlsx",
+          "excel-no-question.xlsx",
+          "excel-no-key.xlsx",
+          "excel-numeric-key.xlsx",
+          "excel-formula-key.xlsx",
+          "excel-hidden-column.xlsx",
+          "empty.docx",
+          "legacy.doc",
+          "wrong-type.xlsx",
+          "corrupt.docx",
+          "dtd.docx",
+          "traversal.docx",
+          "bomb.docx",
+          "deep.docx",
+          "crc.docx",
+          "sample-missing.xlsx"
+        ],
+        "parserCases": [
+          "word А/Б",
+          "word А/Б/В",
+          "word А/В",
+          "excel А/Б",
+          "excel А/Б/В",
+          "excel А/В",
+          "excel-empty-final А/Б/В empty final"
+        ],
+        "reviewGate": true,
+        "checkpointPreserved": true,
+        "engine": "Chromium actual office-import.js"
+      }
+    },
+    "largeTests": {
+      "path": "source/verification/large-tests.json",
+      "sha256": "7ab3b71ec5a56fedf7df5130ca188855e8527167738ea7ae6008623a8bcd8649",
+      "result": {
+        "passed": 17,
+        "checks": [
+          "200 maximum-length questions and six answers save above the former one-cell limit",
+          "Every large test question, two-answer key and explanation round-trips exactly",
+          "Cadet access to a chunked test still hides the key and explanations",
+          "Listing catalogs reads only metadata, never the complete question payload",
+          "A large test grades all 200 questions and a lost acknowledgement does not duplicate it",
+          "A missing, reordered, foreign or altered part cannot become an empty/partly graded test",
+          "A manifest copied from a different test is rejected before exposing its questions",
+          "Failed or partial chunk writes publish no test; a fresh retry reads only its own generation",
+          "Old inline JSON tests continue to load without rewriting historical rows",
+          "Large draft synchronization exceeds 500000 characters and preserves Unicode exactly",
+          "A 200-question exam preserves its full private key beyond the old document limit",
+          "Emoji at chunk boundaries never splits a UTF-16 surrogate pair",
+          "Deleting a large test preserves the immutable parts and accepted answer review",
+          "Replacing a large test retains the original definition and result grading key",
+          "Existing schema cache cannot suppress the new parts sheet on upgrade",
+          "Oversized question counts still fail before publishing",
+          "The actual PC sync controller uploads a changed draft above the former 500000-character limit"
+        ],
+        "backend": "actual Code.gs with a 50000-character cell constraint",
+        "productionWrites": false,
+        "largestQuestions": 200,
+        "questionJSONCharacters": 1273645,
+        "requestUTF8Bytes": 2450343
+      }
+    },
+    "largeTestsUI": {
+      "path": "source/verification/large-tests-ui.json",
+      "sha256": "f3ca9f3a6f07aedab06652adfd3ea3850804825a3dbfd9b1b10af364649b2e55",
+      "result": {
+        "passed": 3,
+        "checks": [
+          "An old server is explained before a large publish, preserving the whole draft",
+          "Restarting retains the complete large draft",
+          "The actual PC publish flow sends more than 2 MB of Ukrainian text and reloads all 200 questions"
+        ],
+        "largestRequestBytes": 2465520,
+        "productionWrites": false,
+        "windowsRuntimeVerified": false
+      }
+    },
+    "actualWindowsStorage": {
+      "source": "Verified v1.2.52 Windows workflow 45575260972; native code unchanged",
+      "sha256": "ade29c4fd1504f5b4068e0ed17e14eb032ca4e4b3f3553e2841bb8a9ec9241ca",
+      "result": {
+        "status": "passed",
+        "passed": 16,
+        "checks": [
+          "Upgrade archives old data and refuses anonymous legacy or global journal access",
+          "Real AES-256-GCM and Windows DPAPI round-trip a private account object",
+          "Lost object acknowledgements retry idempotently without allowing overwrite",
+          "Changing a nonce, GCM tag or ciphertext is rejected even after valid DPAPI rewrapping",
+          "The GCM identity binds both the account owner and the immutable object identifier",
+          "The profile keeps three distinct backups and rejects conflicting commits",
+          "Corrupt profiles restore a verified backup while sharing violations remain visible errors",
+          "If every profile copy is damaged the host refuses an empty reset or overwrite",
+          "A large Unicode journal restores backups and never falsely acknowledges a rolled-back serial",
+          "Collection removes orphan objects and preserves every referenced object and account journal",
+          "Closing the native vault invalidates its capability and exposes backup recovery status",
+          "The remembered vault key is DPAPI-protected and contains no password or bearer token",
+          "A complete Windows host restart restores the saved key, private objects and last journal",
+          "A locked saved-login file reports an error and never falsely acknowledges logout",
+          "A corrupt saved-login cache cannot erase private data and can be repaired by a valid owner",
+          "Explicit logout remains forgotten after another complete Windows restart"
+        ],
+        "actualWindowsHostExecuted": true,
+        "realDPAPIVerified": true,
+        "realCNGGCMVerified": true,
+        "productionRPCRequests": 0,
+        "browserRendered": false
+      }
+    },
+    "actualWindowsHTTP": {
+      "source": "Verified v1.2.52 Windows workflow 45575260972; native code unchanged",
+      "sha256": "98a41a2b0a082e050b5810e61732b05644e24682c21ee8efb7f6c92eab4bc106",
+      "result": {
+        "status": "passed",
+        "passed": 5,
+        "checks": [
+          "Exact 200-question Unicode response: /plain",
+          "Exact 200-question Unicode response: /gzip",
+          "Exact 200-question Unicode response: /redirect",
+          "Rejected invalid or oversized decoded response: /broken",
+          "Rejected invalid or oversized decoded response: /expanded"
+        ],
+        "actualWindowsWinHTTPExecuted": true,
+        "gzipVerified": true,
+        "redirectVerified": true,
+        "postBytesUnchanged": true,
+        "decodedLimitBytes": 8388608,
+        "plainBytes": 1178614,
+        "syntheticGzipBytes": 6785,
+        "decodedSha256": "48cf5f8a582c06502d8d5c456d1f36624e7b4687fcafe5a7cd9e35e0b518b093",
+        "productionRPCRequests": 0,
+        "liveGoogleCompressionMeasured": false
+      }
+    }
+  },
+  "remainingConstraints": [
+    "Google Apps Script concurrency and quotas were not measured under production load",
+    "Full manual refresh and cold schema initialization still create spreadsheet work",
+    "Accelerated models and local Chromium timings are not classroom latency estimates"
+  ]
+}
