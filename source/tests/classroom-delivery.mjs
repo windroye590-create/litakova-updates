@@ -39,7 +39,7 @@ await check('Invalid credentials and account throttling fail immediately; persis
  }
  let attempts=0,pauses=0;
  await assert.rejects(()=>C.signIn('name','password','',async()=>{attempts++;throw Object.assign(Error('busy'),{code:'BUSY'});},async()=>{pauses++;}),x=>x.code==='BUSY');
- assert.equal(attempts,7);assert.equal(pauses,6);
+ assert.equal(attempts,11);assert.equal(pauses,10);
 });
 const training=regressionTest('Клас: приймання без публічної таблиці',2);
 await check('Twenty test starts retry only capacity errors and keep the original request envelope',async()=>{

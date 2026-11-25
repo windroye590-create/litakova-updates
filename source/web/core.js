@@ -36,15 +36,15 @@ export async function keyFor(password,salt){
 export async function credential(password){const salt=b64(crypto.getRandomValues(new Uint8Array(16)));return {passwordSalt:salt,passwordHash:b64(await keyFor(password,salt))};}
 export async function proof(password,salt,nonce){const key=await crypto.subtle.importKey('raw',await keyFor(password,salt),{name:'HMAC',hash:'SHA-256'},false,['sign']);return b64(await crypto.subtle.sign('HMAC',key,bytes(nonce)));}
 export async function signIn(username,password,groupName,request,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),random=Math.random){
- const transient=new Set(['CHALLENGE_EXPIRED','NETWORK','TIMEOUT','BUSY','HTTP_408','HTTP_429','HTTP_500','HTTP_502','HTTP_503','HTTP_504']);
- for(let attempt=0;attempt<7;attempt++){
+ const transient=new Set(['CHALLENGE_EXPIRED','NETWORK','TIMEOUT','BUSY','SERVER_ERROR','HTTP_408','HTTP_429','HTTP_500','HTTP_502','HTTP_503','HTTP_504']);
+ for(let attempt=0;attempt<11;attempt++){
   try{
    const identity={username:username.trim(),groupName};
    const challenge=await request('/api/challenge',identity);
    if(typeof challenge.salt!=='string'||!challenge.salt||typeof challenge.nonce!=='string'||!challenge.nonce)throw Object.assign(Error('Сервер не повернув дані для безпечного входу.'),{code:'BAD_LOGIN_RESPONSE'});
    const value=await proof(password,challenge.salt,challenge.nonce);
    return await request('/api/login',{...identity,nonce:challenge.nonce,proof:value});
-  }catch(error){if(attempt>=(['NETWORK','TIMEOUT'].includes(error.code)?1:6)||!transient.has(error.code))throw error;const cap=Math.min(1500*2**attempt,10000);await pause(Math.round(cap*(.5+random()*.5)));}
+  }catch(error){if(attempt>=(['NETWORK','TIMEOUT'].includes(error.code)?1:error.code==='SERVER_ERROR'?2:10)||!transient.has(error.code))throw error;const cap=Math.min(1500*2**attempt,10000);await pause(Math.round(cap*(.5+random()*.5)));}
  }
 }
 export function payload(method,path,token='',body={}){if(!['GET','POST','DELETE'].includes(method)||!path.startsWith('/api/')||path.includes('..'))throw Error('Некоректний запит');return {action:'api',method,path,token,body,writtenProtocol:1,choiceProtocol:2,testAccessProtocol:1,deliveryProtocol:1,retakeProtocol:1};}

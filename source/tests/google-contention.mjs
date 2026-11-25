@@ -112,6 +112,15 @@ await check('Busy delivery retries stay staggered and bounded while offline back
  }
  assert.equal(C.deliveryRetryDelay(9,'NETWORK',()=>1),300000);
 });
+await check('Classroom sign-in survives ten capacity refusals but limits offline and service-error retries',async()=>{
+ let calls=0;
+ const reply=await C.signIn('synthetic','password','',async path=>{if(path==='/api/challenge'){if(++calls<=10)throw Object.assign(Error('busy'),{code:'BUSY'});return {salt:C.b64(new Uint8Array(16)),nonce:'synthetic-challenge'};}return {ok:true};},async()=>{},()=>0);
+ assert.equal(reply.ok,true);assert.equal(calls,11);
+ for(const [code,maximum] of [['NETWORK',2],['SERVER_ERROR',3],['INVALID_CREDENTIALS',1]]){
+  let attempts=0;await assert.rejects(()=>C.signIn('synthetic','password','',async()=>{attempts++;throw Object.assign(Error(code),{code});},async()=>{},()=>0),error=>error.code===code);
+  assert.equal(attempts,maximum);
+ }
+});
 await check('Cloud checkpoints coalesce for a minute while explicit save and finish send the latest local answer immediately',async()=>{
  const owner=person(),account={run:null,results:[]},calls=[];let ticks=0,saves=0;
  const controller=createExamSession({session:()=>owner,account:()=>account,deviceId:()=>'coalesced-device',now:()=>ticks,random:()=>0,persist:async()=>{saves++;},
