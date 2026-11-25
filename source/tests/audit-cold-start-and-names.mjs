@@ -62,7 +62,7 @@ await check('Explicit maintenance still repairs headers even when readiness is a
  const sheet=context.sheet_('answerChanges'),header=sheet.rows[0][0];sheet.rows[0][0]='Damaged test header';context.ensureSchema_(true,true);assert.equal(sheet.rows[0][0],header);
 });
 await check('Failure during schema repair cannot mark a partial initialization as ready',()=>{
- const old=new Map(cache.values),set=range.setValues,sheet=context.sheet_('answerChanges');cache.values.clear();let injected=false;
+ const old=new Map(cache.values),set=range.setValues,sheet=context.sheet_('answerChanges');sheet.rows[0][0]='Damaged header awaiting repair';cache.values.clear();let injected=false;
  range.setValues=function(values){if(!injected&&this.sheet===sheet&&this.row===1){injected=true;throw Error('Injected schema write failure');}return set.call(this,values);};
  try{assert.throws(()=>context.ensureSchema_(false));assert.equal(cache.get('LK_SCHEMA_ANSWER_CHANGES_V1'),null);}finally{range.setValues=set;}
  try{context.ensureSchema_(false);assert.equal(cache.get('LK_SCHEMA_ANSWER_CHANGES_V1'),'1');}finally{cache.values=new Map(old);}

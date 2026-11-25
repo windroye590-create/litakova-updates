@@ -16,8 +16,8 @@ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
 const PUBLIC_SYNC_DELAY_MS = 30000;
 const REVIEW_LEASE_MS = 120000;
 const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
-const LATEST_APP_VERSION_CODE = 176;
-const LATEST_APP_VERSION_NAME = '1.2.52';
+const LATEST_APP_VERSION_CODE = 177;
+const LATEST_APP_VERSION_NAME = '1.2.53';
 const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
 const ROLE_INSTRUCTOR = 'instructor';
 const ROLE_CADET = 'cadet';
@@ -853,7 +853,7 @@ function ensureSchema_(lockHeld, force) {
     if(force||!schemaReady){
     var spreadsheet = spreadsheet_();
     Object.keys(SHEETS).forEach(function (key) {
-      ensureSheet_(spreadsheet, SHEETS[key], HEADERS[key], false);
+      ensureSheet_(spreadsheet, SHEETS[key], HEADERS[key], false, force);
     });
     migrateTestQuestionCounts_();
     ensureAppSecret_();
@@ -885,18 +885,20 @@ function ensureSchema_(lockHeld, force) {
   }
 }
 
-function ensureSheet_(spreadsheet, name, headers, visible) {
+function ensureSheet_(spreadsheet, name, headers, visible, force) {
   var sheet = spreadsheet.getSheetByName(name);
-  if (!sheet) sheet = spreadsheet.insertSheet(name);
+  var created = !sheet;
+  if (created) sheet = spreadsheet.insertSheet(name);
   if (sheet.getMaxColumns() < headers.length) {
     sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
   }
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-  sheet.setFrozenRows(1);
-  sheet.getRange(1, 1, 1, headers.length)
-    .setFontWeight('bold')
-    .setBackground(visible ? '#17365d' : '#d9eaf7')
-    .setFontColor(visible ? '#ffffff' : '#102746');
+  var range = sheet.getRange(1, 1, 1, headers.length);
+  var previous = force || created ? null : range.getValues()[0];
+  if (!previous || headers.some(function(header, index) { return previous[index] !== header; })) {
+    range.setValues([headers]);
+    sheet.setFrozenRows(1);
+    range.setFontWeight('bold').setBackground(visible ? '#17365d' : '#d9eaf7').setFontColor(visible ? '#ffffff' : '#102746');
+  }
   if (!visible && !sheet.isSheetHidden()) {
     try { sheet.hideSheet(); } catch (ignored) {}
   }
@@ -1437,22 +1439,60 @@ function publicUser_(user) {
 }
 
 function findUserById_(id) {
-  var rows = dataRows_('users');
-  for (var index = 0; index < rows.length; index += 1) {
-    if (String(rows[index][0]) === String(id)) return userFromRow_(rows[index], index);
+  var wanted = String(id), sheet = sheet_('users'), last = sheet.getLastRow();
+  if (last < 2) return null;
+  var key = 'LK_USER_ROW_V1_' + sha256Hex_(wanted), hint = null;
+  try { hint = JSON.parse(CacheService.getScriptCache().get(key) || 'null'); } catch (ignored) {}
+  // Only an address is cached. Every authorization re-reads the live identity,
+  // including status, role and credentials; moved/deleted rows cannot alias it.
+  if (hint && Number.isInteger(hint.row) && hint.row >= 2 && hint.row <= last) {
+    var row = sheet.getRange(hint.row, 1, 1, 9).getValues()[0];
+    if (String(row[0]) === wanted) return userFromRow_(row, hint.row - 2);
+  }
+  var ids = sheet.getRange(2, 1, last - 1, 1).getValues();
+  for (var index = 0; index < ids.length; index += 1) {
+    if (String(ids[index][0]) !== wanted) continue;
+    var number = index + 2, row = sheet.getRange(number, 1, 1, 9).getValues()[0];
+    if (String(row[0]) === wanted) {
+      try { CacheService.getScriptCache().put(key, JSON.stringify({row: number}), 21600); } catch (ignored) {}
+      return userFromRow_(row, index);
+    }
+    // A concurrent row deletion can move the identity after the ID scan.
+    // One atomic full snapshot is a safe, rare fallback for that race.
+    var rows = dataRows_('users');
+    for (var at = 0; at < rows.length; at++) if (String(rows[at][0]) === wanted) return userFromRow_(rows[at], at);
+    return null;
   }
   return null;
 }
 
 function findUserByUsername_(username, groupName) {
-  var wanted = normalize_(username);
-  var wantedGroup = normalize_(groupName);
-  var users = listUsers_();
-  for (var index = 0; index < users.length; index += 1) {
-    var user = users[index];
-    if (normalize_(user.username) !== wanted) continue;
-    if (user.role === ROLE_CADET && wantedGroup && normalize_(user.groupName) !== wantedGroup) continue;
-    return user;
+  var wanted = normalize_(username), wantedGroup = normalize_(groupName), sheet = sheet_('users'), last = sheet.getLastRow();
+  if (last < 2) return null;
+  var key = 'LK_USER_LOGIN_V1_' + sha256Hex_(JSON.stringify([wanted, wantedGroup])), hint = null;
+  var matches = function(user) { return normalize_(user.username) === wanted && !(user.role === ROLE_CADET && wantedGroup && normalize_(user.groupName) !== wantedGroup); };
+  try { hint = JSON.parse(CacheService.getScriptCache().get(key) || 'null'); } catch (ignored) {}
+  if (hint && Number.isInteger(hint.row) && hint.row >= 2 && hint.row <= last) {
+    var user = userFromRow_(sheet.getRange(hint.row, 1, 1, 9).getValues()[0], hint.row - 2);
+    if (user.id !== '' && matches(user)) return user;
+  }
+  var names = sheet.getRange(2, 2, last - 1, 1).getValues();
+  for (var index = 0; index < names.length; index++) {
+    if (normalize_(names[index][0]) !== wanted) continue;
+    var row = index + 2, user = userFromRow_(sheet.getRange(row, 1, 1, 9).getValues()[0], index);
+    if (user.id !== '' && matches(user)) {
+      try {
+        var cache = CacheService.getScriptCache();
+        cache.put(key, JSON.stringify({row: row}), 21600);
+        cache.put('LK_USER_ROW_V1_' + sha256Hex_(String(user.id)), JSON.stringify({row: row}), 21600);
+      } catch (ignored) {}
+      return user;
+    }
+    if (normalize_(user.username) !== wanted) {
+      var users = listUsers_();
+      for (var at = 0; at < users.length; at++) if (matches(users[at])) return users[at];
+      return null;
+    }
   }
   return null;
 }
@@ -3237,8 +3277,8 @@ function generateInvite_(user) {
 function ensurePrimaryInstructor_() {
   var properties = PropertiesService.getScriptProperties();
   var primaryId = String(properties.getProperty('PRIMARY_INSTRUCTOR_ID') || '');
+  if (primaryId) { var current = findUserById_(primaryId); if (current && current.role === ROLE_INSTRUCTOR) return; }
   var instructors = listUsers_().filter(function (user) { return user.role === ROLE_INSTRUCTOR; });
-  if (primaryId && instructors.some(function (user) { return String(user.id) === primaryId; })) return;
   var windRoy = instructors.filter(function (user) { return normalize_(user.username) === 'windroy'; })[0];
   var primary = windRoy || instructors.sort(function (first, second) {
     return dateMillis_(first.createdAt) - dateMillis_(second.createdAt);

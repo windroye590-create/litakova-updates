@@ -8,6 +8,8 @@ const transient=code=>['NETWORK','TIMEOUT','BUSY','STATE_BUSY','SERVER_ERROR','H
 // can replace a clean local copy, never an unacknowledged local change.
 export function createAccountSync({session,account,snapshot,apply,rpc,persist,changed=()=>{},now=Date.now,uuid=()=>crypto.randomUUID(),delay=3000,pollInterval=0,canSync=()=>true}){
  let generation=0,readyToken='',running=null,timer=null,busy=false,error='',unsupported=false,lastAt=0,retryAt=0;
+ const pendingSaves=new WeakMap();let saveSerial=0;
+ async function save(a){const serial=++saveSerial;pendingSaves.set(a,serial);await persist();if(pendingSaves.get(a)===serial)pendingSaves.delete(a);}
  const owner=()=>session()?{...session(),generation}:null;
  const current=s=>s&&s.generation===generation&&session()?.token===s.token&&String(session()?.user?.id)===String(s.user.id);
  const state=a=>a.pcSync??={revisions:{},shadow:{},requests:{},conflicts:{},cursor:''};
@@ -40,6 +42,7 @@ export function createAccountSync({session,account,snapshot,apply,rpc,persist,ch
  }
  async function pull(s,a,force){
   const st=state(a),index=validate(await rpc('GET','/api/account-state',{known:force?'':st.cursor},s.token),s);
+  let modified=false;
   if(!current(s))return;
   if(typeof index.cursor!=='string'||!Array.isArray(index.documents)||index.documents.length>10000)throw Object.assign(Error('Некоректний список чернеток.'),{code:'BAD_ACCOUNT_STATE'});
   for(const item of index.documents){
@@ -54,18 +57,19 @@ export function createAccountSync({session,account,snapshot,apply,rpc,persist,ch
    if(d.revision<(st.revisions[d.key]||0))continue;
    const unknownBase=!Object.prototype.hasOwnProperty.call(st.revisions,d.key);
    if(encode(local)!==encode(base)&&(unknownBase||encode(d.value)!==encode(base))&&encode(d.value)!==encode(local)){
-    st.conflicts[d.key]=copy(d);delete st.requests[d.key];continue;
+    st.conflicts[d.key]=copy(d);delete st.requests[d.key];modified=true;continue;
    }
    if(encode(local)===encode(base)||encode(local)===encode(d.value)){
     const applied=await apply(d.key,copy(d.value),a);if(!current(s))return;
-    if(applied===false){st.conflicts[d.key]=copy(d);delete st.requests[d.key];continue;}
+    if(applied===false){st.conflicts[d.key]=copy(d);delete st.requests[d.key];modified=true;continue;}
     delete st.requests[d.key];
    }
-   st.revisions[d.key]=d.revision;st.shadow[d.key]=copy(d.value);delete st.conflicts[d.key];
+   st.revisions[d.key]=d.revision;st.shadow[d.key]=copy(d.value);delete st.conflicts[d.key];modified=true;
   }
   if(!current(s))return;
-  if(index.stable===true)st.cursor=index.cursor;else st.cursor='';
-  readyToken=s.token;unsupported=false;await persist();
+  const cursor=index.stable===true?index.cursor:'';
+  if(st.cursor!==cursor){st.cursor=cursor;modified=true;}
+  readyToken=s.token;unsupported=false;if(modified||pendingSaves.has(a))await save(a);
  }
  async function work(force){
   const s=owner();if(!s)return;const a=account(),st=state(a);
@@ -81,7 +85,7 @@ export function createAccountSync({session,account,snapshot,apply,rpc,persist,ch
     const digest=await fingerprint(raw);if(!current(s))return;
     let request=st.requests[key];
     const same=request&&request.expectedRevision===revision&&(request.digest===digest||request.raw===raw);
-    if(!same||request.value!==undefined||request.raw!==undefined){request={key,expectedRevision:revision,requestId:same?request.requestId:uuid(),digest};st.requests[key]=request;await persist();}
+    if(!same||request.value!==undefined||request.raw!==undefined){request={key,expectedRevision:revision,requestId:same?request.requestId:uuid(),digest};st.requests[key]=request;await save(a);}
     const body={key,expectedRevision:revision,requestId:request.requestId,value};
     let r;
     try{r=validate(await rpc('POST','/api/account-state/document',body,s.token),s);}
@@ -89,7 +93,7 @@ export function createAccountSync({session,account,snapshot,apply,rpc,persist,ch
     if(!current(s))return;
     const d=validDocument(r.document,s);
     if(d.key!==key||d.revision<revision+1||encode(d.value)!==raw)throw Object.assign(Error('Сервер не підтвердив збереження чернетки.'),{code:'BAD_ACCOUNT_STATE'});
-    st.revisions[key]=d.revision;st.shadow[key]=copy(d.value);delete st.requests[key];delete st.conflicts[key];await persist();
+    st.revisions[key]=d.revision;st.shadow[key]=copy(d.value);delete st.requests[key];delete st.conflicts[key];await save(a);
    }
    if(current(s)){lastAt=now();retryAt=0;}
   }catch(x){
@@ -117,7 +121,7 @@ export function createAccountSync({session,account,snapshot,apply,rpc,persist,ch
   if(choice==='remote'&&await apply(key,copy(remote.value),a,{resolved:true})===false)return;
   if(!current(s))return;
   st.revisions[key]=remote.revision;st.shadow[key]=copy(remote.value);delete st.conflicts[key];delete st.requests[key];
-  await persist();if(current(s))await sync(true);
+  await save(a);if(current(s))await sync(true);
  }
  function reset(){generation++;clearTimeout(timer);timer=null;running=null;busy=false;readyToken='';error='';unsupported=false;lastAt=0;retryAt=0;notify();}
  return {changed:localChanged,status,sync,resolve,reset};

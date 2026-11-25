@@ -79,6 +79,7 @@ jobs:
           node tests/ui.mjs
           node tests/test-access-intake-ui.mjs
           node tests/optimization-ui.mjs
+          node tests/global-optimization-ui.mjs
           node tests/packaged-startup.mjs
       - name: Sign the four public update files
         env:

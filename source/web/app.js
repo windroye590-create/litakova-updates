@@ -211,7 +211,7 @@ async function applyAccountDocument(key,value,a,options={}){
  }
 }
 let examSaveTimer;
-function persist(){scheduledSave=false;saving=diskWriter.save().catch(x=>{x.localSave=true;throw x;});saving.then(()=>{if(user()){accountSync.changed();if(!instructor()&&account().run?.examProtocol===1){clearTimeout(examSaveTimer);examSaveTimer=setTimeout(()=>{if(!working&&!rpcFlights)examSession.background().catch(()=>{});},1500);}}},x=>toast(x.message));return saving;}
+function persist(){clearTimeout(saveTimer);scheduledSave=false;saving=diskWriter.save().catch(x=>{x.localSave=true;throw x;});saving.then(()=>{if(user()){accountSync.changed();if(!instructor()&&account().run?.examProtocol===1){clearTimeout(examSaveTimer);examSaveTimer=setTimeout(()=>{if(!working&&!rpcFlights)examSession.background().catch(()=>{});},1500);}}},x=>toast(x.message));return saving;}
 async function retrySave(){if(checkpoint){const r=typeof secureStorage!=='undefined'&&secureStorage.enabled?await secureStorage.saveJournal(checkpoint):await local('/journal',checkpoint);if(r.ok===false)throw Error(r.error||'Не вдалося зберегти журнал.');journalError='';}await persist();updateStorageNotice();}
 
 function scheduleSave(){scheduledSave=true;updateStorageNotice();clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist(),100);}
@@ -721,6 +721,10 @@ async function start(testId){
 }
 function tick(){if(!alive()||!user()||page!=='runner')return;const r=account().run;if(!r)return;const elapsed=Math.floor(r.examProtocol===1?examSession.elapsed(r):Math.max(0,(uptime()-r.startedUptime)/1000)),remaining=Math.max(0,(r.examProtocol===1?(r.deadline-r.startedAt)/1000:r.test.durationMinutes*60)-elapsed);if($('#timer')){$('#timer').textContent=time(r.test.mode==='exam'?remaining:elapsed);$('#timer').classList.toggle('bad',r.test.mode==='exam'&&remaining<60);}r.lastElapsed=elapsed;if(r.test.mode==='exam'&&remaining===0&&!r.finishRequested&&!r.releaseRequested&&(!r.examProtocol||examSession.owned(r))&&!examSession.status().busy){if(r.examProtocol===1&&!examSession.expired(r)){if($('#timer'))$('#timer').textContent='Уточнюємо час…';examSession.background().catch(()=>{});}else finishRun(false).catch(x=>toast(x.message));}}
 async function recoverRun(offline=false){const session=S.session,a=account(),r=a.run,native=await getClock();if(S.session?.token!==session.token)return;try{if(r?.test.mode==='exam'){if(r.examProtocol===1){if(!offline)await examSession.discover();}else{r.startedUptime=native.uptime-Math.max(0,r.lastElapsed||0)*1000;r.launchId=native.launchId;r.legacyRecovery=true;await persist();}}else if(r?.test.mode==='training'&&r.launchId!==clock.launchId){r.startedUptime=native.uptime-Math.max(0,r.lastElapsed||0)*1000;r.launchId=native.launchId;await persist();}else if(!instructor()&&!offline)await examSession.discover();}catch(x){if(S.session?.token===session.token)lastError=x.message;}}
+async function moveQuestion(index){
+ const r=account().run;if(!r||!Number.isInteger(index)||index<0||index>=r.test.questions.length)return;
+ r.index=index;render();await persist();
+}
 async function finishRun(ask=true,forcedUptime=null){
  const session=S.session,a=account(),r=a.run;if(!r||working)return;
  if(ask){const missing=r.test.questions.filter(q=>!C.answered(q,r.answers)).length;confirmAction('Завершити тест?',missing?`Без відповіді залишилося ${missing} пит. Після завершення результат буде надіслано викладачу.`:'Усі питання отримали відповіді. Результат буде надіслано на спільний сервер.',()=>{if(S.session?.token===session.token&&account().run===r)return finishRun(false);},'Завершити');return;}
@@ -1007,9 +1011,9 @@ async function clickAction(button){
  else if(act==='resume')return resumeRun();
  else if(act==='sync-exam'){await examSession.sync();render();return;}
  else if(act==='handoff-exam'){await examSession.release();page='home';render();document.exitFullscreen?.().catch(()=>{});toast('Спробу збережено. Увійдіть у той самий акаунт на іншому ПК.');return;}
- else if(act==='question'){a.run.index=q;await persist();render();return;}
- else if(act==='prev'||act==='next'){a.run.index+=(act==='prev'?-1:1);await persist();render();return;}
- else if(act==='unanswered'){const r=a.run,n=r.test.questions.length;for(let delta=1;delta<=n;delta++){const i=(r.index+delta)%n;if(!C.answered(r.test.questions[i],r.answers)){r.index=i;await persist();render();return;}}toast('На всі питання вже відповіли.');return;}
+ else if(act==='question')return moveQuestion(q);
+ else if(act==='prev'||act==='next')return moveQuestion((a.run?.index||0)+(act==='prev'?-1:1));
+ else if(act==='unanswered'){const r=a.run;if(!r)return;const n=r.test.questions.length;for(let delta=1;delta<=n;delta++){const i=(r.index+delta)%n;if(!C.answered(r.test.questions[i],r.answers))return moveQuestion(i);}toast('На всі питання вже відповіли.');return;}
  else if(act==='finish')return finishRun();
  else if(act==='open-sheet'){const r=await rpc('GET','/api/instructor/results-sheet');if(!/^https:\/\/docs\.google\.com\/spreadsheets\/d\//.test(r.url))throw Error('Таблицю ще не налаштовано.');window.open(r.url,'_blank','noopener,noreferrer');return;}
  else if(act==='check-update'){await updater.check();return;}
