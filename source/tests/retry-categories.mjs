@@ -61,4 +61,5 @@ await check('Actual exam background resets the network retry delay after capacit
  await assert.rejects(pc.background());const before=calls;at+=9999;assert.equal(await pc.background(),false);assert.equal(calls,before);
  failing=false;at++;await pc.background();assert.equal(calls,before+1);assert.equal(a.examRequest,undefined);
 });
-finish({replayedLiveRun:45687233159,retryBudgetMilliseconds:240000,productionRequests:0});
+const report=finish({replayedLiveRun:45687233159,retryBudgetMilliseconds:240000,productionRequests:0});
+fs.writeFileSync(new URL('../verification/retry-categories.json',import.meta.url),JSON.stringify(report,null,2)+'\n');
