@@ -49,11 +49,20 @@ export async function signIn(username,password,groupName,request,pause=ms=>new P
  }
 }
 export function payload(method,path,token='',body={}){if(!['GET','POST','DELETE'].includes(method)||!path.startsWith('/api/')||path.includes('..'))throw Error('Некоректний запит');return {action:'api',method,path,token,body,writtenProtocol:1,choiceProtocol:2,testAccessProtocol:1,deliveryProtocol:1,retakeProtocol:1};}
-export async function requestCapacity(request,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),random=Math.random){
- for(let attempt=0;;attempt++){
+export function apiReply(reply,path){
+ const missingProtocol=path.startsWith('/api/exam-session')?reply?.examProtocol==null:path.startsWith('/api/account-state')?reply?.accountSyncProtocol==null:false;
+ const health=reply?.loadTestSandbox===true||reply?.status==='online'&&Number.isInteger(reply.version)&&typeof reply.serverBuild==='string';
+ if(reply?.ok===true&&(health||missingProtocol))return {ok:false,code:'BAD_API_RESPONSE',error:'Сервер повернув неповну відповідь. Оновіть дані; збережені відповіді залишаються на ПК.'};
+ return reply;
+}
+export async function requestCapacity(request,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),random=Math.random,capacity=true,replaySafe=false){
+ let busy=0,missing=0;
+ for(;;){
   const reply=await request();
-  if(reply?.ok!==false||!['BUSY','HTTP_429'].includes(reply.code)||attempt>=4)return reply;
-  const cap=Math.min(1500*2**attempt,8000);await pause(Math.round(cap*(.5+random()*.5)));
+  if(reply?.ok===false&&reply.code==='BAD_API_RESPONSE'&&replaySafe&&missing++<2){await pause(Math.round(2500*(1+random())));continue;}
+  if(!capacity)return reply;
+  if(reply?.ok!==false||!['BUSY','HTTP_429'].includes(reply.code)||busy>=4)return reply;
+  const cap=Math.min(1500*2**busy++,8000);await pause(Math.round(cap*(.5+random()*.5)));
  }
 }
 export function resetDeletedTraining(a,deletions){
@@ -164,7 +173,7 @@ export function enrichReview(rows,test){
   return {...row,questionText:row.questionText||q?.text||'',selectedAnswerIds:selected,correctAnswerIds:correct,selectedAnswerText:row.selectedAnswerText||(selected.length?text(selected):'Без відповіді'),correctAnswerText:row.correctAnswerText||text(correct)||'Відповідь недоступна'};
  });
 }
-export function retryable(code){return ['NETWORK','LOCAL_HOST_UNAVAILABLE','TIMEOUT','BUSY','STATE_BUSY','HTTP_408','HTTP_429','HTTP_500','HTTP_502','HTTP_503','HTTP_AUTH','SERVER_ERROR','EMPTY','BAD_JSON','BAD_RESULT_RESPONSE','BAD_EXAM_RESPONSE','RESULT_DELETION_PENDING'].includes(code);}
+export function retryable(code){return ['NETWORK','LOCAL_HOST_UNAVAILABLE','TIMEOUT','BUSY','STATE_BUSY','HTTP_408','HTTP_429','HTTP_500','HTTP_502','HTTP_503','HTTP_AUTH','SERVER_ERROR','EMPTY','BAD_JSON','BAD_RESULT_RESPONSE','BAD_EXAM_RESPONSE','BAD_API_RESPONSE','RESULT_DELETION_PENDING'].includes(code);}
 export function canRetrySubmission(p){return !p.permanent||retryable(p.failureCode);}
 export function retryDelay(n,random=Math.random){const cap=Math.min(10000*2**Math.min(Math.max(n-1,0),5),300000);return Math.round(cap*(.5+random()*.5));}
 // A busy but reachable server needs staggered retries, not minutes of offline

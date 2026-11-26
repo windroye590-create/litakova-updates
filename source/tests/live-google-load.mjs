@@ -34,8 +34,9 @@ async function localSave(client) {
 }
 async function transport(envelope) {
   let url = state.webAppUrl, method = 'POST', body = JSON.stringify({...envelope, loadTestKey: state.secret});
+  const operationTimeout=AbortSignal.timeout(90000);
   for (let redirects = 0; redirects < 6; redirects++) {
-    const response = await fetch(url, {method, body, redirect: 'manual', headers: {'Content-Type': 'application/json', 'User-Agent': 'Litakova-Komisiia-PC/1.0.15 (gzip)'}, signal: AbortSignal.timeout(90000)});
+    const response = await fetch(url, {method, body, redirect: 'manual', headers: {'Content-Type': 'application/json', 'User-Agent': 'Litakova-Komisiia-PC/1.0.15 (gzip)'}, signal: AbortSignal.any([operationTimeout,AbortSignal.timeout(45000)])});
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const target = new URL(response.headers.get('location'), url);
       assert.ok(target.protocol === 'https:' && ['script.google.com', 'script.googleusercontent.com'].includes(target.hostname), 'Unexpected sandbox redirect');
@@ -73,19 +74,21 @@ async function once(method, endpoint, body = {}, token = '', client = -1, label 
 }
 async function rpc(method, endpoint, body = {}, token = '', client = -1) {
   const critical = method === 'POST' && (endpoint === '/api/results' || /^\/api\/tests\/[^/]+\/start$/.test(endpoint) || /^\/api\/exam-session\/(start|claim|finish|release)$/.test(endpoint));
-  const send = () => once(method, endpoint, body, token, client);
-  const reply = critical ? await C.requestCapacity(send) : await send();
+  const send = async () => C.apiReply(await once(method, endpoint, body, token, client),endpoint);
+  const replaySafe=method==='GET'||critical||endpoint==='/api/account-state/document'&&typeof body.requestId==='string';
+  const reply = await C.requestCapacity(send,undefined,undefined,critical,replaySafe);
   if (!reply.ok) throw Object.assign(Error(reply.code || 'API_ERROR'), {code: reply.code || 'API_ERROR'});
   return reply;
 }
 async function retry(work, deadline = 240000, exam = false) {
   const started = Date.now(); let state = null;
   for (;;) {
+    if(Date.now()-started>=deadline)throw Object.assign(Error('CLIENT_RETRY_BUDGET'), {code:'CLIENT_RETRY_BUDGET'});
     try {return await work();} catch (error) {
       if (!C.retryable(error.code) || Date.now() - started >= deadline) throw error;
       state = C.nextDeliveryRetry(state,error.code);
-      const delay = (exam ? C.examRetryDelay : C.deliveryRetryDelay)(state.attempt,error.code);
-      if (Date.now() - started + delay >= deadline) throw Object.assign(Error('CLIENT_RETRY_BUDGET'), {code: 'CLIENT_RETRY_BUDGET'});
+      const remaining=deadline-(Date.now()-started);
+      const delay = Math.min((exam ? C.examRetryDelay : C.deliveryRetryDelay)(state.attempt,error.code),Math.max(1,Math.floor(remaining/3)));
       await pause(delay);
     }
   }

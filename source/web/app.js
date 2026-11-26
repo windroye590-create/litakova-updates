@@ -221,9 +221,10 @@ function runCheckpoint(interrupted=false){const r=account().run;if(!r)return;con
 async function rpc(method,path,body={},token=S.session?.token||''){
  if(updateApplying)throw Error('Застосунок оновлюється.');
  const envelope=C.payload(method,path,token,body);
- const send=()=>{if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});return local('/rpc',envelope);};
+ const send=async()=>{if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});return C.apiReply(await local('/rpc',envelope),path);};
  const critical=method==='POST'&&(path==='/api/results'||/^\/api\/tests\/[^/]+\/start$/.test(path)||/^\/api\/exam-session\/(start|claim|finish|release)$/.test(path));
- rpcFlights++;let r;try{r=await (critical?C.requestCapacity(send):send());}catch(x){x.code??='NETWORK';throw x;}finally{rpcFlights--;}
+ const replaySafe=method==='GET'||critical||path==='/api/account-state/document'&&typeof body?.requestId==='string';
+ rpcFlights++;let r;try{r=await C.requestCapacity(send,undefined,undefined,critical,replaySafe);}catch(x){x.code??='NETWORK';throw x;}finally{rpcFlights--;}
  if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});
  if(!r.ok){
   const x=Object.assign(Error(r.error||'Сервер відхилив запит.'),{code:r.code||'API_ERROR'});
