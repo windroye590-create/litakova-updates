@@ -174,6 +174,15 @@ export function deliveryRetryDelay(n,code,random=Math.random){
  const cap=Math.min(3000*2**Math.min(Math.max(n-1,0),2),12000);
  return Math.round(cap*(.75+random()*.5));
 }
+// Capacity refusals do not count as consecutive network outages (or vice versa).
+export function nextDeliveryRetry(previous,code){
+ const kind=['BUSY','STATE_BUSY','HTTP_429'].includes(code)?'capacity':'network';
+ return {kind,attempt:previous?.kind===kind?Math.min((previous.attempt||0)+1,32):1};
+}
+export function examRetryDelay(n,code,random=Math.random){
+ if(['BUSY','STATE_BUSY','HTTP_429'].includes(code))return deliveryRetryDelay(n,code,random);
+ return Math.round(Math.min(5000*2**Math.min(n,3),30000)*(.5+random()*.5));
+}
 export function mergeResults(a,b){return [...new Map([...a,...b].map(r=>[id(r.id),r])).values()].sort((x,y)=>Date.parse(y.completedAt)-Date.parse(x.completedAt));}
 export function completed(testId,results,pending,run,deletedTests=[]){return deletedTests.includes(id(testId))||results.some(r=>id(r.testId)===id(testId))||pending.some(p=>id(p.body.testId)===id(testId))||(run&&id(run.test.id)===id(testId));}
 export function resultCSV(results){const value=v=>{let s=String(v??'');if(/^[\t\r\n ]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};const rows=[['ПІБ','Група','Тест','Правильних з вибором','Неправильних з вибором','Час, с','Підсумковий бал, %','Дата','Стан перевірки','Набрано балів','Максимум балів','Підтвердження збереженої роботи'],...results.map(r=>[r.userName,r.groupName,r.testTitle,r.correct,choiceCount(r)-r.correct,r.durationSeconds,pendingReview(r)?'':r.score,r.completedAt,pendingReview(r)?'Очікує перевірки':'Перевірено',r.earnedPoints??r.correct,r.maxPoints??r.total,r.examRecovered?'Підтвердив інструктор: '+r.recoveredBy+'; час не перевірено сервером':''])];return '\uFEFF'+rows.map(row=>row.map(value).join(';')).join('\r\n');}

@@ -1,10 +1,10 @@
-import {deliveryRetryDelay} from './core.js';
+import {nextDeliveryRetry,examRetryDelay} from './core.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const checkpoint=r=>({answers:copy(r.answers||{}),index:r.index||0,exitCount:r.exitCount||0});
 const encode=x=>JSON.stringify(x);
 export function createExamSession({session,account,deviceId,rpc,persist,now,changed=()=>{},completed=async()=>{},uuid=()=>crypto.randomUUID(),random=Math.random}){
  let flight=Promise.resolve(),busy=false,error='',anchor=null,readyToken='',generation=0;
- let backgroundFlight=null,nextSyncAt=0,failures=0;
+ let backgroundFlight=null,nextSyncAt=0,failures=0,retryState=null;
  let finishFlight=null,finishSaves=new WeakMap();
  const requestTimes=new WeakMap();
  const current=s=>s&&session()?.token===s.token&&String(session()?.user.id)===String(s.user.id);
@@ -147,8 +147,8 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   const epoch=generation;
   const interval=r?.examProtocol===1?(r.finishRequested||r.releaseRequested?5000:status().pending?60000:30000):60000;
   nextSyncAt=now()+interval*(1+random()*.3);
-  const task=sync().then(value=>{if(epoch===generation)failures=0;return value;}).catch(x=>{
-   if(epoch===generation){failures++;nextSyncAt=now()+(['BUSY','STATE_BUSY','HTTP_429'].includes(x.code)?deliveryRetryDelay(failures,x.code,random):Math.min(5000*2**Math.min(failures,3),30000)*(.5+random()*.5));}
+  const task=sync().then(value=>{if(epoch===generation){failures=0;retryState=null;}return value;}).catch(x=>{
+   if(epoch===generation){failures++;retryState=nextDeliveryRetry(retryState,x.code);nextSyncAt=now()+examRetryDelay(retryState.attempt,x.code,random);}
    throw x;
   }).finally(()=>{if(backgroundFlight===task)backgroundFlight=null;});
   backgroundFlight=task;return task;
@@ -175,6 +175,6 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   if(r?.examProtocol===1){r.releaseRequested=true;changed();}
   return serial(()=>writeWork('release')).catch(x=>{if(current(s)&&account().run===r&&account().examRequest?.action!=='release'){delete r.releaseRequested;changed();}throw x;});
  }
- function reset(){generation++;flight=Promise.resolve();busy=false;readyToken='';anchor=null;error='';backgroundFlight=null;nextSyncAt=0;failures=0;finishFlight=null;finishSaves=new WeakMap();}
+ function reset(){generation++;flight=Promise.resolve();busy=false;readyToken='';anchor=null;error='';backgroundFlight=null;nextSyncAt=0;failures=0;retryState=null;finishFlight=null;finishSaves=new WeakMap();}
  return {status,owned,editable,elapsed,expired,start,claim,discover,sync,background,finish,release,reset};
 }

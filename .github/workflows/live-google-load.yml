@@ -42,6 +42,7 @@ jobs:
           python3 -m unittest discover -s release-tools/tests -p 'test_live_google_verdict.py'
           node source/tests/google-load-isolation.mjs
           node source/tests/credential-literals.mjs
+          node source/tests/retry-categories.mjs
           node --check source/tests/live-google-load.mjs
       - name: Create isolated books and temporary test deployment, restore original HEAD
         env:

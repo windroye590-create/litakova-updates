@@ -77,12 +77,13 @@ async function rpc(method, endpoint, body = {}, token = '', client = -1) {
   if (!reply.ok) throw Object.assign(Error(reply.code || 'API_ERROR'), {code: reply.code || 'API_ERROR'});
   return reply;
 }
-async function retry(work, deadline = 240000) {
-  const started = Date.now(); let attempt = 0;
+async function retry(work, deadline = 240000, exam = false) {
+  const started = Date.now(); let state = null;
   for (;;) {
     try {return await work();} catch (error) {
       if (!C.retryable(error.code) || Date.now() - started >= deadline) throw error;
-      const delay = C.deliveryRetryDelay(++attempt,error.code);
+      state = C.nextDeliveryRetry(state,error.code);
+      const delay = (exam ? C.examRetryDelay : C.deliveryRetryDelay)(state.attempt,error.code);
       if (Date.now() - started + delay >= deadline) throw Object.assign(Error('CLIENT_RETRY_BUDGET'), {code: 'CLIENT_RETRY_BUDGET'});
       await pause(delay);
     }
@@ -169,14 +170,14 @@ try {
     await stage('exam-checkpoint-' + checkpoint, async client => {
       if (client.account.run?.examProtocol !== 1) throw Object.assign(Error('NO_START'), {code: 'NO_START'});
       client.account.run.answers = select(exam, client.index, checkpoint === 1); client.account.run.index = checkpoint === 1 ? 99 : 199; await localSave(client);
-      await retry(() => client.exam.sync());
+      await retry(() => client.exam.sync(), 240000, true);
     });
   }
   startTeacherPoll();
   await stage('exam-finish-200', async client => {
     if (!client.exam || client.account.run?.examProtocol !== 1) throw Object.assign(Error('NO_START'), {code: 'NO_START'});
     client.account.run.answers = select(exam, client.index); await localSave(client);
-    await retry(() => client.exam.finish());
+    await retry(() => client.exam.finish(), 240000, true);
     assert.ok(client.examResult); C.validateResult(client.examResult, client.session.user.id, exam.id);
     expected.push({id: String(client.examResult.id), userId: String(client.session.user.id), test: exam, answers: select(exam, client.index)});
   });

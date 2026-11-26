@@ -753,7 +753,7 @@ async function syncQueue(force=false){
     }
     C.validateResult(r.result,session.user.id,p.body.testId);const review=C.enrichReview(r.review,a.fullTests[id(p.body.testId)]);if(review.length)a.reviews[id(r.result.id)]=review;a.results=C.mergeResults(a.results,[r.result]);a.pending=a.pending.filter(q=>q.body.submissionId!==p.body.submissionId);a.resultWriteVersion=(a.resultWriteVersion||0)+1;a.updatedAt=Date.now();lastError='';if(page==='result'&&lastResult?.submissionId===p.body.submissionId)lastResult={...r,review:a.reviews[id(r.result.id)]||[],testId:id(p.body.testId),submissionId:p.body.submissionId};try{await persist();}catch(x){if(!a.pending.some(q=>q.body.submissionId===p.body.submissionId))a.pending.push(p);throw x;}}
    catch(x){
-    if(S.session?.token!==session.token)break;p.attempts++;p.failure=x.message;p.failureCode=x.code;
+    if(S.session?.token!==session.token)break;p.attempts++;p.failure=x.message;p.failureCode=x.code;p.deliveryRetry=C.nextDeliveryRetry(p.deliveryRetry,x.code);
     if(x.code==='RESULT_DELETED'){
      const testId=id(p.body.testId);
      a.deletedTestIds=a.capabilities?.deletedAttemptRetakes?(a.deletedTestIds||[]).filter(t=>id(t)!==testId):[...new Set([...(a.deletedTestIds||[]),testId])];
@@ -768,9 +768,9 @@ async function syncQueue(force=false){
     }
     if(x.code==='ALREADY_COMPLETED'){
      try{const r=await rpc('GET','/api/my-results',{},session.token);if(S.session?.token!==session.token)break;const authoritative=r.results.find(v=>id(v.testId)===id(p.body.testId));if(authoritative){C.validateResult(authoritative,session.user.id,p.body.testId);a.results=C.mergeResults(a.results,[authoritative]);a.pending=a.pending.filter(q=>q.body.submissionId!==p.body.submissionId);if(page==='result'&&lastResult?.submissionId===p.body.submissionId)lastResult={result:authoritative,review:a.reviews[id(authoritative.id)]||[],testId:id(p.body.testId),submissionId:p.body.submissionId};lastError='';try{await persist();}catch(x){if(!a.pending.some(q=>q.body.submissionId===p.body.submissionId))a.pending.push(p);throw x;}continue;}p.failure='Очікуємо підтвердження сервера.';}
-     catch(problem){if(S.session?.token!==session.token)break;p.failure=problem.message;}
-     p.permanent=false;p.nextAt=Date.now()+C.retryDelay(p.attempts);
-    }else if((x.localSave||C.retryable(x.code))){p.permanent=false;p.nextAt=Date.now()+C.deliveryRetryDelay(p.attempts,x.code);}else p.permanent=true;
+     catch(problem){if(S.session?.token!==session.token)break;p.failure=problem.message;p.failureCode=problem.code;p.deliveryRetry=C.nextDeliveryRetry(p.deliveryRetry,problem.code);}
+     p.permanent=false;p.nextAt=Date.now()+C.deliveryRetryDelay(p.deliveryRetry.attempt,p.failureCode);
+    }else if((x.localSave||C.retryable(x.code))){p.permanent=false;p.nextAt=Date.now()+C.deliveryRetryDelay(p.deliveryRetry.attempt,x.code);}else p.permanent=true;
     await persist();lastError=p.failure;break;
    }
   }
