@@ -1,7 +1,7 @@
 {
   "status": "prepared_not_published",
   "targetVersion": "1.2.54",
-  "implementationCommit": "f672aa042328fe34bee6aa0856c84d1dbb16d1ae",
+  "implementationCommit": "d4799e6b5a13c28fd0afa814f2e6f061b2b3d41e",
   "productionDataWritesInLoadTest": 0,
   "fpvChanged": false,
   "liveCandidate": {
@@ -2209,8 +2209,8 @@
   },
   "publicationComparisonCaveat": "Baseline publication budget180seconds; candidate600seconds; full candidate publication493seconds. Counts are not a same-window publication speed comparison.",
   "pending": [
-    "wait live run45778991808 strict acceptance and cleanup",
-    "publish and verify signed release and native Windows",
+    "wait live45784290354 and CI45784656605",
+    "publish verified signed release and native Windows",
     "copy verified release to Google Drive"
   ],
   "envelopeFailureCandidate": {
@@ -4519,5 +4519,2198 @@
     "replayedLiveRun": 45775264237,
     "automaticAttemptsPerRequest": 3,
     "strictExamValidationPreserved": true
+  },
+  "allDeliveryIntermediateFailures": {
+    "workflowRun": 45778991808,
+    "artifactId": 15099456199,
+    "artifactSHA256": "d0869daa1de505ab56056d19a09f3b6da17063d715c99f5c081eadb0edf131e4",
+    "summary": {
+      "status": "completed",
+      "runError": null,
+      "actualGoogleServer": true,
+      "isolatedSyntheticData": true,
+      "productionDataWrites": 0,
+      "sharedGoogleAccountAndScriptLock": true,
+      "sourceVersion": "1.2.54",
+      "clients": 27,
+      "authenticated": 27,
+      "testedCandidate": true,
+      "credentialStorage": {
+        "newWriterPreservedCredentials": true,
+        "newCellsLiteral": true,
+        "nativeLegacyLengths": [
+          7,
+          7
+        ],
+        "nativeLegacyFormulaLengths": [
+          44,
+          24
+        ],
+        "legacyRecoveryRequired": true,
+        "legacyRecoverable": true,
+        "legacyRecovered": true
+      },
+      "seconds": 1801,
+      "peakActiveHTTP": 28,
+      "phases": [
+        {
+          "name": "login",
+          "seconds": 99,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 14301
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 6514
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 8837
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 13345
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 15646
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 14840
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 22034
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 7072
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 6672
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 12697
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 5715
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 8812
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 98869
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 5288
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 6986
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 13870
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 5039
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 11377
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 4539
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 14770
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 7923
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 5336
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 13480
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 16298
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 7377
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 14769
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 11250
+            }
+          ]
+        },
+        {
+          "name": "workspace",
+          "seconds": 10,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 8193
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 5734
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 9824
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 7223
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 7210
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 9263
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 8299
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 7217
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 7454
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 6974
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 7381
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 4813
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 7129
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 6848
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 6153
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 7216
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 7422
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 6796
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 8192
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 8204
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 6446
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 7119
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 7167
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 6252
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 5978
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 6962
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 7244
+            }
+          ]
+        },
+        {
+          "name": "training-start-50",
+          "seconds": 78,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 54706
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 44370
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 50995
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 64442
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 68488
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 7364
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 3030
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 28872
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 57501
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 9107
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 11652
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 66699
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 15342
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 46085
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 33609
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 4906
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 78022
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 24555
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 47781
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 31164
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 18657
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 59894
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 38731
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 40454
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 38147
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 13208
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 21248
+            }
+          ]
+        },
+        {
+          "name": "training-checkpoint-1",
+          "seconds": 119,
+          "clients": 27,
+          "succeeded": 26,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 116740
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 4716
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 9561
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 84664
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 103022
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 27625
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 46012
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 12539
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 33364
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 34678
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 55539
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 65396
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 41857
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 79979
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 17087
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 2871
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 19270
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 52011
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 119197
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 82815
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 74668
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 49320
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 22186
+            },
+            {
+              "client": 23,
+              "ok": false,
+              "code": "TypeError",
+              "milliseconds": 61683
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 87767
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 37265
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 71885
+            }
+          ]
+        },
+        {
+          "name": "training-checkpoint-2",
+          "seconds": 104,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 56908
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 5269
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 48117
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 52549
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 34599
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 80355
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 62620
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 36907
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 54234
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 6071
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 24156
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 98658
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 40105
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 69350
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 20085
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 9595
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 85453
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 82744
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 74985
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 22151
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 49734
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 96375
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 65437
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 32734
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 11880
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 104258
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 18286
+            }
+          ]
+        },
+        {
+          "name": "training-finish-50",
+          "seconds": 91,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 29433
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 17503
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 82598
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 79179
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 50500
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 64591
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 76034
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 66082
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 69525
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 53439
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 23027
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 39810
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 60382
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 26405
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 43320
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 87392
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 7998
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 3847
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 11341
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 33080
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 47580
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 19998
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 91399
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 36685
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 57107
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 73333
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 14498
+            }
+          ]
+        },
+        {
+          "name": "workspace-after-training",
+          "seconds": 11,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 5557
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 5677
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 5022
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 10884
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 5733
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 5930
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 5639
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 5192
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 6055
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 4331
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 4728
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 5738
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 4910
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 4305
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 5681
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 4760
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 4974
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 4510
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 5840
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 5272
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 4604
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 5600
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 4478
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 4526
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 4883
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 4811
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 4456
+            }
+          ]
+        },
+        {
+          "name": "exam-start-200",
+          "seconds": 120,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 26138
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 77344
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 37507
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 67286
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 22777
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 52085
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 47525
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 88704
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 14261
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 106615
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 56184
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 73386
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 59708
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 43877
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 32320
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 63635
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 4862
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 41565
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 29559
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 94652
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 120168
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 83881
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 80861
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 70810
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 9135
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 102962
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 17890
+            }
+          ]
+        },
+        {
+          "name": "exam-checkpoint-1",
+          "seconds": 244,
+          "clients": 27,
+          "succeeded": 26,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 45696
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 61614
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 39969
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 48313
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 243502
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 55931
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 20129
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 3341
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 234948
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 10403
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 14886
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 12240
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 225431
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 19084
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 33112
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 36466
+            },
+            {
+              "client": 16,
+              "ok": false,
+              "code": "CLIENT_RETRY_BUDGET",
+              "milliseconds": 230460
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 43627
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 237396
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 5538
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 22518
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 228841
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 53522
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 232163
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 50319
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 26520
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 240347
+            }
+          ]
+        },
+        {
+          "name": "exam-checkpoint-2",
+          "seconds": 105,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 13004
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 105092
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 19137
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 85492
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 47607
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 8415
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 62651
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 37022
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 71078
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 52152
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 23685
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 86921
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 10644
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 49729
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 68599
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 102639
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 25702
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 32310
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 34004
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 98164
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 16770
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 4196
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 55139
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 46039
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 66689
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 39236
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 93288
+            }
+          ]
+        },
+        {
+          "name": "exam-finish-200",
+          "seconds": 123,
+          "clients": 27,
+          "succeeded": 27,
+          "outcomes": [
+            {
+              "client": 0,
+              "ok": true,
+              "milliseconds": 28901
+            },
+            {
+              "client": 1,
+              "ok": true,
+              "milliseconds": 58710
+            },
+            {
+              "client": 2,
+              "ok": true,
+              "milliseconds": 83328
+            },
+            {
+              "client": 3,
+              "ok": true,
+              "milliseconds": 9626
+            },
+            {
+              "client": 4,
+              "ok": true,
+              "milliseconds": 85640
+            },
+            {
+              "client": 5,
+              "ok": true,
+              "milliseconds": 32898
+            },
+            {
+              "client": 6,
+              "ok": true,
+              "milliseconds": 123194
+            },
+            {
+              "client": 7,
+              "ok": true,
+              "milliseconds": 97115
+            },
+            {
+              "client": 8,
+              "ok": true,
+              "milliseconds": 53277
+            },
+            {
+              "client": 9,
+              "ok": true,
+              "milliseconds": 110667
+            },
+            {
+              "client": 10,
+              "ok": true,
+              "milliseconds": 25888
+            },
+            {
+              "client": 11,
+              "ok": true,
+              "milliseconds": 39599
+            },
+            {
+              "client": 12,
+              "ok": true,
+              "milliseconds": 79222
+            },
+            {
+              "client": 13,
+              "ok": true,
+              "milliseconds": 21554
+            },
+            {
+              "client": 14,
+              "ok": true,
+              "milliseconds": 44090
+            },
+            {
+              "client": 15,
+              "ok": true,
+              "milliseconds": 36168
+            },
+            {
+              "client": 16,
+              "ok": true,
+              "milliseconds": 89802
+            },
+            {
+              "client": 17,
+              "ok": true,
+              "milliseconds": 56722
+            },
+            {
+              "client": 18,
+              "ok": true,
+              "milliseconds": 70868
+            },
+            {
+              "client": 19,
+              "ok": true,
+              "milliseconds": 100219
+            },
+            {
+              "client": 20,
+              "ok": true,
+              "milliseconds": 5749
+            },
+            {
+              "client": 21,
+              "ok": true,
+              "milliseconds": 63437
+            },
+            {
+              "client": 22,
+              "ok": true,
+              "milliseconds": 48674
+            },
+            {
+              "client": 23,
+              "ok": true,
+              "milliseconds": 106012
+            },
+            {
+              "client": 24,
+              "ok": true,
+              "milliseconds": 74642
+            },
+            {
+              "client": 25,
+              "ok": true,
+              "milliseconds": 16660
+            },
+            {
+              "client": 26,
+              "ok": true,
+              "milliseconds": 67146
+            }
+          ]
+        }
+      ],
+      "summaries": {
+        "setup": {
+          "requests": 33,
+          "codes": {
+            "OK": 33
+          },
+          "roundTripMs": {
+            "count": 33,
+            "p50": 5734,
+            "p95": 7425,
+            "max": 18806
+          },
+          "serverMs": {
+            "count": 33,
+            "p50": 3607,
+            "p95": 5783,
+            "max": 14287
+          },
+          "lockWaitMs": {
+            "count": 33,
+            "p50": 51,
+            "p95": 157,
+            "max": 206
+          },
+          "lockHeldMs": {
+            "count": 33,
+            "p50": 3505,
+            "p95": 5659,
+            "max": 6331
+          }
+        },
+        "login": {
+          "requests": 81,
+          "codes": {
+            "OK": 67,
+            "BUSY": 13,
+            "TIMEOUT": 1
+          },
+          "roundTripMs": {
+            "count": 81,
+            "p50": 3160,
+            "p95": 5274,
+            "max": 90001
+          },
+          "serverMs": {
+            "count": 80,
+            "p50": 1477,
+            "p95": 3257,
+            "max": 3598
+          },
+          "lockWaitMs": {
+            "count": 80,
+            "p50": 0,
+            "p95": 2127,
+            "max": 2237
+          },
+          "lockHeldMs": {
+            "count": 80,
+            "p50": 0,
+            "p95": 372,
+            "max": 487
+          }
+        },
+        "workspace": {
+          "requests": 27,
+          "codes": {
+            "OK": 27
+          },
+          "roundTripMs": {
+            "count": 27,
+            "p50": 7210,
+            "p95": 8299,
+            "max": 9824
+          },
+          "serverMs": {
+            "count": 27,
+            "p50": 5289,
+            "p95": 6719,
+            "max": 8341
+          },
+          "lockWaitMs": {
+            "count": 27,
+            "p50": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "lockHeldMs": {
+            "count": 27,
+            "p50": 0,
+            "p95": 0,
+            "max": 0
+          }
+        },
+        "training-start-50": {
+          "requests": 151,
+          "codes": {
+            "OK": 27,
+            "BUSY": 124
+          },
+          "roundTripMs": {
+            "count": 151,
+            "p50": 3552,
+            "p95": 5858,
+            "max": 17145
+          },
+          "serverMs": {
+            "count": 151,
+            "p50": 2227,
+            "p95": 4399,
+            "max": 6911
+          },
+          "lockWaitMs": {
+            "count": 151,
+            "p50": 2054,
+            "p95": 2151,
+            "max": 2661
+          },
+          "lockHeldMs": {
+            "count": 151,
+            "p50": 0,
+            "p95": 2519,
+            "max": 4127
+          }
+        },
+        "training-checkpoint-1": {
+          "requests": 131,
+          "codes": {
+            "OK": 27,
+            "BUSY": 103,
+            "NETWORK": 1
+          },
+          "roundTripMs": {
+            "count": 131,
+            "p50": 3490,
+            "p95": 7757,
+            "max": 12729
+          },
+          "serverMs": {
+            "count": 129,
+            "p50": 2197,
+            "p95": 4480,
+            "max": 9308
+          },
+          "lockWaitMs": {
+            "count": 129,
+            "p50": 2049,
+            "p95": 2143,
+            "max": 2194
+          },
+          "lockHeldMs": {
+            "count": 129,
+            "p50": 0,
+            "p95": 2809,
+            "max": 7894
+          }
+        },
+        "training-checkpoint-2": {
+          "requests": 128,
+          "codes": {
+            "BUSY": 101,
+            "OK": 27
+          },
+          "roundTripMs": {
+            "count": 128,
+            "p50": 3592,
+            "p95": 5575,
+            "max": 7494
+          },
+          "serverMs": {
+            "count": 128,
+            "p50": 2226,
+            "p95": 3854,
+            "max": 5739
+          },
+          "lockWaitMs": {
+            "count": 128,
+            "p50": 2049,
+            "p95": 2147,
+            "max": 2284
+          },
+          "lockHeldMs": {
+            "count": 128,
+            "p50": 0,
+            "p95": 2676,
+            "max": 3765
+          }
+        },
+        "teacher-publication": {
+          "requests": 17,
+          "codes": {
+            "OK": 17
+          },
+          "roundTripMs": {
+            "count": 17,
+            "p50": 3213,
+            "p95": 3952,
+            "max": 3992
+          },
+          "serverMs": {
+            "count": 17,
+            "p50": 1789,
+            "p95": 2551,
+            "max": 2672
+          },
+          "lockWaitMs": {
+            "count": 17,
+            "p50": 0,
+            "p95": 144,
+            "max": 179
+          },
+          "lockHeldMs": {
+            "count": 17,
+            "p50": 0,
+            "p95": 0,
+            "max": 0
+          }
+        },
+        "training-finish-50": {
+          "requests": 188,
+          "codes": {
+            "BUSY": 160,
+            "OK": 27,
+            "NETWORK": 1
+          },
+          "roundTripMs": {
+            "count": 188,
+            "p50": 3430,
+            "p95": 6815,
+            "max": 10585
+          },
+          "serverMs": {
+            "count": 187,
+            "p50": 2187,
+            "p95": 5148,
+            "max": 6282
+          },
+          "lockWaitMs": {
+            "count": 187,
+            "p50": 2049,
+            "p95": 2144,
+            "max": 2473
+          },
+          "lockHeldMs": {
+            "count": 187,
+            "p50": 0,
+            "p95": 3301,
+            "max": 4265
+          }
+        },
+        "workspace-after-training": {
+          "requests": 27,
+          "codes": {
+            "OK": 27
+          },
+          "roundTripMs": {
+            "count": 27,
+            "p50": 5021,
+            "p95": 5930,
+            "max": 10884
+          },
+          "serverMs": {
+            "count": 27,
+            "p50": 3415,
+            "p95": 4454,
+            "max": 9100
+          },
+          "lockWaitMs": {
+            "count": 27,
+            "p50": 47,
+            "p95": 135,
+            "max": 139
+          },
+          "lockHeldMs": {
+            "count": 27,
+            "p50": 0,
+            "p95": 0,
+            "max": 4550
+          }
+        },
+        "exam-start-200": {
+          "requests": 227,
+          "codes": {
+            "BUSY": 200,
+            "OK": 27
+          },
+          "roundTripMs": {
+            "count": 227,
+            "p50": 3370,
+            "p95": 6567,
+            "max": 9223
+          },
+          "serverMs": {
+            "count": 227,
+            "p50": 2188,
+            "p95": 5110,
+            "max": 7628
+          },
+          "lockWaitMs": {
+            "count": 227,
+            "p50": 2048,
+            "p95": 2146,
+            "max": 2165
+          },
+          "lockHeldMs": {
+            "count": 227,
+            "p50": 0,
+            "p95": 3628,
+            "max": 5352
+          }
+        },
+        "exam-checkpoint-1": {
+          "requests": 196,
+          "codes": {
+            "BUSY": 169,
+            "OK": 26,
+            "TIMEOUT": 1
+          },
+          "roundTripMs": {
+            "count": 196,
+            "p50": 3553,
+            "p95": 5503,
+            "max": 90001
+          },
+          "serverMs": {
+            "count": 195,
+            "p50": 2228,
+            "p95": 3781,
+            "max": 6327
+          },
+          "lockWaitMs": {
+            "count": 195,
+            "p50": 2055,
+            "p95": 2153,
+            "max": 2295
+          },
+          "lockHeldMs": {
+            "count": 195,
+            "p50": 0,
+            "p95": 2615,
+            "max": 4017
+          }
+        },
+        "exam-checkpoint-2": {
+          "requests": 129,
+          "codes": {
+            "NETWORK": 1,
+            "BUSY": 100,
+            "OK": 28
+          },
+          "roundTripMs": {
+            "count": 129,
+            "p50": 3489,
+            "p95": 6024,
+            "max": 12857
+          },
+          "serverMs": {
+            "count": 128,
+            "p50": 2182,
+            "p95": 4348,
+            "max": 9049
+          },
+          "lockWaitMs": {
+            "count": 128,
+            "p50": 2045,
+            "p95": 2140,
+            "max": 2524
+          },
+          "lockHeldMs": {
+            "count": 128,
+            "p50": 0,
+            "p95": 2548,
+            "max": 8863
+          }
+        },
+        "exam-finish-200": {
+          "requests": 239,
+          "codes": {
+            "BUSY": 212,
+            "OK": 27
+          },
+          "roundTripMs": {
+            "count": 239,
+            "p50": 3444,
+            "p95": 6483,
+            "max": 9214
+          },
+          "serverMs": {
+            "count": 239,
+            "p50": 2200,
+            "p95": 5172,
+            "max": 6718
+          },
+          "lockWaitMs": {
+            "count": 239,
+            "p50": 2047,
+            "p95": 2144,
+            "max": 2227
+          },
+          "lockHeldMs": {
+            "count": 239,
+            "p50": 0,
+            "p95": 4008,
+            "max": 5112
+          }
+        },
+        "publication-drain": {
+          "requests": 26,
+          "codes": {
+            "OK": 26
+          },
+          "roundTripMs": {
+            "count": 26,
+            "p50": 12394,
+            "p95": 15172,
+            "max": 16356
+          },
+          "serverMs": {
+            "count": 26,
+            "p50": 10407,
+            "p95": 13282,
+            "max": 14127
+          },
+          "lockWaitMs": {
+            "count": 26,
+            "p50": 69,
+            "p95": 149,
+            "max": 188
+          },
+          "lockHeldMs": {
+            "count": 26,
+            "p50": 7018,
+            "p95": 9492,
+            "max": 10780
+          }
+        }
+      },
+      "publication": {
+        "budgetSeconds": 600,
+        "publicRowsAfter180Seconds": 22,
+        "seconds": 483
+      },
+      "findings": {
+        "busyResponses": 1182,
+        "googleQuotaResponses": 0,
+        "timeouts": 2,
+        "signingKeyFingerprints": 1,
+        "phaseFailures": 2
+      },
+      "results": {
+        "target": 54,
+        "acknowledged": 54,
+        "authoritative": 54,
+        "publicRows": 54,
+        "answersVerifiedForAcknowledgedResults": true,
+        "pendingOnClients": 0
+      }
+    },
+    "acceptance": {
+      "status": "failed",
+      "scope": "all classroom stages, durable delivery and publication within the scenario budgets",
+      "failures": [
+        "phase_incomplete:training-checkpoint-1",
+        "phase_incomplete:exam-checkpoint-1"
+      ]
+    },
+    "cleanup": {
+      "status": "passed",
+      "productionDeploymentPreserved": true,
+      "headRestored": true,
+      "booksTrashed": [
+        "private",
+        "public"
+      ],
+      "testDeploymentDeleted": true,
+      "namespacePurged": true,
+      "removedProperties": 46,
+      "removedCacheKeys": 107
+    }
+  },
+  "apiEnvelopeChecks": {
+    "scope": "api-response-retry",
+    "status": "passed",
+    "passed": 7,
+    "failed": 0,
+    "checks": [
+      {
+        "name": "Health and missing synchronization protocols cannot acknowledge an API operation while a legitimate empty success remains valid",
+        "status": "passed"
+      },
+      {
+        "name": "The real application relay retries a read with the identical envelope and never exposes the health reply",
+        "status": "passed"
+      },
+      {
+        "name": "A committed account checkpoint with an unrelated acknowledgement replays its original ID and creates one revision",
+        "status": "passed"
+      },
+      {
+        "name": "An unknown acknowledgement after non-idempotent creation is not automatically repeated",
+        "status": "passed"
+      },
+      {
+        "name": "A missing envelope after four capacity refusals receives its own bounded retry allowance",
+        "status": "passed"
+      },
+      {
+        "name": "The unchanged 240-second budget retains a final useful retry instead of aborting with unused time",
+        "status": "passed"
+      },
+      {
+        "name": "Redirected load requests share the 90-second operation budget and use the native 45-second receive timeout",
+        "status": "passed"
+      }
+    ],
+    "requests": 10,
+    "requestLog": [
+      {
+        "method": "POST",
+        "path": "/api/instructor/groups",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/register",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/groups",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/instructor/tests",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/tests/29/start",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/account-state/document",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/account-state/document",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/account-state/document",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/instructor/groups",
+        "ok": true,
+        "code": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/groups",
+        "ok": true,
+        "code": null
+      }
+    ],
+    "sourceSHA256": "f0bd6741263f356669d118c10814c24711c7e21d025bb11fdd9944346fcdc47c",
+    "productionRequests": 0,
+    "windowsRuntimeVerified": false,
+    "replayedLiveRun": 45778991808,
+    "retryBudgetMilliseconds": 240000,
+    "safeMutationReplayOnly": true
   }
 }
