@@ -60,7 +60,7 @@ const browser=await chromium.launch({headless:true,args:['--no-sandbox'],executa
 const ctx=await browser.newContext({viewport:{width:1360,height:1000},locale:'uk-UA'});const page=await ctx.newPage();page.on('pageerror',e=>failures.push(e.message));
 async function mark(name,f){await f();checks.push(name);console.log('PASS '+checks.length+': '+name);}
 async function reset(){if(page.url().startsWith(origin))await page.evaluate(()=>localStorage.setItem('lk-pc-window','test-reset'));state={version:1,theme:'dark',groups:[group],session:{token:instructorToken,user:{id:'1',username:'WindRoy',fullName:'Інструктор перевірки',role:'instructor'}},accounts:{}};journal={};events=[];currentCode=installed;stage=2;diskFailure=false;journalFailure=false;helperFailure=false;offline=false;applyCount=0;versionReloads=0;}
-async function open(){await page.goto(origin+'/?key=preserved-native-key');await page.locator('.nav button[data-page=more]').click();await page.getByRole('heading',{name:'Про застосунок'}).waitFor();await page.waitForTimeout(200);}
+async function open(){await page.goto(origin+'/?key=preserved-native-key');await page.locator('.nav button[data-page=more]').click();await page.getByRole('heading',{name:'Оновлення',exact:true}).waitFor();await page.waitForTimeout(200);}
 const check=()=>page.locator('button[data-action=check-update]').click();
 try{
  await reset();await open();

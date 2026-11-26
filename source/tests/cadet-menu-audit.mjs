@@ -63,7 +63,7 @@ async function check(name,work){await work();checks.push(name);console.log('PASS
 const action=(name,scope=page)=>scope.locator('[data-action="'+name+'"]').first();
 async function click(name,scope=page){await action(name,scope).click();}
 async function nav(name){await page.locator('.nav [data-page="'+name+'"]').click();await page.locator('.nav [data-page="'+name+'"][aria-current=page]').waitFor({state:'attached'});}
-async function inventory(name){inventories[name]=await page.locator('button:visible,input:visible,textarea:visible,select:visible,summary:visible').evaluateAll(els=>els.map(e=>({tag:e.tagName,action:e.dataset.action||'',page:e.dataset.page||'',type:e.type||'',disabled:e.disabled===true,label:(e.getAttribute('aria-label')||e.textContent||e.getAttribute('placeholder')||'').trim().slice(0,100)})));}
+async function inventory(name){if(process.env.LITAKOVA_CADET_SHOTS==='1'&&['home','tests','results','profile'].includes(name))await page.screenshot({path:new URL('cadet-menu-'+name+'.png',output).pathname,fullPage:true});inventories[name]=await page.locator('button:visible,input:visible,textarea:visible,select:visible,summary:visible').evaluateAll(els=>els.map(e=>({tag:e.tagName,action:e.dataset.action||'',page:e.dataset.page||'',type:e.type||'',disabled:e.disabled===true,label:(e.getAttribute('aria-label')||e.textContent||e.getAttribute('placeholder')||'').trim().slice(0,100)})));}
 async function findTest(test){await nav('tests');await page.locator('#filter').fill(test.title);await page.locator('.test-card').filter({hasText:test.title}).waitFor();return page.locator('.test-card').filter({hasText:test.title});}
 async function start(test){const card=await findTest(test);await click('start',card);await page.locator('#modal[open]').waitFor();await page.locator('#modal button.primary').click();await page.locator('.runner').waitFor();}
 try{
@@ -77,7 +77,7 @@ try{
  await page.goto(origin+'/?key=cadet-menu-audit');await page.locator('.layout').waitFor();await until(()=>account()?.tests?.some(t=>String(t.id)===String(training.id)));
  await check('Cadet sees exactly Home, My tests, My results and Profile without instructor controls',async()=>{
   assert.deepEqual(await page.locator('.nav [data-page]').evaluateAll(els=>els.map(e=>e.dataset.page)),['home','tests','results','more']);
-  assert.equal(await page.locator('[data-action=new-test],[data-action=add-cadet],[data-action=invite],[data-action=analytics],[data-action=audit]').count(),0);await inventory('home');
+  assert.equal(await page.locator('[data-action=new-test],[data-action=add-cadet],[data-action=invite],[data-action=analytics],[data-action=audit]').count(),0);assert.equal(await page.locator('.cards .stat').count(),3);assert.ok(!(await page.locator('.cards').innerText()).toLocaleLowerCase('uk-UA').includes('у черзі'));assert.equal(await page.locator('[data-action=download-all]').count(),0);await inventory('home');
  });
  await check('Update data responds on all four menu pages and preserves the selected section',async()=>{
   for(const section of ['home','tests','results','more']){await nav(section);const refresh=page.locator('.topbar [data-action=refresh]');await refresh.waitFor();await refresh.click();await page.locator('.topbar [data-action=refresh]:not([disabled])').waitFor();assert.equal(await page.locator('.nav [data-page="'+section+'"]').getAttribute('aria-current'),'page');}
@@ -85,7 +85,7 @@ try{
  });
  await check('Home shortcut opens the test catalogue and topbar theme toggles both ways without losing the page',async()=>{
   await page.getByRole('button',{name:/Перейти до тестів/}).click();await page.getByRole('heading',{name:'Мої тести',exact:true}).waitFor();
-  await click('theme');await until(()=>state.theme==='dark');await click('theme');await until(()=>state.theme==='light');assert.equal(await page.getByRole('heading',{name:'Мої тести',exact:true}).count(),1);await inventory('tests');
+  await click('theme');await until(()=>state.theme==='dark');await click('theme');await until(()=>state.theme==='light');assert.equal(await page.getByRole('heading',{name:'Мої тести',exact:true}).count(),1);assert.equal(await page.locator('.catalog-note').count(),1);assert.equal(await page.locator('.test-card').filter({hasText:'Розпочате тренування можна завершити без інтернету'}).count(),0);await inventory('tests');
  });
  await check('Test search and clear work, catalogue Next and Previous change the actual visible cards',async()=>{
   await page.locator('#filter').fill(training.title);assert.equal(await page.locator('.test-card').count(),1);await page.locator('#filter').fill('');
@@ -99,8 +99,8 @@ try{
  await check('Download and Refresh on PC cache the selected test without starting a run',async()=>{
   const card=await findTest(training);await click('download',card);await until(()=>account().fullTests[training.id]);assert.equal(account().run,null);await card.getByRole('button',{name:'↻ Оновити на ПК'}).click();await until(()=>calls.filter(c=>c.path==='/api/tests/'+training.id).length>=2);const cached=clone(account().fullTests[training.id]);offline=true;await click('download',card);await page.locator('#toast').filter({hasText:'Тестова відсутність мережі'}).waitFor();assert.deepEqual(account().fullTests[training.id],cached);offline=false;
  });
- await check('Download available from catalogue and Home works without starting or reopening completed work',async()=>{
-  await click('download-all');await until(()=>account().fullTests[exam.id]);await nav('home');await click('download-all');assert.equal(account().run,null);assert.equal(account().pending.length,0);
+ await check('Available tests download from the catalogue while Home and Profile omit duplicate download actions',async()=>{
+  await click('download-all');await until(()=>account().fullTests[exam.id]);await nav('home');assert.equal(await page.locator('[data-action=download-all]').count(),0);await nav('more');assert.equal(await page.locator('[data-action=download-all]').count(),0);await nav('home');assert.equal(account().run,null);assert.equal(account().pending.length,0);
  });
  await check('Home All shortcut opens My results and shows only the signed-in cadet',async()=>{
   await page.getByRole('button',{name:'Усі →',exact:true}).click();await page.getByRole('heading',{name:'Мої результати',exact:true}).waitFor();assert.equal(await page.getByText(outsider.user.fullName,{exact:false}).count(),0);
@@ -110,11 +110,11 @@ try{
   assert.equal(account().results.length,53);const before=await page.locator('.compact-results tbody tr').allTextContents();await page.locator('[data-action=list-page][data-list=results][data-index="2"]').click();assert.notDeepEqual(await page.locator('.compact-results tbody tr').allTextContents(),before);
   await page.locator('[data-action=list-page][data-list=results][data-index="1"]').click();await page.locator('#filter').fill(completed[0].testTitle);assert.equal(await page.locator('.compact-results tbody tr').count(),1);
  });
- await check('CSV export downloads the selected cadet result with Ukrainian text and no foreign data',async()=>{
-  const ready=page.waitForEvent('download');await click('export-csv');const download=await ready,raw=fs.readFileSync(await download.path(),'utf8');assert.ok(raw.includes(person.user.fullName));assert.ok(raw.includes(completed[0].testTitle));assert.ok(!raw.includes(outsider.user.fullName));
+ await check('Cadet results provide review without CSV, Excel or instructor export controls',async()=>{
+  assert.equal(await page.locator('[data-action=export-csv],[data-action=export-xlsx],[data-action=group-statement]').count(),0);assert.equal(await page.locator('[data-action=review-result]').count(),1);assert.equal(downloads.length,0);
  });
- await check('CSV with cleared search exports all 53 own results across both list pages',async()=>{
-  await page.locator('#filter').fill('');const ready=page.waitForEvent('download');await click('export-csv');const download=await ready,raw=fs.readFileSync(await download.path(),'utf8');assert.equal(raw.trim().split('\r\n').length,54);assert.ok(!raw.includes(outsider.user.fullName));await page.locator('#filter').fill(completed[0].testTitle);
+ await check('All 53 own results stay accessible across both pages after removing cadet export controls',async()=>{
+  await page.locator('#filter').fill('');assert.equal(await page.locator('.compact-results tbody tr').count(),50);await page.locator('[data-action=list-page][data-list=results][data-index="2"]').click();assert.equal(await page.locator('.compact-results tbody tr').count(),3);assert.equal(await page.locator('[data-action=export-csv]').count(),0);await page.locator('#filter').fill(completed[0].testTitle);
  });
  await check('Review opens, Back to results and Back to tests work, and cached review remains readable offline',async()=>{
   await click('review-result');await page.locator('.result-card').waitFor();await inventory('result-review');assert.equal(await page.locator('.review').count(),1);
@@ -125,8 +125,8 @@ try{
   await nav('more');await page.getByRole('heading',{name:'Профіль',exact:true}).waitFor();await inventory('profile');assert.ok((await page.locator('.settings-grid').innerText()).includes(person.user.fullName));
   await click('theme',page.locator('.settings-grid'));await until(()=>state.theme==='dark');await page.reload();await page.locator('.layout').waitFor();await nav('more');assert.equal(state.theme,'dark');await click('theme',page.locator('.settings-grid'));await until(()=>state.theme==='light');
  });
- await check('Profile Check updates, Download tests and Send empty queue respond without opening instructor tools',async()=>{
-  await click('check-update');await until(()=>calls.some(c=>c.path==='/updates/check'));await page.locator('#update-message').filter({hasText:'Установлено актуальну версію'}).waitFor();await click('download-all');await click('sync');assert.equal(account().pending.length,0);
+ await check('Profile keeps update checking, identity and compact version metadata without duplicate download or queue controls',async()=>{
+  await click('check-update');await until(()=>calls.some(c=>c.path==='/updates/check'));await page.locator('#update-message').filter({hasText:'Установлено актуальну версію'}).waitFor();assert.equal(await page.locator('.settings-grid [data-action=download-all],.settings-grid [data-action=sync]').count(),0);assert.equal(await page.getByRole('heading',{name:'Про застосунок',exact:true}).count(),0);assert.ok((await page.locator('.profile-meta').innerText()).includes(buildVersion.version));assert.equal(account().pending.length,0);
  });
  await check('Start confirmation can be cancelled by its button and Escape without creating an attempt',async()=>{
   const card=await findTest(training);await click('start',card);await page.locator('#modal[open]').waitFor();await click('cancel-modal',page.locator('#modal'));assert.equal(account().run,null);
@@ -145,19 +145,19 @@ try{
   await click('unanswered');await page.locator('[data-run-written]').fill(text);await click('next');await page.locator('[data-run-answer]').nth(0).check();await page.locator('[data-run-answer]').nth(1).check();await page.locator('[data-action=question][data-q="1"]').click();assert.equal(await page.locator('[data-run-written]').inputValue(),text);await until(()=>account().run.answers[training.questions[1].id]===text);await click('unanswered');await page.locator('#toast').filter({hasText:'На всі питання вже відповіли.'}).waitFor();assert.equal(await page.locator('[data-run-written]').inputValue(),text);
  });
  await check('Reopening an unfinished training through Home and Continue keeps all answers and its current question',async()=>{
-  await page.reload();await page.locator('.layout').waitFor();assert.ok(account().run);await click('resume');await page.locator('.runner').waitFor();assert.equal(await page.locator('[data-run-written]').inputValue(),text);await page.reload();await page.locator('.layout').waitFor();if(await page.locator('[data-action=resume]').count())await click('resume');await page.locator('.runner').waitFor();assert.equal(await page.locator('[data-run-written]').inputValue(),text);
+  await page.reload();await page.locator('.layout').waitFor();assert.ok(account().run);assert.equal(await page.locator('[data-action=resume]').count(),1);await click('resume');await page.locator('.runner').waitFor();assert.equal(await page.locator('[data-run-written]').inputValue(),text);await page.reload();await page.locator('.layout').waitFor();if(await page.locator('[data-action=resume]').count())await click('resume');await page.locator('.runner').waitFor();assert.equal(await page.locator('[data-run-written]').inputValue(),text);
  });
  await check('Cancel finish keeps the active training and creates no result',async()=>{
   await click('finish');await page.locator('#modal[open]').waitFor();await click('cancel-modal',page.locator('#modal'));assert.ok(account().run);assert.equal(account().pending.length,0);
  });
  await check('Finishing offline keeps one durable queued work and both queue buttons retain it until reconnect',async()=>{
   offline=true;await click('finish');await page.locator('#modal[open]').waitFor();await page.locator('#modal button.primary').click();await page.locator('.result-card').waitFor();await until(()=>account().pending.length===1);assert.equal(account().run,null);await inventory('queued-result');
-  await page.locator('.result-card [data-page=results]').click();await page.getByRole('heading',{name:'Мої результати',exact:true}).waitFor();await click('sync',page.locator('.topbar'));await until(()=>account().pending.length===1);await click('sync',page.locator('#results-panel'));assert.equal(account().pending.length,1);await nav('more');await click('sync',page.locator('.settings-grid'));assert.equal(account().pending.length,1);assert.equal(account().pending[0].body.answers.find(a=>a.questionId===training.questions[1].id).text,text);
+  await page.locator('.result-card [data-page=results]').click();await page.getByRole('heading',{name:'Мої результати',exact:true}).waitFor();await click('sync',page.locator('.topbar'));await until(()=>account().pending.length===1);await click('sync',page.locator('#results-panel'));assert.equal(account().pending.length,1);await nav('home');assert.equal(await page.locator('.cards .stat').count(),4);assert.ok((await page.locator('.cards').innerText()).toLocaleLowerCase('uk-UA').includes('у черзі'));await nav('more');assert.equal(await page.locator('.settings-grid [data-action=sync]').count(),0);await click('sync',page.locator('.topbar'));assert.equal(account().pending.length,1);assert.equal(account().pending[0].body.answers.find(a=>a.questionId===training.questions[1].id).text,text);
   await click('logout',page.locator('.settings-grid'));await page.locator('#modal[open]').waitFor();assert.ok((await page.locator('#modal').innerText()).includes('Зміни ще не надіслані'));await click('cancel-modal',page.locator('#modal'));assert.equal(state.session.user.id,person.user.id);assert.equal(account().pending.length,1);
  });
  await check('Reconnect and Send queue commit one result with exact written text and clear the pending indicator',async()=>{
-  offline=false;await click('sync',page.locator('.settings-grid'));await until(()=>account().pending.length===0);const rows=api('GET','/api/my-results',person.token).results.filter(r=>r.testId===training.id);assert.equal(rows.length,1);
-  assert.equal(api('GET','/api/results/'+rows[0].id+'/review',person.token).review.find(q=>q.type==='written').text,text);assert.equal(await page.locator('.topbar [data-action=sync]').count(),0);
+  offline=false;await click('sync',page.locator('.topbar'));await until(()=>account().pending.length===0);const rows=api('GET','/api/my-results',person.token).results.filter(r=>r.testId===training.id);assert.equal(rows.length,1);
+  assert.equal(api('GET','/api/results/'+rows[0].id+'/review',person.token).review.find(q=>q.type==='written').text,text);assert.equal(await page.locator('.topbar [data-action=sync]').count(),0);await nav('home');assert.equal(await page.locator('.cards .stat').count(),3);assert.ok(!(await page.locator('.cards').innerText()).toLocaleLowerCase('uk-UA').includes('у черзі'));
  });
  await start(exam);
  await check('Exam starts through its confirmation, accepts choices and written text and Sync now saves them',async()=>{
