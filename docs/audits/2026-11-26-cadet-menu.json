@@ -2264,5 +2264,16 @@
   "publishedAssetsMatchingSource": 27,
   "productSourceChanged": false,
   "actualWindowsHostExecutedInThisAudit": false,
-  "productionRequests": 0
+  "productionRequests": 0,
+  "githubVerification": {
+    "workflowRun": 45868006017,
+    "attempt": 2,
+    "status": "success",
+    "sourceCommit": "af1061d732df73d227e20dc4c407e46ef9acaba3",
+    "artifactId": 15142265627,
+    "artifactSHA256": "652a5a53ff1eee87d2a56a973a8eaaf50c5bfbe418873ba71cc4f5aa2d6f2b93",
+    "checksPassed": 29,
+    "realUserClicks": 108,
+    "initialAttempt": "Browser dependency setup failed on external Microsoft APT HTTP403 before browser tests; rerun passed."
+  }
 }
