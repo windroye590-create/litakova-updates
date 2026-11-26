@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import * as Core from '../web/core.js';
 const app=fs.readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
 const start=app.indexOf('function resetSessionViews('),end=app.indexOf('\nfunction ',start);assert.ok(start>=0&&end>start);
 const privateAccount={draft:{title:'Keep the persisted work'},pending:[{answer:'Keep this answer'}]};
@@ -16,7 +17,7 @@ assert.equal(box.S.accounts.owner,privateAccount);assert.equal(privateAccount.dr
 console.log('PASS Locking a session clears every transient private screen and cancels stale view requests');
 console.log('PASS Clearing session views preserves persisted drafts and unsent answers');
 const rpcStart=app.indexOf('async function rpc('),rpcEnd=app.indexOf('\nasync function ',rpcStart+1);assert.ok(rpcStart>=0&&rpcEnd>rpcStart);
-Object.assign(box,{updateApplying:false,rpcFlights:0,C:{payload:()=>({})},local:async()=>({ok:false,code:'SESSION_EXPIRED',error:'Expired session'}),persist:async()=>{throw Error('Disk write failure');},secureStorage:{enabled:true,lock:async()=>{box.vaultClosed=true;}},render:()=>{box.loginRendered=box.S.session===null;},checkpoint:{answer:'Old journal'},S:{session:{token:'expired-token',user:{id:'owner'}},accounts:{owner:privateAccount}}});
+Object.assign(box,{updateApplying:false,rpcFlights:0,C:Core,local:async()=>({ok:false,code:'SESSION_EXPIRED',error:'Expired session'}),persist:async()=>{throw Error('Disk write failure');},secureStorage:{enabled:true,lock:async()=>{box.vaultClosed=true;}},render:()=>{box.loginRendered=box.S.session===null;},checkpoint:{answer:'Old journal'},S:{session:{token:'expired-token',user:{id:'owner'}},accounts:{owner:privateAccount}}});
 vm.runInContext(app.slice(rpcStart,rpcEnd),box);
 await assert.rejects(box.rpc('GET','/api/workspace'),error=>error.code==='SESSION_EXPIRED'&&error.message.includes('Disk write failure'));
 assert.equal(box.vaultClosed,true);assert.equal(box.loginRendered,true);assert.equal(box.S.session,null);assert.equal(Object.keys(box.S.accounts).length,0);assert.equal(box.checkpoint,null);assert.equal(privateAccount.draft.title,'Keep the persisted work');
