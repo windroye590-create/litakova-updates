@@ -164,7 +164,7 @@ export function enrichReview(rows,test){
   return {...row,questionText:row.questionText||q?.text||'',selectedAnswerIds:selected,correctAnswerIds:correct,selectedAnswerText:row.selectedAnswerText||(selected.length?text(selected):'Без відповіді'),correctAnswerText:row.correctAnswerText||text(correct)||'Відповідь недоступна'};
  });
 }
-export function retryable(code){return ['NETWORK','LOCAL_HOST_UNAVAILABLE','TIMEOUT','BUSY','STATE_BUSY','HTTP_408','HTTP_429','HTTP_500','HTTP_502','HTTP_503','HTTP_AUTH','SERVER_ERROR','EMPTY','BAD_JSON','BAD_RESULT_RESPONSE','RESULT_DELETION_PENDING'].includes(code);}
+export function retryable(code){return ['NETWORK','LOCAL_HOST_UNAVAILABLE','TIMEOUT','BUSY','STATE_BUSY','HTTP_408','HTTP_429','HTTP_500','HTTP_502','HTTP_503','HTTP_AUTH','SERVER_ERROR','EMPTY','BAD_JSON','BAD_RESULT_RESPONSE','BAD_EXAM_RESPONSE','RESULT_DELETION_PENDING'].includes(code);}
 export function canRetrySubmission(p){return !p.permanent||retryable(p.failureCode);}
 export function retryDelay(n,random=Math.random){const cap=Math.min(10000*2**Math.min(Math.max(n-1,0),5),300000);return Math.round(cap*(.5+random()*.5));}
 // A busy but reachable server needs staggered retries, not minutes of offline

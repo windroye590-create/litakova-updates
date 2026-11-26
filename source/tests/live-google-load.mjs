@@ -66,7 +66,8 @@ async function once(method, endpoint, body = {}, token = '', client = -1, label 
   const record = {phase: label, client, method, path: endpoint, status: wire.status, code: reply.ok ? 'OK' : reply.code || 'API_ERROR', category: wire.category,
     milliseconds: Math.round(performance.now() - started), serverMilliseconds: metrics.elapsedMs ?? null, lockWaitMilliseconds: metrics.lockWaitMs ?? null,
     lockHeldMilliseconds: metrics.lockHeldMs ?? null, stages: metrics.stages || {}, sessionFailure: metrics.sessionFailure || null, signingKeyFingerprint:metrics.signingKeyFingerprint||null,encoding: wire.encoding,
-    ...(endpoint==='/api/challenge'&&reply.ok?{challengeSaltLength:typeof reply.salt==='string'?reply.salt.length:null,challengeSaltBase64:typeof reply.salt==='string'&&/^[A-Za-z0-9+/]+={0,2}$/.test(reply.salt)}:{})};
+    ...(endpoint==='/api/challenge'&&reply.ok?{challengeSaltLength:typeof reply.salt==='string'?reply.salt.length:null,challengeSaltBase64:typeof reply.salt==='string'&&/^[A-Za-z0-9+/]+={0,2}$/.test(reply.salt)}:{}),
+    ...(endpoint.startsWith('/api/exam-session')&&reply.ok?{examProtocol:reply.examProtocol??null,hasExamDocument:!!reply.document,sandboxHealth:reply.loadTestSandbox===true}: {})};
   calls.push(record); await fs.appendFile(path.join(out, 'requests.jsonl'), JSON.stringify(record) + '\n');
   return reply;
 }

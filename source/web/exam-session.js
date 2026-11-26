@@ -2,7 +2,7 @@ import {nextDeliveryRetry,examRetryDelay} from './core.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const checkpoint=r=>({answers:copy(r.answers||{}),index:r.index||0,exitCount:r.exitCount||0});
 const encode=x=>JSON.stringify(x);
-export function createExamSession({session,account,deviceId,rpc,persist,now,changed=()=>{},completed=async()=>{},uuid=()=>crypto.randomUUID(),random=Math.random}){
+export function createExamSession({session,account,deviceId,rpc,persist,now,changed=()=>{},completed=async()=>{},uuid=()=>crypto.randomUUID(),random=Math.random,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
  let flight=Promise.resolve(),busy=false,error='',anchor=null,readyToken='',generation=0;
  let backgroundFlight=null,nextSyncAt=0,failures=0,retryState=null;
  let finishFlight=null,finishSaves=new WeakMap();
@@ -25,6 +25,7 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
  }
  function validate(reply,s){
   const d=reply?.document,v=d?.value;
+  if(reply?.examProtocol==null)throw Object.assign(Error('Сервер не повернув дані іспиту. Спробуйте ще раз; збережені відповіді залишаються на ПК.'),{code:'BAD_EXAM_RESPONSE'});
   if(reply?.examProtocol!==1||String(reply.userId)!==String(s.user.id)||!Number.isFinite(reply.serverNow)||!Number.isSafeInteger(d?.revision)||d.revision<0||v&&(!v.test||v.test.mode!=='exam'||!Array.isArray(v.test.questions)||!v.test.questions.length||!v.submissionId||!Number.isSafeInteger(v.fence)||!Number.isFinite(v.startedAt)||!Number.isFinite(v.deadline)||v.deadline<=v.startedAt||!['active','finishing','completed'].includes(v.status)))throw Object.assign(Error('Некоректна відповідь сервера іспиту.'),{code:'BAD_EXAM_STATE'});
   return reply;
  }
@@ -76,7 +77,19 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   }else{old.revision=reply.document.revision;old.fence=v.fence;}
   await persistLocal();return true;
  }
- async function request(path,body,s){const sent=now(),reply=validate(await rpc(path==='/api/exam-session'?'GET':'POST',path,body,s.token),s);requestTimes.set(reply,sent);return reply;}
+ async function request(path,body,s){
+  for(let attempt=0;;attempt++){
+   if(!current(s))throw Object.assign(Error('Обліковий запис змінено.'),{code:'SESSION_CHANGED'});
+   const sent=now(),raw=await rpc(path==='/api/exam-session'?'GET':'POST',path,body,s.token);
+   try{const reply=validate(raw,s);requestTimes.set(reply,sent);return reply;}
+   catch(x){
+    // A Google redirect can return a successful health response instead of the
+    // API envelope. Keep validation strict and replay the exact request body.
+    if(x.code!=='BAD_EXAM_RESPONSE'||attempt>=2)throw x;
+    await pause(Math.round(2500*(1+random())));
+   }
+  }
+ }
  function serial(work){
   const owner=session(),epoch=generation;
   const task=flight.catch(()=>{}).then(async()=>{
