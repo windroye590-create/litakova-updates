@@ -82,6 +82,7 @@ jobs:
           node tests/optimization-ui.mjs
           node tests/global-optimization-ui.mjs
           node tests/packaged-startup.mjs
+          node tests/cadet-menu-audit.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

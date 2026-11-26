@@ -81,6 +81,7 @@ jobs:
           node tests/optimization-ui.mjs
           node tests/global-optimization-ui.mjs
           node tests/packaged-startup.mjs
+          node tests/cadet-menu-audit.mjs
       - name: Sign the four public update files
         env:
           LK_SIGNING_PKCS12_BASE64: ${{ secrets.LK_SIGNING_PKCS12_BASE64 }}
