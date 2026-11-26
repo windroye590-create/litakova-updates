@@ -223,7 +223,7 @@ async function rpc(method,path,body={},token=S.session?.token||''){
  const envelope=C.payload(method,path,token,body);
  const send=async()=>{if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});return C.apiReply(await local('/rpc',envelope),path);};
  const critical=method==='POST'&&(path==='/api/results'||/^\/api\/tests\/[^/]+\/start$/.test(path)||/^\/api\/exam-session\/(start|claim|finish|release)$/.test(path));
- const replaySafe=method==='GET'||critical||path==='/api/account-state/document'&&typeof body?.requestId==='string';
+ const replaySafe=C.apiReplaySafe(method,path,body);
  rpcFlights++;let r;try{r=await C.requestCapacity(send,undefined,undefined,critical,replaySafe);}catch(x){x.code??='NETWORK';throw x;}finally{rpcFlights--;}
  if(token&&S.session?.token!==token)throw Object.assign(Error('Обліковий запис змінився. Повторіть дію.'),{code:'SESSION_CHANGED'});
  if(!r.ok){

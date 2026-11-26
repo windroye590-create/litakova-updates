@@ -18,6 +18,8 @@ await check('Health and missing synchronization protocols cannot acknowledge an 
  assert.equal(C.apiReply({ok:true},'/api/account-state/document').code,'BAD_API_RESPONSE');
  const empty={ok:true};assert.equal(C.apiReply(empty,'/api/instructor/tests/test'),empty);
  const invalidUser={ok:true,accountSyncProtocol:1,userId:'other'};assert.equal(C.apiReply(invalidUser,'/api/account-state/document'),invalidUser);
+ for(const path of ['/api/results','/api/tests/test/start']){assert.equal(C.apiReplaySafe('POST',path,{}),false);assert.equal(C.apiReplaySafe('POST',path,{submissionId:'stable-submission'}),true);}
+ for(const path of ['/api/account-state/document','/api/exam-session/start']){assert.equal(C.apiReplaySafe('POST',path,{}),false);assert.equal(C.apiReplaySafe('POST',path,{requestId:'stable-request'}),true);}
 });
 await check('The real application relay retries a read with the identical envelope and never exposes the health reply',async()=>{
  const pc=relay();let first=true;pc.hook(e=>{if(first){first=false;return health();}return api(e.method,e.path,e.token,e.body);});

@@ -75,7 +75,7 @@ async function once(method, endpoint, body = {}, token = '', client = -1, label 
 async function rpc(method, endpoint, body = {}, token = '', client = -1) {
   const critical = method === 'POST' && (endpoint === '/api/results' || /^\/api\/tests\/[^/]+\/start$/.test(endpoint) || /^\/api\/exam-session\/(start|claim|finish|release)$/.test(endpoint));
   const send = async () => C.apiReply(await once(method, endpoint, body, token, client),endpoint);
-  const replaySafe=method==='GET'||critical||endpoint==='/api/account-state/document'&&typeof body.requestId==='string';
+  const replaySafe=C.apiReplaySafe(method,endpoint,body);
   const reply = await C.requestCapacity(send,undefined,undefined,critical,replaySafe);
   if (!reply.ok) throw Object.assign(Error(reply.code || 'API_ERROR'), {code: reply.code || 'API_ERROR'});
   return reply;

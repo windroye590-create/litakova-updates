@@ -55,6 +55,13 @@ export function apiReply(reply,path){
  if(reply?.ok===true&&(health||missingProtocol))return {ok:false,code:'BAD_API_RESPONSE',error:'Сервер повернув неповну відповідь. Оновіть дані; збережені відповіді залишаються на ПК.'};
  return reply;
 }
+export function apiReplaySafe(method,path,body){
+ if(method==='GET')return true;
+ if(method!=='POST')return false;
+ if(path==='/api/results'||/^\/api\/tests\/[^/]+\/start$/.test(path))return typeof body?.submissionId==='string'&&!!body.submissionId;
+ if(path==='/api/account-state/document'||/^\/api\/exam-session\/(start|claim|finish|release)$/.test(path))return typeof body?.requestId==='string'&&!!body.requestId;
+ return false;
+}
 export async function requestCapacity(request,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),random=Math.random,capacity=true,replaySafe=false){
  let busy=0,missing=0;
  for(;;){
