@@ -1,0 +1,2177 @@
+{
+  "status": "passed",
+  "version": "1.2.56",
+  "visibleActions": [
+    "auth-mode",
+    "check-update",
+    "download",
+    "download-all",
+    "finish",
+    "handoff-exam",
+    "list-page",
+    "logout",
+    "nav",
+    "next",
+    "prev",
+    "question",
+    "refresh",
+    "review-result",
+    "role",
+    "show-password",
+    "start",
+    "sync-exam",
+    "theme",
+    "unanswered"
+  ],
+  "clickedActions": [
+    "auth-mode",
+    "cancel-modal",
+    "check-update",
+    "download",
+    "download-all",
+    "finish",
+    "handoff-exam",
+    "list-page",
+    "logout",
+    "nav",
+    "next",
+    "prev",
+    "question",
+    "refresh",
+    "resume",
+    "review-result",
+    "role",
+    "show-password",
+    "start",
+    "sync",
+    "sync-exam",
+    "theme",
+    "toggle-menu",
+    "unanswered"
+  ],
+  "checksPassed": 29,
+  "checks": [
+    "Cadet sees exactly Home, My tests, My results and Profile without instructor controls",
+    "Update data responds on all four menu pages and preserves the selected section",
+    "Home shortcut opens the test catalogue and topbar theme toggles both ways without losing the page",
+    "Test search and clear work, catalogue Next and Previous change the actual visible cards",
+    "A closed test cannot start and a completed test cannot be started again",
+    "Download and Refresh on PC cache the selected test without starting a run",
+    "Available tests download from the catalogue while Home and Profile omit duplicate download actions",
+    "Home All shortcut opens My results and shows only the signed-in cadet",
+    "Results Next and Previous work and result search does not change the saved test search",
+    "Cadet results provide review without CSV, Excel or instructor export controls",
+    "All 53 own results stay accessible across both pages after removing cadet export controls",
+    "Review opens, Back to results and Back to tests work, and cached review remains readable offline",
+    "Profile opens the correct account and its theme switch survives reloading",
+    "Profile keeps update checking, identity and compact version metadata without duplicate download or queue controls",
+    "Start confirmation can be cancelled by its button and Escape without creating an attempt",
+    "First and last question boundaries, numbered buttons, Next and Previous all respond",
+    "Choice checkboxes toggle by mouse and keyboard and reject a third simultaneous answer",
+    "Skip unanswered opens the written question and writing survives changing questions",
+    "Reopening an unfinished training through Home and Continue keeps all answers and its current question",
+    "Cancel finish keeps the active training and creates no result",
+    "Finishing offline keeps one durable queued work and both queue buttons retain it until reconnect",
+    "Reconnect and Send queue commit one result with exact written text and clear the pending indicator",
+    "Exam starts through its confirmation, accepts choices and written text and Sync now saves them",
+    "Exam handoff returns Home and Continue restores editing with the same deadline and written answer",
+    "Exam finish confirmation records one result and leaves the result screen responsive",
+    "Compact menu opens every cadet section, closes after selection and responds to Escape",
+    "Keyboard Enter activates a menu item and the profile logout returns to the login form",
+    "Cadet login role, registration toggle and password visibility controls respond",
+    "Signing in again restores the same account and sidebar logout remains logged out after restart"
+  ],
+  "realUserClicks": 108,
+  "clicks": [
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "home",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "refresh",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "refresh",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "results",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "refresh",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "more",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "refresh",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "home",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "theme",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "theme",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "list-page",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "list-page",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "download",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "download",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "download",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "download-all",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "home",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "more",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "home",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "results",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "list-page",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "list-page",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "list-page",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "review-result",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "results",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "review-result",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "more",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "theme",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "more",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "theme",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "check-update",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "start",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "cancel-modal",
+      "page": "",
+      "type": "button"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "start",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "start",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "next",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "next",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "prev",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "question",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "unanswered",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "next",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "question",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "unanswered",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "resume",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "resume",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "finish",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "cancel-modal",
+      "page": "",
+      "type": "button"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "finish",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "results",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "sync",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "sync",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "home",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "more",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "sync",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "logout",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "cancel-modal",
+      "page": "",
+      "type": "button"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "sync",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "home",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "start",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "INPUT",
+      "action": "",
+      "page": "",
+      "type": "checkbox"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "next",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "sync-exam",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "handoff-exam",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "resume",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "question",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "finish",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "results",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "toggle-menu",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "home",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "toggle-menu",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "tests",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "toggle-menu",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "results",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "toggle-menu",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "more",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "toggle-menu",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "toggle-menu",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "toggle-menu",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "home",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "nav",
+      "page": "more",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "logout",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "role",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "show-password",
+      "page": "",
+      "type": "button"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "show-password",
+      "page": "",
+      "type": "button"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "auth-mode",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "auth-mode",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "",
+      "page": "",
+      "type": "submit"
+    },
+    {
+      "tag": "BUTTON",
+      "action": "logout",
+      "page": "",
+      "type": "submit"
+    }
+  ],
+  "inventories": {
+    "home": [
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "home",
+        "type": "submit",
+        "disabled": false,
+        "label": "Головна"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "tests",
+        "type": "submit",
+        "disabled": false,
+        "label": "Мої тести"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "results",
+        "type": "submit",
+        "disabled": false,
+        "label": "Мої результати"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "more",
+        "type": "submit",
+        "disabled": false,
+        "label": "Профіль"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "logout",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Вийти з облікового запису"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "theme",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Змінити тему"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "refresh",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "↻ Оновити дані"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "tests",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перейти до тестів →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "results",
+        "type": "submit",
+        "disabled": false,
+        "label": "Усі →"
+      }
+    ],
+    "tests": [
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "home",
+        "type": "submit",
+        "disabled": false,
+        "label": "Головна"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "tests",
+        "type": "submit",
+        "disabled": false,
+        "label": "Мої тести"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "results",
+        "type": "submit",
+        "disabled": false,
+        "label": "Мої результати"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "more",
+        "type": "submit",
+        "disabled": false,
+        "label": "Профіль"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "logout",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Вийти з облікового запису"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "theme",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Змінити тему"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "refresh",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "↻ Оновити дані"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "download-all",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "↓ Завантажити доступні"
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "text",
+        "disabled": false,
+        "label": "Знайти тест"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "download",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "↓ Завантажити"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Тест закрито"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "download",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "↓ Завантажити"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "download",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "↓ Завантажити"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "start",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "Почати тест →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "list-page",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "← Попередні"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "list-page",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Наступні →"
+      }
+    ],
+    "results": [
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "home",
+        "type": "submit",
+        "disabled": false,
+        "label": "Головна"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "tests",
+        "type": "submit",
+        "disabled": false,
+        "label": "Мої тести"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "results",
+        "type": "submit",
+        "disabled": false,
+        "label": "Мої результати"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "more",
+        "type": "submit",
+        "disabled": false,
+        "label": "Профіль"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "logout",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Вийти з облікового запису"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "theme",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Змінити тему"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "refresh",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "↻ Оновити дані"
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "text",
+        "disabled": false,
+        "label": "Пошук результатів"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 53"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 52"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 51"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 50"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 49"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 48"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 47"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 46"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 45"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 44"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 43"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 42"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 41"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 40"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 39"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 38"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 37"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 36"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 35"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 34"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 33"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 32"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 31"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 30"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 29"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 28"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 27"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 26"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 25"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 24"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 23"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 22"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 21"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 20"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 19"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 18"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 17"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 16"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 15"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 14"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 13"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 12"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 11"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 10"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 09"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 08"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 07"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 06"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 05"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "review-result",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірка відповідей: Архівна робота курсанта 04"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "list-page",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "← Попередні"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "list-page",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Наступні →"
+      }
+    ],
+    "result-review": [
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "results",
+        "type": "submit",
+        "disabled": false,
+        "label": "До результатів"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "tests",
+        "type": "submit",
+        "disabled": false,
+        "label": "До тестів"
+      }
+    ],
+    "profile": [
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "home",
+        "type": "submit",
+        "disabled": false,
+        "label": "Головна"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "tests",
+        "type": "submit",
+        "disabled": false,
+        "label": "Мої тести"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "results",
+        "type": "submit",
+        "disabled": false,
+        "label": "Мої результати"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "more",
+        "type": "submit",
+        "disabled": false,
+        "label": "Профіль"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "logout",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Вийти з облікового запису"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "theme",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Змінити тему"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "refresh",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "↻ Оновити дані"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "theme",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Темна тема"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "logout",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Вийти"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "check-update",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Перевірити оновлення"
+      }
+    ],
+    "training-runner": [
+      {
+        "tag": "BUTTON",
+        "action": "refresh",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Оновити дані"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "question",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "1"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "question",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "2"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "question",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "3"
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "checkbox",
+        "disabled": false,
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "checkbox",
+        "disabled": false,
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "checkbox",
+        "disabled": false,
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "action": "prev",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "← Назад"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "unanswered",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "До пропущеного"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "next",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Далі →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "finish",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Завершити тест"
+      }
+    ],
+    "queued-result": [
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "results",
+        "type": "submit",
+        "disabled": false,
+        "label": "До результатів"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "nav",
+        "page": "tests",
+        "type": "submit",
+        "disabled": false,
+        "label": "До тестів"
+      }
+    ],
+    "exam-runner": [
+      {
+        "tag": "BUTTON",
+        "action": "sync-exam",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Зберегти зараз"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "question",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "1"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "question",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "2"
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "checkbox",
+        "disabled": false,
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "checkbox",
+        "disabled": false,
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "checkbox",
+        "disabled": false,
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "action": "prev",
+        "page": "",
+        "type": "submit",
+        "disabled": true,
+        "label": "← Назад"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "unanswered",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "До пропущеного"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "next",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Далі →"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "handoff-exam",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Зберегти й перейти на інший ПК"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "finish",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Завершити тест"
+      }
+    ],
+    "cadet-login": [
+      {
+        "tag": "BUTTON",
+        "action": "role",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Інструктор"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "role",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Курсант"
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "text",
+        "disabled": false,
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "action": "",
+        "page": "",
+        "type": "password",
+        "disabled": false,
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "action": "show-password",
+        "page": "",
+        "type": "button",
+        "disabled": false,
+        "label": "Показати"
+      },
+      {
+        "tag": "SELECT",
+        "action": "",
+        "page": "",
+        "type": "select-one",
+        "disabled": false,
+        "label": "Оберіть групуconstructorАудит меню курсантаВидалення — група АВидалення — група БЛелека-100Призначен"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Увійти"
+      },
+      {
+        "tag": "BUTTON",
+        "action": "auth-mode",
+        "page": "",
+        "type": "submit",
+        "disabled": false,
+        "label": "Зареєструватися"
+      }
+    ]
+  },
+  "downloadCount": 0,
+  "productionRequests": 0,
+  "externalRequests": 0,
+  "actualCodeGs": true,
+  "syntheticAccountsOnly": true,
+  "pageErrors": []
+}

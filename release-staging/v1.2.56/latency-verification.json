@@ -1,0 +1,116 @@
+{
+  "latency": {
+    "status": "passed",
+    "passed": 9,
+    "checks": [
+      "Sheet handles are reused only within one request; no request cache survives its response",
+      "Lost finish replies still resolve to one immutable result with all 50 answers",
+      "Role and account status are read again on the next request",
+      "Fifty rapid answers and navigation steps retain every answer without fifty full profile rewrites",
+      "One deferred full snapshot includes the latest answer and question index",
+      "A lost journal acknowledgement rejects navigation persistence and retains a recoverable exact snapshot",
+      "Clock checkpoints save elapsed time in the journal without rewriting full question text or starting a cloud request",
+      "The faster wake-up skips idle, logged-out, instructor and paused application states",
+      "Only due retryable results or an exam finishing/releasing wake delivery early"
+    ],
+    "measurements": {
+      "trainingStart": {
+        "sheetHandleLookups": 6,
+        "bySheet": {
+          "_Користувачі": 1,
+          "_Тести": 1,
+          "_Доступ_до_тестів": 1,
+          "_Групи": 1,
+          "_Результати_дані": 1,
+          "_Видалені_результати": 1
+        }
+      },
+      "trainingFinish": {
+        "sheetHandleLookups": 5,
+        "bySheet": {
+          "_Користувачі": 1,
+          "_Результати_дані": 1,
+          "_Видалені_результати": 1,
+          "_Чернетки_ПК": 1,
+          "_Тести": 1
+        }
+      },
+      "examStart": {
+        "sheetHandleLookups": 8,
+        "bySheet": {
+          "_Користувачі": 1,
+          "_Чернетки_ПК": 1,
+          "_Тести": 1,
+          "_Доступ_до_тестів": 1,
+          "_Групи": 1,
+          "_Результати_дані": 1,
+          "_Видалені_результати": 1,
+          "_Відновлення_іспитів": 1
+        }
+      },
+      "examFinish": {
+        "sheetHandleLookups": 4,
+        "bySheet": {
+          "_Користувачі": 1,
+          "_Чернетки_ПК": 1,
+          "_Результати_дані": 1,
+          "_Видалені_результати": 1
+        }
+      },
+      "navigation50": {
+        "fullProfileWritesBeforeIdle": 0,
+        "journalWrites": 50,
+        "pendingFullProfileWrites": 1
+      }
+    },
+    "benchmarkOnly": false,
+    "productionRequests": 0,
+    "liveGoogleTimingMeasured": false
+  },
+  "browser": {
+    "status": "passed",
+    "benchmarkOnly": false,
+    "passed": 4,
+    "checks": [
+      "Question two renders while a 1200 ms profile write is pending",
+      "Rapid navigation and newer answers are durably saved after the delayed write",
+      "A disk failure remains visible and retry preserves both answers",
+      "Restart restores every selected answer without application errors"
+    ],
+    "questions": 200,
+    "simulatedDiskMilliseconds": 1200,
+    "navigationMilliseconds": 13,
+    "renderedBeforeDiskAcknowledgement": true,
+    "productionWrites": false,
+    "pageErrors": [],
+    "appSHA256": "e6ee6a2d424ee7ab0470d121639b2bc52e6b9cd36b758dbd60ff755f40c5ced9"
+  },
+  "liveResults": {
+    "target": 54,
+    "acknowledged": 54,
+    "authoritative": 54,
+    "publicRows": 54,
+    "answersVerifiedForAcknowledgedResults": true,
+    "pendingOnClients": 0
+  },
+  "liveFindings": {
+    "busyResponses": 980,
+    "googleQuotaResponses": 0,
+    "timeouts": 0,
+    "signingKeyFingerprints": 1,
+    "phaseFailures": 0
+  },
+  "liveCleanup": {
+    "status": "passed",
+    "productionDeploymentPreserved": true,
+    "headRestored": true,
+    "booksTrashed": [
+      "private",
+      "public"
+    ],
+    "testDeploymentDeleted": true,
+    "namespacePurged": true,
+    "removedProperties": 46,
+    "removedCacheKeys": 114
+  }
+}

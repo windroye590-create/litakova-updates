@@ -1,0 +1,74 @@
+{
+  "status": "passed",
+  "version": "1.2.56",
+  "code": 180,
+  "api": 26,
+  "implementationCommit": "85047bfdd08edeeedc789316e9e231d618bd1f0b",
+  "releaseSourceCommit": "7d3f8f6590b6262f2e1b6fe1e868715a74e127c2",
+  "releaseUrl": "https://github.com/windroye590-create/litakova-updates/releases/tag/v1.2.56",
+  "sha256": "c9277cdd467156435be13e8bfe4ac60c5618cc323676720d09e6896e18605bc8",
+  "executableBytes": 3220636,
+  "releaseWorkflowRun": 45970149421,
+  "automationVerificationRun": 45970025961,
+  "nativeWindowsWorkflowRun": 45970930576,
+  "latestStableReleaseVerified": true,
+  "allFourPublicFilesMatchChannel": true,
+  "publicCatalogSignatureVerified": true,
+  "packedAssets": 27,
+  "actualWindowsHostVerified": true,
+  "nativeWindowsChecks": 16,
+  "actualWinHTTPCompressionChecks": 5,
+  "cadetMenuScenarios": 29,
+  "cadetMenuRealClicks": 108,
+  "cadetMenuProductionRequests": 0,
+  "serverWillChange": true,
+  "serverSemanticSHA256": "3435fce6e172153cc1f562ef2f269d99629694e3d8c378b92cefd171c6281124",
+  "serverBuild": "pc-api26-3435fce6e172153c",
+  "liveGoogleLoadMeasuredForThisRelease": true,
+  "liveGoogleWorkflowRun": 45966290427,
+  "fpvChanged": false,
+  "verifiedAt": "2026-11-27T09:07:30.134360+00:00",
+  "latencyChecks": 9,
+  "writtenUIChecks": 9,
+  "serverLatencyImprovementConsistentlyConfirmed": false,
+  "artifactDigests": {
+    "live-google-load": "ebe9cb25e30ef689d9f2f0bb3e2ffae35d65e3fcd83f29ef7bf8826f864981ac",
+    "automation-verification": "e4ad05921ca7b7e72d05b109cbe31256761e85b4a2af650ffcba58c0673b0997",
+    "release-verification": "642b0c8e3fe5faaffd5bc343536053e2d329edcc4336898fcb144e3057a681c9",
+    "windows-native-storage-audit": "5725469c8d87e1ed9deb1638b6966f989367af33df5fac08c03419fa3084430c"
+  },
+  "liveComparison": {
+    "45784290354": {
+      "training-finish-50": {
+        "endToEndMedianSeconds": 44.88,
+        "endToEndMaxSeconds": 87.5,
+        "successfulLockMedianMilliseconds": 2931,
+        "successfulHTTPMedianMilliseconds": 6057,
+        "successfulSamples": 27
+      },
+      "exam-finish-200": {
+        "endToEndMedianSeconds": 37.74,
+        "endToEndMaxSeconds": 75.92,
+        "successfulLockMedianMilliseconds": 2366,
+        "successfulHTTPMedianMilliseconds": 5232,
+        "successfulSamples": 27
+      }
+    },
+    "45966290427": {
+      "training-finish-50": {
+        "endToEndMedianSeconds": 41.73,
+        "endToEndMaxSeconds": 83.83,
+        "successfulLockMedianMilliseconds": 2529,
+        "successfulHTTPMedianMilliseconds": 5186,
+        "successfulSamples": 27
+      },
+      "exam-finish-200": {
+        "endToEndMedianSeconds": 51.69,
+        "endToEndMaxSeconds": 101.27,
+        "successfulLockMedianMilliseconds": 3152,
+        "successfulHTTPMedianMilliseconds": 6025,
+        "successfulSamples": 27
+      }
+    }
+  }
+}
