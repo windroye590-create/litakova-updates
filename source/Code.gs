@@ -16,8 +16,8 @@ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
 const PUBLIC_SYNC_DELAY_MS = 30000;
 const REVIEW_LEASE_MS = 120000;
 const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
-const LATEST_APP_VERSION_CODE = 179;
-const LATEST_APP_VERSION_NAME = '1.2.55';
+const LATEST_APP_VERSION_CODE = 180;
+const LATEST_APP_VERSION_NAME = '1.2.56';
 const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
 const ROLE_INSTRUCTOR = 'instructor';
 const ROLE_CADET = 'cadet';
@@ -106,6 +106,7 @@ const MARKER_SUFFIX = ']]';
 var workspaceMutation_ = null;
 var workspaceWriteRequest_ = false;
 var spreadsheetCache_ = null;
+var requestSheetCache_ = null;
 var publicResultsSpreadsheetCache_ = null;
 var publicResultsSheetCache_ = null;
 var publicLayouts_ = [];
@@ -135,7 +136,7 @@ function doGet() {
     ok: true,
     service: 'Літакова Комісія',
     version: API_VERSION,
-    serverBuild: 'pc-api26-b44b075754351786',
+    serverBuild: 'pc-api26-3435fce6e172153c',
     resultDeletion: true,
     deletedAttemptRetakes: true,
     singleAttempt: true,
@@ -212,6 +213,7 @@ function setAppDownloadUrl(url, versionCode, versionName) {
 }
 
 function doPost(e) {
+  requestSheetCache_=Object.create(null);
   requestSigningSecret_=null;requestSigningActive_=true;attemptTrafficRequest_=false;attemptTrafficHint_=false;
   responsePresentations_ = [];requestWriteFlushed_ = false;requestCommitFailed_ = false;
   resultSeriesCache_ = null;
@@ -304,7 +306,7 @@ function doPost(e) {
       finishRequestWrite_();
       try { lock.releaseLock(); } catch (ignored) {}
     }
-    requestSigningSecret_=null;requestSigningActive_=false;attemptTrafficRequest_=false;attemptTrafficHint_=false;
+    requestSigningSecret_=null;requestSigningActive_=false;attemptTrafficRequest_=false;attemptTrafficHint_=false;requestSheetCache_=null;
   }
 }
 
@@ -1434,8 +1436,10 @@ function spreadsheet_() {
 }
 
 function sheet_(key) {
+  if(requestSheetCache_&&Object.prototype.hasOwnProperty.call(requestSheetCache_,key))return requestSheetCache_[key];
   var sheet = spreadsheet_().getSheetByName(SHEETS[key]);
   if (!sheet) fail_('Не знайдено службовий аркуш: ' + SHEETS[key], 'SCHEMA_ERROR');
+  if(requestSheetCache_)requestSheetCache_[key]=sheet;
   return sheet;
 }
 

@@ -214,7 +214,7 @@ let examSaveTimer;
 function persist(){clearTimeout(saveTimer);scheduledSave=false;saving=diskWriter.save().catch(x=>{x.localSave=true;throw x;});saving.then(()=>{if(user()){accountSync.changed();if(!instructor()&&account().run?.examProtocol===1){clearTimeout(examSaveTimer);examSaveTimer=setTimeout(()=>{if(!working&&!rpcFlights)examSession.background().catch(()=>{});},1500);}}},x=>toast(x.message));return saving;}
 async function retrySave(){if(checkpoint){const r=typeof secureStorage!=='undefined'&&secureStorage.enabled?await secureStorage.saveJournal(checkpoint):await local('/journal',checkpoint);if(r.ok===false)throw Error(r.error||'Не вдалося зберегти журнал.');journalError='';}await persist();updateStorageNotice();}
 
-function scheduleSave(){scheduledSave=true;updateStorageNotice();clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist(),100);}
+function scheduleSave(delay=100){scheduledSave=true;updateStorageNotice();clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist(),delay);}
 function stamp(value){S.journalSerial=(S.journalSerial||0)+1;return {serial:S.journalSerial,...structuredClone(value)};}
 function journal(value){if(value.kind==='draft'){const d=account().draft;if(!d||d.localId!==value.localId||d.localRevision!==value.revision)return;value={kind:'draft',userId:value.userId,localId:value.localId,revision:value.revision,draft:C.draftJournalSnapshot(d)};}if(new TextEncoder().encode(JSON.stringify(value)).length>7*1024*1024)throw Error('Журнал завеликий. Збережіть чернетку перед продовженням.');journalPending++;checkpoint=stamp(value);const snapshot=checkpoint;journalSaving=journalSaving.catch(()=>{}).then(()=>typeof secureStorage!=='undefined'&&secureStorage.enabled?secureStorage.saveJournal(snapshot):local('/journal',snapshot)).then(r=>{if(r.ok===false)throw Error(r.error||'Не вдалося зберегти дані на диску.');});journalSaving.then(()=>{journalPending--;journalError='';updateStorageNotice();},x=>{journalPending--;journalError=x.message;updateStorageNotice();toast(x.message);});}
 function runCheckpoint(interrupted=false){const r=account().run;if(!r)return;const value={kind:'run',userId:id(user().id),submissionId:r.submissionId,revision:(r.localRevision||0)+1,answers:r.answers,index:r.index||0,lastElapsed:Math.floor(r.examProtocol===1?examSession.elapsed(r):Math.max(0,(uptime()-r.startedUptime)/1000)),exitCount:r.exitCount||0,interrupted};r.localRevision=value.revision;r.lastElapsed=value.lastElapsed;if(interrupted)r.interrupted=true;return value;}
@@ -729,7 +729,7 @@ function tick(){if(!alive()||!user()||page!=='runner')return;const r=account().r
 async function recoverRun(offline=false){const session=S.session,a=account(),r=a.run,native=await getClock();if(S.session?.token!==session.token)return;try{if(r?.test.mode==='exam'){if(r.examProtocol===1){if(!offline)await examSession.discover();}else{r.startedUptime=native.uptime-Math.max(0,r.lastElapsed||0)*1000;r.launchId=native.launchId;r.legacyRecovery=true;await persist();}}else if(r?.test.mode==='training'&&r.launchId!==clock.launchId){r.startedUptime=native.uptime-Math.max(0,r.lastElapsed||0)*1000;r.launchId=native.launchId;await persist();}else if(!instructor()&&!offline)await examSession.discover();}catch(x){if(S.session?.token===session.token)lastError=x.message;}}
 async function moveQuestion(index){
  const r=account().run;if(!r||!Number.isInteger(index)||index<0||index>=r.test.questions.length)return;
- r.index=index;render();await persist();
+ r.index=index;journal(runCheckpoint());render();scheduleSave(1000);await journalSaving;
 }
 async function finishRun(ask=true,forcedUptime=null){
  const session=S.session,a=account(),r=a.run;if(!r||working)return;
@@ -783,6 +783,14 @@ async function syncQueue(force=false){
  }finally{resolve();if(syncQueue.completion===completion)syncQueue.completion=null;if(syncing===session.token){syncing=false;if(S.session?.token===session.token&&page!=='runner'&&page!=='editor')render();}}
 }
 let backgroundSyncing=false;
+function deliveryTick(){
+ if(updateApplying||!alive()||!user()||instructor())return;
+ const a=account(),r=a.run;
+ // Only completed work gets this faster wake-up. Existing request/backoff
+ // guards still decide whether to send; idle account/report polling stays slow.
+ if(a.pending.some(C.canRetrySubmission)||r?.examProtocol===1&&(r.finishRequested||r.releaseRequested))
+  return backgroundTick();
+}
 async function backgroundTick(){
  if(updateApplying||!alive())return;
  if(diskWriter.status().error||journalError)await retrySave().catch(()=>{});
@@ -1057,7 +1065,7 @@ document.addEventListener('input',event=>{
  if(el.id==='filter'){filter=el.value;if(user()&&['tests','cadets'].includes(page)){account().sectionSearches??={};account().sectionSearches[page]=filter;scheduleSave();}resetPage(page);if(page==='results'){if(instructor()){account().resultsSearches??={};account().resultsSearches[resultsView()]=filter;scheduleSave();}resetPage('ranking');resetPage('reviews');$('#results-table').innerHTML=resultsTable();}else if(page==='tests')$('#test-list').innerHTML=testsList();else if(page==='cadets'||page==='more'){const at=el.selectionStart;render();const f=$('#filter');f?.focus();f?.setSelectionRange(at,at);}return;}
  if(!user())return;const a=account(),d=a.draft;
  if(page==='grading'&&grading&&el.dataset.grade){if(!reviewPresence.canEdit()){updateReviewPresenceUI();return;}const item=grading.draft.items[el.dataset.grade]??={points:'',comment:''};item[el.dataset.gradeProp]=el.value;grading.draft.request=null;scheduleSave();return;}
- if(page==='runner'&&el.dataset.runWritten){const r=a.run;if(r.examProtocol===1&&!examSession.editable(r))return;const q=r.test.questions.find(q=>id(q.id)===el.dataset.runWritten);if(!q||!C.isWritten(q))return;if(el.value.length>3000||(C.answerStorageLength(r.test,{...r.answers,[id(q.id)]:el.value})>48000&&C.answerStorageLength(r.test,{...r.answers,[id(q.id)]:el.value})>=C.answerStorageLength(r.test,r.answers))){el.value=r.answers[id(q.id)]??'';toast('До 3000 символів на питання і до 48 000 символів загалом.');return;}r.answers[id(q.id)]=el.value;journal(runCheckpoint());scheduleSave();return;}
+ if(page==='runner'&&el.dataset.runWritten){const r=a.run;if(r.examProtocol===1&&!examSession.editable(r))return;const q=r.test.questions.find(q=>id(q.id)===el.dataset.runWritten);if(!q||!C.isWritten(q))return;if(el.value.length>3000||(C.answerStorageLength(r.test,{...r.answers,[id(q.id)]:el.value})>48000&&C.answerStorageLength(r.test,{...r.answers,[id(q.id)]:el.value})>=C.answerStorageLength(r.test,r.answers))){el.value=r.answers[id(q.id)]??'';toast('До 3000 символів на питання і до 48 000 символів загалом.');return;}r.answers[id(q.id)]=el.value;journal(runCheckpoint());scheduleSave(1000);return;}
  if(page==='editor'&&d){let patch;if(el.dataset.draft){const prop=el.dataset.draft;d[prop]=el.type==='checkbox'?el.checked:el.value;patch={scope:'root',prop,value:d[prop]};if(prop==='mode'){scheduleSave();render();}}
   if(el.dataset.question!==undefined){const value=el.dataset.prop==='maxPoints'?(el.value===''?'':Number(el.value)):el.value;d.questions[+el.dataset.question][el.dataset.prop]=value;patch={scope:'question',q:+el.dataset.question,prop:el.dataset.prop,value};}
   if(el.dataset.answer!==undefined){d.questions[+el.dataset.answer].answers[+el.dataset.a].text=el.value;patch={scope:'answer',q:+el.dataset.answer,a:+el.dataset.a,value:el.value};}
@@ -1066,7 +1074,7 @@ document.addEventListener('input',event=>{
   if(patch){d.localRevision=(d.localRevision||0)+1;journal({kind:'draft',userId:id(user().id),localId:d.localId,revision:d.localRevision,patch});}
   refreshImportReview();scheduleSave();
  }
- if(page==='runner'&&el.dataset.runAnswer){const q=a.run.test.questions[a.run.index||0];if(a.run.examProtocol===1&&!examSession.editable(a.run))return;let value;try{value=C.toggleChoice(q,a.run.answers[id(q.id)],el.dataset.runAnswer,el.checked);}catch(x){el.checked=false;toast(x.message);return;}const next={...a.run.answers,[id(q.id)]:value};if(C.answerStorageLength(a.run.test,next)>48000&&C.answerStorageLength(a.run.test,next)>=C.answerStorageLength(a.run.test,a.run.answers)){render();toast('Скоротіть письмові відповіді, щоб додати цей вибір: загальний обсяг перевищує 48 000 символів.');return;}a.run.answers=next;journal(runCheckpoint());scheduleSave();render();}
+  if(page==='runner'&&el.dataset.runAnswer){const q=a.run.test.questions[a.run.index||0];if(a.run.examProtocol===1&&!examSession.editable(a.run))return;let value;try{value=C.toggleChoice(q,a.run.answers[id(q.id)],el.dataset.runAnswer,el.checked);}catch(x){el.checked=false;toast(x.message);return;}const next={...a.run.answers,[id(q.id)]:value};if(C.answerStorageLength(a.run.test,next)>48000&&C.answerStorageLength(a.run.test,next)>=C.answerStorageLength(a.run.test,a.run.answers)){render();toast('Скоротіть письмові відповіді, щоб додати цей вибір: загальний обсяг перевищує 48 000 символів.');return;}a.run.answers=next;journal(runCheckpoint());scheduleSave(1000);render();}
 });
 function markAway(){if(updateApplying||!alive()||!user()||away)return;away=true;const r=account().run;if(r?.test.mode==='exam'){r.exitCount++;journal(runCheckpoint());scheduleSave();}}
 document.addEventListener('visibilitychange',()=>{if(updateApplying||!alive()||!user())return;if(document.hidden)markAway();else{away=false;getClock().then(()=>tick()).catch(()=>{});if(!account().run)refresh();accountSync.sync(true);}});
@@ -1096,6 +1104,7 @@ async function init(){
  setInterval(()=>{if(updateApplying||!alive()||!instructor())return;if(['grading','answer-correction'].includes(page))reviewPresence.tick();else if(pendingReviewsPage()&&!document.hidden)pollReviewPresence();},25000);
  setInterval(()=>{if(!updateApplying&&!document.hidden&&alive()&&!working&&!rpcFlights&&!syncing&&!backgroundSyncing){if(user()&&updateData.flight?.token!==S.session.token&&!account().pending.some(C.canRetrySubmission)){if(page!=='runner'&&page!=='editor')refresh();}}},45000+Math.floor(Math.random()*15000));
  setInterval(()=>{backgroundTick().catch(()=>{});},10000+Math.floor(Math.random()*5000));
+ setInterval(()=>{deliveryTick()?.catch(()=>{});},1000+Math.floor(Math.random()*1000));
  }catch(x){diskStateLoaded=false;window.dispatchEvent(new Event('lk:startup-failed'));if(!document.querySelector('[data-startup-error]'))app.innerHTML=`<div class="boot">Не вдалося відкрити програму<small>${e(x.message)}</small></div>`;}
 }
 init();

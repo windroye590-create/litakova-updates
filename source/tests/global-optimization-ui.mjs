@@ -78,7 +78,7 @@ try {
   checks.push('Rapid navigation and newer answers are durably saved after the delayed write');
   failState = true;
   const failure = await page.evaluate(async () => {
-    try {await (await import('/app.js')).clickAction({dataset: {action: 'question', q: '6'}});} catch (error) {return error.code;}
+    try {const app=await import('/app.js');await app.clickAction({dataset: {action: 'question', q: '6'}});await app.persist();} catch (error) {return error.code;}
   });
   assert.equal(failure, 'STORAGE_WRITE');
   await page.evaluate(async () => (await import('/app.js')).clickAction({dataset: {action: 'retry-save'}}));
