@@ -65,11 +65,16 @@ async function login(role,username,password,groupName){await page.locator(`butto
  });
  const test=api('GET','/api/instructor/dashboard',instructorToken).tests.find(t=>t.title==='Письмові відповіді — UI');
  api('POST','/api/instructor/tests/'+test.id+'/access',instructorToken,{expectedRevision:test.access.revision,scope:'all',open:true});
- const creds=await (await import('../web/core.js')).credential('written-ui-password');
+ const core=await import('../web/core.js'),creds=await core.credential('written-ui-password');
  const cadet=api('POST','/api/register','',{fullName:'Письмовий Курсант UI',username:'written_ui',groupId:group.id,...creds});const full=api('GET','/api/tests/'+test.id,cadet.token).test;
  await click('logout');await login('cadet','written_ui','written-ui-password',group.name);
  await mark('Cadet writes multiline text without seeing the model answer',async()=>{
-  await page.locator('.nav button[data-page=tests]').click();const card=page.locator('.test-card').filter({hasText:test.title});await card.locator('[data-action=start]').click();await page.locator('#modal button.primary').click();await page.locator('.runner').waitFor();await page.getByText('Висоту',{exact:true}).click();await click('next');await page.locator('[data-run-written]').fill('Перший крок.\nДругий крок. <script>alert(1)</script>');assert.ok(!(await page.locator('body').textContent()).includes('Приватні критерії'));await page.waitForTimeout(450);assert.equal(state.accounts[String(cadet.user.id)].run.answers[String(full.questions[1].id)],'Перший крок.\nДругий крок. <script>alert(1)</script>');
+  await page.locator('.nav button[data-page=tests]').click();const card=page.locator('.test-card').filter({hasText:test.title});await card.locator('[data-action=start]').click();await page.locator('#modal button.primary').click();await page.locator('.runner').waitFor();await page.getByText('Висоту',{exact:true}).click();await click('next');
+  const qid=String(full.questions[1].id),text='Перший крок.\nДругий крок. <script>alert(1)</script>';
+  const ack=page.waitForResponse(response=>response.url().endsWith('/journal')&&response.request().method()==='POST'&&JSON.parse(response.request().postData()||'{}').answers?.[qid]===text);
+  await page.locator('[data-run-written]').fill(text);assert.ok(!(await page.locator('body').textContent()).includes('Приватні критерії'));
+  assert.equal((await(await ack).json()).ok,true);assert.equal(journal.answers[qid],text);
+  const recovered=structuredClone(state);core.applyCheckpoint(recovered,structuredClone(journal));assert.equal(recovered.accounts[String(cadet.user.id)].run.answers[qid],text);
  });
  await mark('Written response survives application reload',async()=>{await page.reload();await page.getByRole('heading',{name:/Вітаємо/}).waitFor();await click('resume');await page.locator(`[data-run-written="${full.questions[1].id}"]`).waitFor();assert.ok((await page.locator(`[data-run-written="${full.questions[1].id}"]`).inputValue()).includes('Другий крок.'));await click('next');await page.locator(`[data-run-written="${full.questions[2].id}"]`).fill('Дія курсанта');});
  await mark('Offline submit saves the complete typed response',async()=>{offline=true;await click('finish');await page.locator('#modal button.primary').click();await page.waitForFunction(()=>document.body.textContent.includes('Результат у черзі.'));const pending=state.accounts[String(cadet.user.id)].pending[0];assert.equal(pending.body.writtenProtocol,1);assert.ok(pending.body.answers[1].text.includes('<script>'),JSON.stringify(pending.body.answers));assert.equal(state.accounts[String(cadet.user.id)].run,null);});
