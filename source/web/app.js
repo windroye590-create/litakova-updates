@@ -792,7 +792,7 @@ function deliveryTick(){
  const a=account(),r=a.run;
  // Only completed work gets this faster wake-up. Existing request/backoff
  // guards still decide whether to send; idle account/report polling stays slow.
- if(a.pending.some(C.canRetrySubmission)||r?.examProtocol===1&&(r.finishRequested||r.releaseRequested))
+ if(a.pending.some(p=>C.canRetrySubmission(p)&&(!p.nextAt||p.nextAt<=Date.now()))||r?.examProtocol===1&&(r.finishRequested||r.releaseRequested))
   return backgroundTick();
 }
 async function backgroundTick(){
