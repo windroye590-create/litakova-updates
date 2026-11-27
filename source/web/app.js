@@ -731,6 +731,10 @@ async function moveQuestion(index){
  const r=account().run;if(!r||!Number.isInteger(index)||index<0||index>=r.test.questions.length)return;
  r.index=index;journal(runCheckpoint());render();scheduleSave(1000);await journalSaving;
 }
+function saveRunClock(){
+ if(updateApplying||!alive()||user()?.role!=='cadet'||!account().run||uptime()-lastTimerSaved<10000)return;
+ lastTimerSaved=uptime();journal(runCheckpoint());
+}
 async function finishRun(ask=true,forcedUptime=null){
  const session=S.session,a=account(),r=a.run;if(!r||working)return;
  if(ask){const missing=r.test.questions.filter(q=>!C.answered(q,r.answers)).length;confirmAction('Завершити тест?',missing?`Без відповіді залишилося ${missing} пит. Після завершення результат буде надіслано викладачу.`:'Усі питання отримали відповіді. Результат буде надіслано на спільний сервер.',()=>{if(S.session?.token===session.token&&account().run===r)return finishRun(false);},'Завершити');return;}
@@ -1099,7 +1103,7 @@ async function init(){
  S={...S,...raw};if(raw.localResumeWarning)lastError=raw.localResumeWarning;S.accounts??={};S.groups??=[];S.journalSerial=Math.max(S.journalSerial||0,j.serial||0);const restored=C.applyCheckpoint(S,j);diskStateLoaded=true;if(restored)await persist();
  await getClock();if(S.updateReturnPage==='more'){page='more';delete S.updateReturnPage;delete S.updateTargetCode;await persist();}render();updateStatus();if(user()){await recoverRun();await refresh();await syncQueue();}else loadGroups();
  setInterval(()=>{if(alive()&&!updateApplying)updateStatus();},10000);
- timerInterval=setInterval(()=>{if(updateApplying)return;reviewPresence.expire();tick();if(user()?.role==='cadet'&&account().run&&uptime()-lastTimerSaved>=10000){lastTimerSaved=uptime();scheduleSave();}},1000);
+ timerInterval=setInterval(()=>{if(updateApplying)return;reviewPresence.expire();tick();saveRunClock();},1000);
  setInterval(()=>{if(alive()&&!updateApplying)getClock().then(()=>tick()).catch(()=>{});},10000);
  setInterval(()=>{if(updateApplying||!alive()||!instructor())return;if(['grading','answer-correction'].includes(page))reviewPresence.tick();else if(pendingReviewsPage()&&!document.hidden)pollReviewPresence();},25000);
  setInterval(()=>{if(!updateApplying&&!document.hidden&&alive()&&!working&&!rpcFlights&&!syncing&&!backgroundSyncing){if(user()&&updateData.flight?.token!==S.session.token&&!account().pending.some(C.canRetrySubmission)){if(page!=='runner'&&page!=='editor')refresh();}}},45000+Math.floor(Math.random()*15000));
