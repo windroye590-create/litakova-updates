@@ -29,6 +29,29 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   if(reply?.examProtocol!==1||String(reply.userId)!==String(s.user.id)||!Number.isFinite(reply.serverNow)||!Number.isSafeInteger(d?.revision)||d.revision<0||v&&(!v.test||v.test.mode!=='exam'||!Array.isArray(v.test.questions)||!v.test.questions.length||!v.submissionId||!Number.isSafeInteger(v.fence)||!Number.isFinite(v.startedAt)||!Number.isFinite(v.deadline)||v.deadline<=v.startedAt||!['active','finishing','completed'].includes(v.status)))throw Object.assign(Error('Некоректна відповідь сервера іспиту.'),{code:'BAD_EXAM_STATE'});
   return reply;
  }
+ function compactView(path,body,s){
+  const r=account().run;
+  if(!r||r.examProtocol!==1||String(r.userId)!==String(s.user.id)||r.ownerId!==deviceId()||r.locked
+    ||r.test?.mode!=='exam'||!Array.isArray(r.test.questions)||!r.test.questions.length||r.test.questions.length>200
+    ||!Number.isSafeInteger(r.revision)||r.revision<1||!Number.isSafeInteger(r.fence))return null;
+  if(path!=='/api/exam-session'&&(path!=='/api/exam-session/save'||body.expectedRevision!==r.revision
+    ||body.submissionId!==r.submissionId||body.fence!==r.fence||body.deviceId!==deviceId()))return null;
+  return {test:r.test,submissionId:r.submissionId,revision:r.revision,fence:r.fence,ownerId:r.ownerId,startedAt:r.startedAt,deadline:r.deadline};
+ }
+ function expandReply(reply,view,path,body){
+  const d=reply?.document,v=d?.value;
+  if(!d||!Object.hasOwn(d,'questionsOmitted'))return reply;
+  const read=path==='/api/exam-session';
+  if(!view||reply.examSyncProtocol!==1||d.questionsOmitted!==true||d.unchanged!==read||reply.completion
+    ||v?.status!=='active'||String(v.test?.id)!==String(view.test.id)||v.submissionId!==view.submissionId
+    ||v.ownerId!==view.ownerId||v.fence!==view.fence||v.startedAt!==view.startedAt||v.deadline!==view.deadline
+    ||!v.answers||typeof v.answers!=='object'||Array.isArray(v.answers)||!Number.isInteger(v.index)||v.index<0||v.index>=view.test.questions.length
+    ||!Number.isInteger(v.exitCount)||v.exitCount<0
+    ||d.revision!==(read?view.revision:body.expectedRevision+1)
+    ||!read&&(v.lastRequest!==body.requestId||v.lastDevice!==body.deviceId))
+    throw Object.assign(Error('Потрібна повна відповідь сервера іспиту.'),{code:'BAD_EXAM_COMPACT'});
+  return {...reply,document:{...d,value:{...v,test:view.test}}};
+ }
  function elapsed(r=account().run){
   if(r?.examProtocol===1){if(anchor?.id===r.submissionId&&anchor.token===session()?.token)return Math.max(0,(anchor.server+Math.max(0,now()-anchor.local)-r.startedAt)/1000);return Math.max(0,r.lastElapsed||0);}
   return Math.max(0,(now()-(r?.startedUptime||0))/1000);
@@ -75,14 +98,20 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
    }
    a.run={...copy(v),examProtocol:1,userId:String(s.user.id),revision:reply.document.revision,acknowledged:encode(checkpoint(v)),locked:!mine,lastElapsed:Math.max(0,(anchor.server-v.startedAt)/1000)};
   }else{old.revision=reply.document.revision;old.fence=v.fence;}
-  await persistLocal();return true;
+  if(!(reply.document.questionsOmitted===true&&reply.document.unchanged===true&&same&&mine&&!replace))await persistLocal();return true;
  }
  async function request(path,body,s){
+  const view=compactView(path,body,s);
+  const compact=view?{...body,examSyncProtocol:1,knownTestId:String(view.test.id),knownSubmissionId:view.submissionId,
+    knownRevision:view.revision,knownFence:view.fence,knownDeviceId:deviceId()}:null;
+  let full=false;
   for(let attempt=0;;attempt++){
    if(!current(s))throw Object.assign(Error('Обліковий запис змінено.'),{code:'SESSION_CHANGED'});
-   const sent=now(),raw=await rpc(path==='/api/exam-session'?'GET':'POST',path,body,s.token);
-   try{const reply=validate(raw,s);requestTimes.set(reply,sent);return reply;}
+   const sent=now(),raw=await rpc(path==='/api/exam-session'?'GET':'POST',path,compact&&!full?compact:body,s.token);
+   try{const reply=validate(expandReply(raw,compact&&!full?view:null,path,body),s);requestTimes.set(reply,sent);return reply;}
    catch(x){
+    // Retry this same stable request once without the optional short response.
+    if(x.code==='BAD_EXAM_COMPACT'){if(!full){full=true;continue;}x.code='BAD_EXAM_STATE';throw x;}
     // A Google redirect can return a successful health response instead of the
     // API envelope. Keep validation strict and replay the exact request body.
     if(x.code!=='BAD_EXAM_RESPONSE'||attempt>=2)throw x;

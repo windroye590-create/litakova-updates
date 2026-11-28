@@ -52,7 +52,7 @@ async function transport(envelope) {
     }
     if (!response.ok) reply = {...reply, ok: false, code: 'HTTP_' + response.status};
     if (/too many|quota|limit exceeded/i.test(String(reply.error || ''))) category ||= 'GOOGLE_QUOTA_OR_CONCURRENCY';
-    return {reply, status: response.status, category, encoding: response.headers.get('content-encoding') || 'identity'};
+    return {reply, status: response.status, category, encoding: response.headers.get('content-encoding') || 'identity',responseBytes:Buffer.byteLength(raw)};
   }
   throw Error('Sandbox redirect limit exceeded');
 }
@@ -68,7 +68,8 @@ async function once(method, endpoint, body = {}, token = '', client = -1, label 
     milliseconds: Math.round(performance.now() - started), serverMilliseconds: metrics.elapsedMs ?? null, lockWaitMilliseconds: metrics.lockWaitMs ?? null,
     lockHeldMilliseconds: metrics.lockHeldMs ?? null, stages: metrics.stages || {}, sessionFailure: metrics.sessionFailure || null, signingKeyFingerprint:metrics.signingKeyFingerprint||null,encoding: wire.encoding,
     ...(endpoint==='/api/challenge'&&reply.ok?{challengeSaltLength:typeof reply.salt==='string'?reply.salt.length:null,challengeSaltBase64:typeof reply.salt==='string'&&/^[A-Za-z0-9+/]+={0,2}$/.test(reply.salt)}:{}),
-    ...(endpoint.startsWith('/api/exam-session')&&reply.ok?{examProtocol:reply.examProtocol??null,hasExamDocument:!!reply.document,sandboxHealth:reply.loadTestSandbox===true}: {})};
+    ...(endpoint.startsWith('/api/exam-session')&&reply.ok?{examProtocol:reply.examProtocol??null,hasExamDocument:!!reply.document,sandboxHealth:reply.loadTestSandbox===true,
+      responseBytes:wire.responseBytes??null,examSyncProtocol:reply.examSyncProtocol??null,questionsOmitted:reply.document?.questionsOmitted===true,unchanged:reply.document?.unchanged===true}: {})};
   calls.push(record); await fs.appendFile(path.join(out, 'requests.jsonl'), JSON.stringify(record) + '\n');
   return reply;
 }
@@ -175,6 +176,7 @@ try {
       if (client.account.run?.examProtocol !== 1) throw Object.assign(Error('NO_START'), {code: 'NO_START'});
       client.account.run.answers = select(exam, client.index, checkpoint === 1); client.account.run.index = checkpoint === 1 ? 99 : 199; await localSave(client);
       await retry(() => client.exam.sync(), 240000, true);
+      if(checkpoint===2)await retry(()=>client.exam.discover(),240000,true);
     });
   }
   startTeacherPoll();

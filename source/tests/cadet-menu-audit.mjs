@@ -31,6 +31,7 @@ const access=api('GET','/api/instructor/tests/'+closed.id+'/access',instructorTo
 api('POST','/api/instructor/tests/'+closed.id+'/access',instructorToken,{expectedRevision:access.test.access.revision,scope:'all',open:false});
 let state={version:1,theme:'light',session:person,accounts:{},groups:[group]},journal={},offline=false;
 const calls=[],errors=[],clicks=[],checks=[],inventories={},downloads=[];
+let compactExamReplies=0;
 const web=new URL('../web/',import.meta.url),output=new URL('../verification/',import.meta.url);
 fs.mkdirSync(output,{recursive:true});
 const clone=v=>JSON.parse(JSON.stringify(v));
@@ -48,7 +49,7 @@ const server=http.createServer(async(req,res)=>{
   if(route==='/rpc'){
    let raw='';for await(const chunk of req)raw+=chunk;const envelope=JSON.parse(raw);calls.push(clone(envelope));
    if(offline){res.end(JSON.stringify({ok:false,code:'NETWORK',error:'Тестова відсутність мережі'}));return;}
-   res.end(context.doPost({postData:{contents:raw}}).text);return;
+   const reply=context.doPost({postData:{contents:raw}}).text;if(JSON.parse(reply).document?.questionsOmitted===true)compactExamReplies++;res.end(reply);return;
   }
   const file=new URL(route==='/'?'index.html':route.slice(1),web);if(!file.pathname.startsWith(web.pathname)||!fs.existsSync(file)){res.writeHead(404);res.end();return;}
   res.setHeader('Content-Type',({'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png','.ttf':'font/ttf','.wasm':'application/wasm'})[path.extname(file.pathname)]||'application/octet-stream');res.end(fs.readFileSync(file));
@@ -186,9 +187,9 @@ try{
   const form=page.locator('#auth-form');await form.locator('[name=username]').fill(person.user.username);await form.locator('[name=password]').fill(password);await form.locator('select').selectOption({label:group.name});await form.locator('button.primary').click();
   await page.locator('.layout').waitFor();assert.equal(state.session.user.id,person.user.id);assert.equal(account().pending.length,0);await click('logout',page.locator('.sidebar'));if(await page.locator('#modal[open]').count())await page.locator('#modal button.primary').click();await page.locator('#auth-form').waitFor();await page.reload();await page.locator('#auth-form').waitFor();assert.equal(state.session,null);
  });
- assert.deepEqual(errors,[]);assert.ok(clicks.length>70);assert.equal(calls.filter(c=>c.path?.startsWith('/api/instructor/')).length,0);
+ assert.deepEqual(errors,[]);assert.ok(clicks.length>70);assert.ok(compactExamReplies>0,'The actual browser must accept a short exam save response');assert.equal(calls.filter(c=>c.path?.startsWith('/api/instructor/')).length,0);
  const visibleActions=[...new Set(Object.values(inventories).flat().map(x=>x.action).filter(Boolean))].sort(),clickedActions=[...new Set(clicks.map(x=>x.action).filter(Boolean))].sort();assert.deepEqual(visibleActions.filter(a=>!clickedActions.includes(a)),[],'Every inventoried button action must be exercised');
- const report={status:'passed',version:buildVersion.version,visibleActions,clickedActions,checksPassed:checks.length,checks,realUserClicks:clicks.length,clicks,inventories,downloadCount:downloads.length,productionRequests:0,externalRequests:0,actualCodeGs:true,syntheticAccountsOnly:true,pageErrors:errors};
+ const report={status:'passed',version:buildVersion.version,visibleActions,clickedActions,checksPassed:checks.length,checks,realUserClicks:clicks.length,clicks,inventories,compactExamReplies,downloadCount:downloads.length,productionRequests:0,externalRequests:0,actualCodeGs:true,syntheticAccountsOnly:true,pageErrors:errors};
  fs.writeFileSync(new URL('cadet-menu-audit.json',output),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,checks:checks.length,clicks:clicks.length,productionRequests:0}));
 }catch(e){
  const report={status:'failed',checksPassed:checks.length,checks,error:String(e.stack||e),pageErrors:errors,clicks,inventories,productionRequests:0};fs.writeFileSync(new URL('cadet-menu-audit.json',output),JSON.stringify(report,null,2)+'\n');if(page){await page.screenshot({path:new URL('cadet-menu-audit-failure.png',output).pathname,fullPage:true}).catch(()=>{});console.error((await page.locator('body').innerText()).slice(-3000));}throw e;

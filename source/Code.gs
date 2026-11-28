@@ -16,8 +16,8 @@ const PUBLIC_SYNC_RETRY = 'LK_PUBLIC_SYNC_RETRY_V1';
 const PUBLIC_SYNC_DELAY_MS = 30000;
 const REVIEW_LEASE_MS = 120000;
 const REVIEW_LEASE_PREFIX = 'LK_REVIEW_SESSION_V1_';
-const LATEST_APP_VERSION_CODE = 180;
-const LATEST_APP_VERSION_NAME = '1.2.56';
+const LATEST_APP_VERSION_CODE = 181;
+const LATEST_APP_VERSION_NAME = '1.2.57';
 const APP_DOWNLOAD_URL_PROPERTY = 'PC_DOWNLOAD_URL';
 const ROLE_INSTRUCTOR = 'instructor';
 const ROLE_CADET = 'cadet';
@@ -136,7 +136,7 @@ function doGet() {
     ok: true,
     service: 'Літакова Комісія',
     version: API_VERSION,
-    serverBuild: 'pc-api26-3435fce6e172153c',
+    serverBuild: 'pc-api26-d597272f2d50d73e',
     resultDeletion: true,
     deletedAttemptRetakes: true,
     singleAttempt: true,
@@ -4432,9 +4432,10 @@ function examExpand_(doc) {
   value.sourceTest=source;value.test=test;
   return doc;
 }
-function examDocument_(user) {
+function examDocument_(user,packedOnly) {
   var observed={rows:pcStateMetadata_(user)};
-  var doc=examExpand_(pcStateRead_(user,EXAM_STATE_KEY_,pcStateLatest_(pcStateHeaders_(user,observed.rows),EXAM_STATE_KEY_)));
+  var doc=pcStateRead_(user,EXAM_STATE_KEY_,pcStateLatest_(pcStateHeaders_(user,observed.rows),EXAM_STATE_KEY_));
+  if(!packedOnly)doc=examExpand_(doc);
   // The immutable result is the terminal commit. A separate rewrite of the
   // whole attempt would add another flush and row allocation to every finish.
   if(doc.value&&doc.value.status!=='completed'){
@@ -4443,7 +4444,24 @@ function examDocument_(user) {
   }
   doc.pcStateObserved=observed;return doc;
 }
-function examReply_(user,doc,completion) {
+function examCompactReply_(user,doc,sync) {
+  var v=doc.value,b=sync&&sync.body;
+  if(!b||b.examSyncProtocol!==1||!v||!v.test||v.status!=='active'||Date.now()>=v.deadline
+    ||String(b.knownTestId)!==String(v.test.id)||b.knownSubmissionId!==v.submissionId
+    ||b.knownDeviceId!==v.ownerId||!v.ownerId||b.knownFence!==v.fence
+    ||!Number.isSafeInteger(b.knownRevision)||b.knownRevision<1)return null;
+  if(sync.read){if(b.knownRevision!==doc.revision)return null;}
+  else if(b.knownRevision!==b.expectedRevision||doc.revision!==b.expectedRevision+1
+    ||v.lastRequest!==b.requestId||v.lastDevice!==b.deviceId||b.deviceId!==v.ownerId)return null;
+  var value={};Object.keys(v).forEach(function(key){if(['test','sourceTest','sourceQuestions','questionOrder','answerOrder'].indexOf(key)<0)value[key]=v[key];});
+  value.test={id:String(v.test.id)};
+  var out={examProtocol:1,examSyncProtocol:1,userId:String(user.id),serverNow:Date.now(),
+    document:{revision:doc.revision,questionsOmitted:true,unchanged:!!sync.read,value:value}};
+  presentResponse_(function(){out.document.value=copyObject_(value);});return out;
+}
+function examReply_(user,doc,completion,sync) {
+  var compact=!completion&&examCompactReply_(user,doc,sync);if(compact)return compact;
+  if(doc.value&&!Array.isArray(doc.value.test&&doc.value.test.questions))doc=examExpand_(doc);
   var visible=null;
   if(doc.value){visible={};Object.keys(doc.value).forEach(function(key){if(['sourceTest','sourceQuestions','questionOrder','answerOrder'].indexOf(key)<0)visible[key]=doc.value[key];});}
   var value=visible;
@@ -4457,8 +4475,9 @@ function examIdentifier_(value) {
   if(typeof value!=='string'||!/^[A-Za-z0-9_-]{8,100}$/.test(value))fail_('Некоректний ключ спроби.','BAD_REQUEST');
   return value;
 }
-function examWrite_(user,doc,value,request) {
-  var next=examExpand_(pcStateWrite_(user,EXAM_STATE_KEY_,{expectedRevision:doc.revision,requestId:request||Utilities.getUuid(),value:examPack_(value)},doc.pcStateObserved).document);
+function examWrite_(user,doc,value,request,packedOnly) {
+  var next=pcStateWrite_(user,EXAM_STATE_KEY_,{expectedRevision:doc.revision,requestId:request||Utilities.getUuid(),value:examPack_(value)},doc.pcStateObserved).document;
+  if(!packedOnly)next=examExpand_(next);
   next.pcStateObserved=doc.pcStateObserved;return next;
 }
 function examCheckpoint_(attempt,checkpoint) {
@@ -4492,11 +4511,12 @@ function examFinalize_(user,doc) {
 function routeExam_(method,path,body,user,choiceProtocol) {
   if(path.indexOf('/api/exam-session')!==0)return null;
   requireRole_(user,ROLE_CADET);
-  var doc=examDocument_(user),v=doc.value;
+  var compact=body.examSyncProtocol===1&&choiceProtocol===2;
+  var doc=examDocument_(user,compact&&method==='GET'),v=doc.value;
   if(v&&v.status!=='completed')requireSingleAttemptTest_(v.sourceTest||v.test);
   if(v&&v.status!=='completed')requireChoiceProtocol_(v.sourceTest||v.test,choiceProtocol);
   if(method==='GET'&&path==='/api/exam-session'){
-    var reply=examReply_(user,doc);
+    var reply=examReply_(user,doc,null,compact?{body:body,read:true}:null);
     if(!v&&deletedRetakeRequest_&&body.knownTestId&&hasDeletedAttempt_(user.id,body.knownTestId)){reply.attemptDeleted=true;reply.deletedTestId=String(body.knownTestId);}
     return reply;
   }
@@ -4538,16 +4558,16 @@ function routeExam_(method,path,body,user,choiceProtocol) {
   }
   if(!['/api/exam-session/save','/api/exam-session/finish','/api/exam-session/release'].includes(path))fail_('Дію не знайдено.','NOT_FOUND');
   var requestDigest=sha256Hex_(JSON.stringify({action:path,checkpoint:body.checkpoint}));
-  if(v.lastRequest===request&&v.lastDevice===device){if(v.lastRequestDigest!==requestDigest)fail_('Ключ запиту вже використано для інших відповідей.','REQUEST_CONFLICT');if(path==='/api/exam-session/finish')return examFinalize_(user,doc);return examReply_(user,doc);}
+  if(v.lastRequest===request&&v.lastDevice===device){if(v.lastRequestDigest!==requestDigest)fail_('Ключ запиту вже використано для інших відповідей.','REQUEST_CONFLICT');if(path==='/api/exam-session/finish')return examFinalize_(user,doc);return examReply_(user,doc,null,compact&&path==='/api/exam-session/save'?{body:body}:null);}
   if(v.ownerId!==device||body.fence!==v.fence)fail_('Іспит продовжено на іншому ПК. Тут редагування зупинено.','EXAM_TAKEN');
   if(v.status==='finishing'||Date.now()>=v.deadline)return examFinalize_(user,doc);
   if(body.expectedRevision!==doc.revision)fail_('На сервері вже є новіша версія спроби.','REVISION_CONFLICT');
   examCheckpoint_(v,body.checkpoint);v.lastRequest=request;v.lastRequestDigest=requestDigest;v.lastDevice=device;
   if(path==='/api/exam-session/release'){v.ownerId='';v.fence++;}
   if(path==='/api/exam-session/finish'){v.status='finishing';v.finishedAt=Date.now();}
-  doc=examWrite_(user,doc,v,request);
+  doc=examWrite_(user,doc,v,request,compact&&path==='/api/exam-session/save');
   if(path==='/api/exam-session/finish')return examFinalize_(user,doc);
-  return examReply_(user,doc);
+  return examReply_(user,doc,null,compact&&path==='/api/exam-session/save'?{body:body}:null);
 }
 
 // Selection is a legacy scalar for one answer, or a set of two IDs.
