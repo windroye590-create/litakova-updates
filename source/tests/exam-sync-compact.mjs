@@ -17,12 +17,12 @@ let parsing=0;const parse=context.parseQuestions_;
 context.parseQuestions_=function(...args){parsing++;return parse.apply(this,args);};
 function wire(owner,method,path,body){const raw=context.doPost({postData:{contents:JSON.stringify(C.payload(method,path,owner.token,body))}}).text;const reply=JSON.parse(raw);if(!reply.ok)throw Object.assign(Error(reply.error),{code:reply.code});return {reply,bytes:Buffer.byteLength(raw)};}
 function pc(owner=person(),initial={},device='compact-device-'+owner.user.id){
- let session={token:owner.token,user:owner.user},hook=null,legacy=false,clock=10000,saves=0,disk=clone(initial);
+ let session={token:owner.token,user:owner.user},hook=null,legacy=false,failDisk=false,clock=10000,saves=0,disk=clone(initial);
  const a={run:null,...clone(initial)},calls=[],completions=[];
  const controller=createExamSession({session:()=>session,account:()=>a,deviceId:()=>device,now:()=>clock,
-  persist:async()=>{saves++;disk=clone(a);},completed:async value=>completions.push(clone(value)),pause:async()=>{},
-  rpc:async(method,path,body)=>{const sent=clone(body);if(legacy)delete sent.examSyncProtocol;const before=parsing,result=wire(owner,method,path,sent),call={method,path,body:clone(body),reply:clone(result.reply),bytes:result.bytes,questionParses:parsing-before};calls.push(call);return hook?hook(call):clone(result.reply);}});
- return {owner,a,device,controller,calls,completions,saves:()=>saves,disk:()=>disk,hook:value=>hook=value,legacy:()=>legacy=true,advance:ms=>{clock+=ms;serverTime+=ms;},switch:()=>session={token:'other-session',user:{id:'other-owner',role:'cadet'}}};
+  persist:async()=>{saves++;if(failDisk)throw Error('Synthetic local storage failure');disk=clone(a);},completed:async value=>completions.push(clone(value)),pause:async()=>{},
+  rpc:async(method,path,body)=>{const durableRequestId=disk.examRequest?.requestId,sent=clone(body);if(legacy)delete sent.examSyncProtocol;const before=parsing,result=wire(owner,method,path,sent),call={method,path,body:clone(body),reply:clone(result.reply),bytes:result.bytes,questionParses:parsing-before,durableRequestId};calls.push(call);return hook?hook(call):clone(result.reply);}});
+ return {owner,a,device,controller,calls,completions,saves:()=>saves,disk:()=>disk,failDisk:value=>failDisk=value,hook:value=>hook=value,legacy:()=>legacy=true,advance:ms=>{clock+=ms;serverTime+=ms;},switch:()=>session={token:'other-session',user:{id:'other-owner',role:'cadet'}}};
 }
 function answerAll(p,test){const byId=new Map(test.questions.map(q=>[String(q.id),q]));p.a.run.answers=Object.fromEntries(p.a.run.test.questions.map(q=>{const original=byId.get(String(q.id));return [String(q.id),q.type==='written'?'Точний текст\nписьмової відповіді':C.choiceValue(q,original.answers.filter(a=>a.isCorrect).map(a=>String(a.id)))];}));p.a.run.index=test.questions.length-1;}
 const small=makeTest(50),large=makeTest(200);
@@ -43,6 +43,12 @@ for(const test of [small,large]){
  }
 }
 if(!benchmark){
+ await check('An unchanged short read cannot hide an unacknowledged initial full snapshot',async()=>{
+  const p=pc();p.failDisk(true);await assert.rejects(()=>p.controller.start(small.id),e=>e.localSave===true);assert.equal(p.disk().run,undefined);await assert.rejects(()=>p.controller.discover(),e=>e.localSave===true);assert.equal(p.disk().run,undefined);p.failDisk(false);const before=p.saves();await p.controller.discover();assert.equal(p.calls.at(-1).reply.document.questionsOmitted,true);assert.equal(p.saves(),before+1);assert.equal(p.disk().run.test.questions.length,50);await p.controller.discover();assert.equal(p.saves(),before+1);
+ });
+ await check('A failed local request-ID save is retried before any compact cloud write',async()=>{
+  const p=pc();await p.controller.start(small.id);answerAll(p,small);p.failDisk(true);await assert.rejects(()=>p.controller.sync(),e=>e.localSave===true);const pending=clone(p.a.examRequest);await assert.rejects(()=>p.controller.sync(),e=>e.localSave===true);assert.equal(p.calls.filter(c=>c.path.endsWith('/save')).length,0);p.failDisk(false);await p.controller.sync();const sent=p.calls.filter(c=>c.path.endsWith('/save'));assert.equal(sent.length,1);assert.equal(sent[0].durableRequestId,pending.requestId);assert.equal(sent[0].body.requestId,pending.requestId);assert.equal(p.a.run.revision,2);
+ });
  await check('New clients retain full-response compatibility when the server ignores the optional protocol',async()=>{
   const p=pc();p.legacy();await p.controller.start(small.id);answerAll(p,small);const expected=clone(p.a.run.answers);await p.controller.sync();assert.equal(p.calls.at(-1).reply.document.questionsOmitted,undefined);assert.deepEqual(p.a.run.answers,expected);await p.controller.discover();assert.equal(p.calls.at(-1).reply.document.questionsOmitted,undefined);await p.controller.finish();assert.equal(p.completions[0].result.correct,50);
  });

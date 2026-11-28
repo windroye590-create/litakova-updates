@@ -6,9 +6,10 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
  let flight=Promise.resolve(),busy=false,error='',anchor=null,readyToken='',generation=0;
  let backgroundFlight=null,nextSyncAt=0,failures=0,retryState=null;
  let finishFlight=null,finishSaves=new WeakMap();
+ let localSaves=0,localSaved=0;
  const requestTimes=new WeakMap();
  const current=s=>s&&session()?.token===s.token&&String(session()?.user.id)===String(s.user.id);
- async function persistLocal(){try{return await persist();}catch(x){x.localSave=true;throw x;}}
+ async function persistLocal(){const n=++localSaves,epoch=generation;try{const value=await persist();if(epoch===generation)localSaved=Math.max(localSaved,n);return value;}catch(x){x.localSave=true;throw x;}}
  function saveFinishIntent(r){
   const pending=account().examRequest;
   const previous=pending?.action==='finish'&&pending.submissionId===r.submissionId&&pending.fence===r.fence?pending:null;
@@ -98,7 +99,7 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
    }
    a.run={...copy(v),examProtocol:1,userId:String(s.user.id),revision:reply.document.revision,acknowledged:encode(checkpoint(v)),locked:!mine,lastElapsed:Math.max(0,(anchor.server-v.startedAt)/1000)};
   }else{old.revision=reply.document.revision;old.fence=v.fence;}
-  if(!(reply.document.questionsOmitted===true&&reply.document.unchanged===true&&same&&mine&&!replace))await persistLocal();return true;
+  if(!(reply.document.questionsOmitted===true&&reply.document.unchanged===true&&same&&mine&&!replace&&localSaved===localSaves))await persistLocal();return true;
  }
  async function request(path,body,s){
   const view=compactView(path,body,s);
@@ -171,6 +172,7 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   let pending=a.examRequest;
   if(pending&&(pending.submissionId!==r.submissionId||pending.fence!==r.fence)){delete a.examRequest;pending=null;}
   if(!pending){pending={action,submissionId:r.submissionId,deviceId:deviceId(),fence:r.fence,expectedRevision:r.revision,requestId:action==='finish'?r.finishRequestId:uuid(),checkpoint:value};a.examRequest=pending;await persistLocal();}
+  else if(localSaved!==localSaves)await persistLocal();
   const reply=await request('/api/exam-session/'+pending.action,{...pending,testId:String(r.test.id)},s);
   if(!current(s))return false;
   if(reply.completion){delete a.examRequest;return accept(reply,s,a);}
@@ -217,6 +219,6 @@ export function createExamSession({session,account,deviceId,rpc,persist,now,chan
   if(r?.examProtocol===1){r.releaseRequested=true;changed();}
   return serial(()=>writeWork('release')).catch(x=>{if(current(s)&&account().run===r&&account().examRequest?.action!=='release'){delete r.releaseRequested;changed();}throw x;});
  }
- function reset(){generation++;flight=Promise.resolve();busy=false;readyToken='';anchor=null;error='';backgroundFlight=null;nextSyncAt=0;failures=0;retryState=null;finishFlight=null;finishSaves=new WeakMap();}
+ function reset(){generation++;flight=Promise.resolve();busy=false;readyToken='';anchor=null;error='';backgroundFlight=null;nextSyncAt=0;failures=0;retryState=null;finishFlight=null;finishSaves=new WeakMap();localSaves=0;localSaved=0;}
  return {status,owned,editable,elapsed,expired,start,claim,discover,sync,background,finish,release,reset};
 }
