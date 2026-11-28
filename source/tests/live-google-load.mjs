@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {randomUUID, webcrypto} from 'node:crypto';
 import * as C from '../web/core.js';
 import {createExamSession} from '../web/exam-session.js';
+import {googleRelayFailure} from './fixtures/google-relay.mjs';
 globalThis.crypto ??= webcrypto;
 const options = Object.fromEntries(process.argv.slice(2).reduce((out, value, index, all) => {if (value.startsWith('--')) out.push([value.slice(2), all[index + 1]]); return out;}, []));
 const statePath = path.resolve(options.state || ''), out = path.resolve(options['report-dir'] || '');
@@ -52,7 +53,8 @@ async function transport(envelope) {
     }
     if (!response.ok) reply = {...reply, ok: false, code: 'HTTP_' + response.status};
     if (/too many|quota|limit exceeded/i.test(String(reply.error || ''))) category ||= 'GOOGLE_QUOTA_OR_CONCURRENCY';
-    return {reply, status: response.status, category, encoding: response.headers.get('content-encoding') || 'identity',responseBytes:Buffer.byteLength(raw)};
+    const clientReply=!response.ok||!raw.replace(/^[ \r\n]+/,'').startsWith('{')?googleRelayFailure(response.status):reply;
+    return {reply,clientReply, status: response.status, category, encoding: response.headers.get('content-encoding') || 'identity',responseBytes:Buffer.byteLength(raw)};
   }
   throw Error('Sandbox redirect limit exceeded');
 }
@@ -65,13 +67,14 @@ async function once(method, endpoint, body = {}, token = '', client = -1, label 
   const reply = wire.reply, metrics = reply.loadTestMetrics || {};
   await trackCacheKeys(metrics);
   const record = {phase: label, client, method, path: endpoint, status: wire.status, code: reply.ok ? 'OK' : reply.code || 'API_ERROR', category: wire.category,
+    clientCode:wire.clientReply?.code??(reply.ok?'OK':reply.code||'API_ERROR'),
     milliseconds: Math.round(performance.now() - started), serverMilliseconds: metrics.elapsedMs ?? null, lockWaitMilliseconds: metrics.lockWaitMs ?? null,
     lockHeldMilliseconds: metrics.lockHeldMs ?? null, stages: metrics.stages || {}, sessionFailure: metrics.sessionFailure || null, signingKeyFingerprint:metrics.signingKeyFingerprint||null,encoding: wire.encoding,
     ...(endpoint==='/api/challenge'&&reply.ok?{challengeSaltLength:typeof reply.salt==='string'?reply.salt.length:null,challengeSaltBase64:typeof reply.salt==='string'&&/^[A-Za-z0-9+/]+={0,2}$/.test(reply.salt)}:{}),
     ...(endpoint.startsWith('/api/exam-session')&&reply.ok?{examProtocol:reply.examProtocol??null,hasExamDocument:!!reply.document,sandboxHealth:reply.loadTestSandbox===true,
       responseBytes:wire.responseBytes??null,examSyncProtocol:reply.examSyncProtocol??null,questionsOmitted:reply.document?.questionsOmitted===true,unchanged:reply.document?.unchanged===true}: {})};
   calls.push(record); await fs.appendFile(path.join(out, 'requests.jsonl'), JSON.stringify(record) + '\n');
-  return reply;
+  return wire.clientReply||reply;
 }
 async function rpc(method, endpoint, body = {}, token = '', client = -1) {
   const critical = method === 'POST' && (endpoint === '/api/results' || /^\/api\/tests\/[^/]+\/start$/.test(endpoint) || /^\/api\/exam-session\/(start|claim|finish|release)$/.test(endpoint));

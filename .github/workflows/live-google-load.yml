@@ -45,6 +45,7 @@ jobs:
           node source/tests/retry-categories.mjs
           node source/tests/exam-response-retry.mjs
           node source/tests/api-response-retry.mjs
+          python3 source/tests/native_http.py
           node --check source/tests/live-google-load.mjs
       - name: Create isolated books and temporary test deployment, restore original HEAD
         env:
