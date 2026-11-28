@@ -1,0 +1,175 @@
+{
+  "publication": {
+    "status": "passed",
+    "version": "1.2.57",
+    "code": 181,
+    "api": 26,
+    "implementationCommit": "e2bff09916d0c8735afe15a433937401b022b1f1",
+    "releaseSourceCommit": "c150f9de87ce9b6702f9d857789201f7feae41f0",
+    "releaseUrl": "https://github.com/windroye590-create/litakova-updates/releases/tag/v1.2.57",
+    "sha256": "2c7cf070b19f558899c912f447769de1ec7aa4491c64022e150f9bfae9e8c065",
+    "executableBytes": 3223196,
+    "releaseWorkflowRun": 46140547950,
+    "automationVerificationRun": 46138515948,
+    "nativeWindowsWorkflowRun": 46140951148,
+    "latestStableReleaseVerified": true,
+    "allFourPublicFilesMatchChannel": true,
+    "publicCatalogSignatureVerified": true,
+    "packedAssets": 27,
+    "actualWindowsHostVerified": true,
+    "nativeWindowsChecks": 16,
+    "actualWinHTTPCompressionChecks": 5,
+    "cadetMenuScenarios": 29,
+    "cadetMenuRealClicks": 108,
+    "cadetMenuProductionRequests": 0,
+    "serverWillChange": true,
+    "serverSemanticSHA256": "d597272f2d50d73e624f1cc5f999a7f5cd854f7d325bdbeb3163ec3954b615d9",
+    "serverBuild": "pc-api26-d597272f2d50d73e",
+    "liveGoogleLoadMeasuredForThisRelease": true,
+    "liveGoogleWorkflowRun": 46138523440,
+    "liveDriverNativeRelayParityVectors": 14,
+    "compactExamChecks": 24,
+    "serverLatencyImprovementConsistentlyConfirmed": false,
+    "originalFailedLiveGoogleWorkflowRun": 46136592457,
+    "fpvChanged": false,
+    "verifiedAt": "2026-11-28T11:41:13.956759+00:00",
+    "artifactDigests": {
+      "automation-verification": "5a0ca9226fb64e102f8ab74b3e1e5a02ff9e21c665ea02185db4f75dbdb2a986",
+      "live-google-load": "7f289151c1e163206fab7de2e8c9ca93a0ad8c2be25aecc51c0e4297292eea77",
+      "release-verification": "cf5764462446b7bc6591c21b53aa310396819aae9a25f8921347a6c63119f277",
+      "windows-native-storage-audit": "1e71ef10326b8e437c2806672c09f6a1aac60d24919ccafd4174dfa93d3bcf8a"
+    },
+    "shortExamSaveAcknowledgements": 54,
+    "shortExamUnchangedReads": 27
+  },
+  "acceptedLiveGoogleControl": {
+    "status": "passed",
+    "seconds": 1388,
+    "findings": {
+      "busyResponses": 1035,
+      "googleQuotaResponses": 0,
+      "timeouts": 0,
+      "signingKeyFingerprints": 1,
+      "phaseFailures": 0
+    },
+    "results": {
+      "target": 54,
+      "acknowledged": 54,
+      "authoritative": 54,
+      "publicRows": 54,
+      "answersVerifiedForAcknowledgedResults": true,
+      "pendingOnClients": 0
+    },
+    "shortSaves": 54,
+    "shortReads": 27,
+    "cleanup": {
+      "status": "passed",
+      "productionDeploymentPreserved": true,
+      "headRestored": true,
+      "booksTrashed": [
+        "private",
+        "public"
+      ],
+      "testDeploymentDeleted": true,
+      "namespacePurged": true,
+      "removedProperties": 46,
+      "removedCacheKeys": 115
+    },
+    "phases": [
+      {
+        "name": "login",
+        "succeeded": 27,
+        "medianSeconds": 12.567,
+        "maxSeconds": 23.028
+      },
+      {
+        "name": "workspace",
+        "succeeded": 27,
+        "medianSeconds": 4.377,
+        "maxSeconds": 8.756
+      },
+      {
+        "name": "training-start-50",
+        "succeeded": 27,
+        "medianSeconds": 32.483,
+        "maxSeconds": 65.845
+      },
+      {
+        "name": "training-checkpoint-1",
+        "succeeded": 27,
+        "medianSeconds": 39.852,
+        "maxSeconds": 98.522
+      },
+      {
+        "name": "training-checkpoint-2",
+        "succeeded": 27,
+        "medianSeconds": 39.465,
+        "maxSeconds": 89.839
+      },
+      {
+        "name": "training-finish-50",
+        "succeeded": 27,
+        "medianSeconds": 44.142,
+        "maxSeconds": 84.653
+      },
+      {
+        "name": "workspace-after-training",
+        "succeeded": 27,
+        "medianSeconds": 4.588,
+        "maxSeconds": 9.893
+      },
+      {
+        "name": "exam-start-200",
+        "succeeded": 27,
+        "medianSeconds": 43.33,
+        "maxSeconds": 82.309
+      },
+      {
+        "name": "exam-checkpoint-1",
+        "succeeded": 27,
+        "medianSeconds": 48.418,
+        "maxSeconds": 103.24
+      },
+      {
+        "name": "exam-checkpoint-2",
+        "succeeded": 27,
+        "medianSeconds": 51.646,
+        "maxSeconds": 104.348
+      },
+      {
+        "name": "exam-finish-200",
+        "succeeded": 27,
+        "medianSeconds": 55.641,
+        "maxSeconds": 117.869
+      }
+    ],
+    "shortBytes": {
+      "exam-checkpoint-1": {
+        "min": 3527,
+        "max": 3532
+      },
+      "exam-checkpoint-2": {
+        "min": 6170,
+        "max": 6178
+      },
+      "exam-read": {
+        "min": 6043,
+        "max": 6048
+      }
+    }
+  },
+  "initialLiveGoogleControl": {
+    "run": 46136592457,
+    "status": "failed",
+    "acknowledged": 53,
+    "target": 54,
+    "pendingOnClients": 1,
+    "failure": "Google HTML HTTP 404 was incorrectly exposed as permanent HTTP_404 by the Node load driver; the shipped native relay exposes NETWORK. Driver aligned and checked by executing actual native relay for 14 HTTP failure vectors.",
+    "artifactSHA256": "08d5db91a0b9be4d24bbfff5ed728087f42693b294edeffbd402de4ee0892d7b"
+  },
+  "unchangedProductionFilesAfterLocalAckGuard": [
+    "source/Code.gs",
+    "source/web/exam-session.js"
+  ],
+  "latencyNote": "Less JSON and fewer question parses are verified; consistent end-to-end Google latency or BUSY improvement is not confirmed. Checkpoint 2 includes an additional unchanged read in the new live scenario."
+}

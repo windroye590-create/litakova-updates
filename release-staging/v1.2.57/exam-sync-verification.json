@@ -1,0 +1,89 @@
+{
+  "model": {
+    "status": "passed",
+    "passed": 24,
+    "checks": [
+      "50 questions: unchanged read omits question text and does not rewrite the profile",
+      "50 questions: short save acknowledges exact choices and written text after the durable write",
+      "50 questions: clients without the optional protocol still receive the full frozen test",
+      "200 questions: unchanged read omits question text and does not rewrite the profile",
+      "200 questions: short save acknowledges exact choices and written text after the durable write",
+      "200 questions: clients without the optional protocol still receive the full frozen test",
+      "An unchanged short read cannot hide an unacknowledged initial full snapshot",
+      "A failed local request-ID save is retried before any compact cloud write",
+      "New clients retain full-response compatibility when the server ignores the optional protocol",
+      "Incomplete compact state cannot acknowledge a save without a complete fallback",
+      "Wrong revision, device, fence or attempt identity fall back to a complete response",
+      "A foreign attempt hint can only return the authenticated cadet own attempt",
+      "The optional short protocol cannot bypass the multiple-choice compatibility requirement",
+      "A malformed short read is retried once with a full response and the local answers survive",
+      "A malformed short save replays the same request ID and checkpoint without a second commit",
+      "An unsolicited short reply after full fallback is rejected without clearing unsent work",
+      "Lost save acknowledgement keeps one request and reuses the committed revision after reconnect",
+      "Typing during a slow short save is retained and the newer answers are acknowledged next",
+      "Handoff and claim use full responses; the former owner is fenced and keeps its unsent backup",
+      "Finishing elsewhere returns the complete authoritative result instead of a short active response",
+      "Finishing and account replacement never reuse an old cached question set",
+      "Revoked access is checked afresh before any short response is returned",
+      "Account changes during short-read fallback cannot trigger another request for the previous account",
+      "Clock updates stay monotonic, and an expired attempt gets a full state"
+    ],
+    "measurements": {
+      "questions50": {
+        "readBytes": 456,
+        "fullReadBytes": 54707,
+        "saveBytes": 1800,
+        "fullBytes": 56050,
+        "readQuestionParses": 0,
+        "saveQuestionParses": 1,
+        "readProfileWrites": 0,
+        "unchangedProfileWrites": 0
+      },
+      "questions200": {
+        "readBytes": 456,
+        "fullReadBytes": 202569,
+        "saveBytes": 6644,
+        "fullBytes": 208756,
+        "readQuestionParses": 0,
+        "saveQuestionParses": 1,
+        "readProfileWrites": 0,
+        "unchangedProfileWrites": 0
+      }
+    },
+    "benchmarkOnly": false,
+    "productionRequests": 0,
+    "liveGoogleTimingMeasured": false,
+    "serverSHA256": "61fb5bb4b90196e1459da783725de5ebc5b28c2dae829437464fe7ca52303efa",
+    "controllerSHA256": "368270dd3a49125270e3abaae457e482176ffc117ac62c24059d85ff5cda30ac"
+  },
+  "liveResults": {
+    "target": 54,
+    "acknowledged": 54,
+    "authoritative": 54,
+    "publicRows": 54,
+    "answersVerifiedForAcknowledgedResults": true,
+    "pendingOnClients": 0
+  },
+  "liveFindings": {
+    "busyResponses": 1035,
+    "googleQuotaResponses": 0,
+    "timeouts": 0,
+    "signingKeyFingerprints": 1,
+    "phaseFailures": 0
+  },
+  "liveCleanup": {
+    "status": "passed",
+    "productionDeploymentPreserved": true,
+    "headRestored": true,
+    "booksTrashed": [
+      "private",
+      "public"
+    ],
+    "testDeploymentDeleted": true,
+    "namespacePurged": true,
+    "removedProperties": 46,
+    "removedCacheKeys": 115
+  },
+  "liveShortSaves": 54,
+  "liveShortReads": 27
+}
